@@ -13,8 +13,11 @@
     "resolveJsonModule": true,
     "jsx": "react-jsx",
     "paths": {
-      "*": ["node_modules/*"]
-    }
+      "components/*": ["src/components/*"],
+      "pages/*": ["src/pages/*"],
+      "utils/*": ["src/utils/*"]
+    },
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*"]
 }

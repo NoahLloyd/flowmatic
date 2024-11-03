@@ -8,12 +8,26 @@ type LayoutProps = {
 };
 
 const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
+  const name = JSON.parse(localStorage.getItem("name"));
+  const fromColor = JSON.parse(localStorage.getItem("fromColor")) || "#E8CBC0";
+  const toColor = JSON.parse(localStorage.getItem("toColor")) || "#636FA4";
+
+  console.log("fromColor:", fromColor); // Debugging line
+  console.log("toColor:", toColor); // Debugging line
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-[#E8CBC0] to-[#636FA4] p-4 ">
+    <div
+      style={{
+        background: `linear-gradient(to bottom right, ${fromColor}, ${toColor})`,
+      }}
+      className="flex h-screen p-4"
+    >
       {/* Sidebar with title */}
-      <Sidebar title="Noah Lloyd" selected={selected} onSelect={setSelected} />
+      <Sidebar title={name} selected={selected} onSelect={setSelected} />
       {/* Main content area */}
-      <div className="flex-1 bg-white rounded-xl p-6 shadow-lg">{children}</div>
+      <div className="flex-1 bg-white rounded-xl overflow-scroll p-6 shadow-lg">
+        {children}
+      </div>
     </div>
   );
 };

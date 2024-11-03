@@ -426,6 +426,11 @@
     tar "^6.0.5"
     yargs "^17.0.1"
 
+"@electron/remote@^2.1.2":
+  version "2.1.2"
+  resolved "https://registry.npmjs.org/@electron/remote/-/remote-2.1.2.tgz"
+  integrity sha512-EPwNx+nhdrTBxyCqXt/pftoQg/ybtWDW3DUWHafejvnB1ZGGfMpv6e15D8KeempocjXe78T7WreyGGb3mlZxdA==
+
 "@electron/universal@^2.0.1":
   version "2.0.1"
   resolved "https://registry.npmjs.org/@electron/universal/-/universal-2.0.1.tgz"
@@ -715,6 +720,13 @@
   integrity sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==
   dependencies:
     "@types/node" "*"
+
+"@types/electron@^1.6.12":
+  version "1.6.12"
+  resolved "https://registry.npmjs.org/@types/electron/-/electron-1.6.12.tgz"
+  integrity sha512-NIJokDkGv9h+MStCL1IuiL1FOHYVkszoWeNxJtSI5dcEKRGbX83JcVYNAgk019qOQgJkHtz9WdP0CDXvrArrGg==
+  dependencies:
+    electron "*"
 
 "@types/estree@^1.0.5":
   version "1.0.6"
@@ -2401,10 +2413,10 @@ electron-winstaller@^5.3.0:
   optionalDependencies:
     "@electron/windows-sign" "^1.1.2"
 
-electron@33.0.1:
-  version "33.0.1"
-  resolved "https://registry.npmjs.org/electron/-/electron-33.0.1.tgz"
-  integrity sha512-PipPnWH4gvf7o+P8jlKQZGgPfb5eHcLgTrnKkFzb98MXhyPjVJYCR7YWqcawZ8IfyJCut8vMxLuBFLT1Ag8TSQ==
+electron@*, electron@^33.0.2, "electron@>= 13.0.0":
+  version "33.0.2"
+  resolved "https://registry.npmjs.org/electron/-/electron-33.0.2.tgz"
+  integrity sha512-C2WksfP0COsMHbYXSJG68j6S3TjuGDrw/YT42B526yXalIlNQZ2GeAYKryg6AEMkIp3p8TUfDRD0+HyiyCt/nw==
   dependencies:
     "@electron/get" "^2.0.0"
     "@types/node" "^20.9.0"

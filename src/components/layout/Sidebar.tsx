@@ -26,7 +26,10 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
 
   return (
     <div className="w-64 flex flex-col pr-4 space-y-4">
-      <div className="p-4 shadow bg-white bg-opacity-10 rounded-xl mb-4 flex items-center justify-between">
+      <div
+        onClick={() => onSelect("Settings")}
+        className="p-4 shadow cursor-pointer bg-white bg-opacity-10 rounded-xl mb-4 flex items-center justify-between"
+      >
         <h1 className="text-lg font-medium text-slate-700">{title}</h1>
         <ChevronsUpDown className="w-5 h-5 text-slate-700" />
       </div>
