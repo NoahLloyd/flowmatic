@@ -3,6 +3,7 @@ import SidebarItem from "./SidebarItem";
 import {
   Home,
   Settings,
+  Pencil,
   Check,
   Clock,
   BarChart2,
@@ -20,6 +21,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
     { label: "Home", icon: Home },
     { label: "Focus", icon: Clock },
     { label: "Tasks", icon: Check },
+    { label: "Writing", icon: Pencil },
     { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];

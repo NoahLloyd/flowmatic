@@ -5,6 +5,7 @@ import Focus from "../pages/focus/Focus";
 import Tasks from "../pages/tasks/Tasks";
 import Insights from "../pages/insights/insights";
 import Settings from "../pages/settings/Settings";
+import Writing from "../pages/writing/Writing";
 import { useTimer } from "../hooks/useTimer";
 import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
@@ -79,6 +80,9 @@ const PageContent = () => {
           onChangeTaskType={handleChangeTaskType}
         />
       );
+      break;
+    case "Writing":
+      content = <Writing />;
       break;
     case "Insights":
       content = (

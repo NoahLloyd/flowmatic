@@ -56,7 +56,9 @@ const Focus: React.FC<FocusProps> = ({
       )}
       Start a task, list all tasks that are for day and when one is clicked
       start a 1 hour timer where that task will automatically be connected to
-      this timing session <br></br>Soundscape/lo-fi radio
+      this timing session <br></br>Soundscape/lo-fi radio<br></br>Daliy progress
+      stars in menu bar?<br></br>Menu bar options should be all 5 ratings and
+      starting the timer again so it starts counting
     </div>
   );
 };

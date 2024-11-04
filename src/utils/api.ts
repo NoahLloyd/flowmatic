@@ -1,12 +1,5 @@
-interface Session {
-  user_id: string;
-  notes: string;
-  task: string;
-  project: string;
-  minutes: number;
-  focus: number;
-  created_at?: string;
-}
+import { Session } from "src/types/Session";
+import { WritingEntries } from "src/types/Writing";
 
 export const api = {
   submitSession: (data: Session) =>
@@ -14,4 +7,27 @@ export const api = {
 
   getUserSessions: (userId: string) =>
     window.electron.apiRequest("GET", `/session/user/${userId}`),
+
+  getAllEntries: async (): Promise<WritingEntries> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest("GET", "/writing/entries", {
+      user_id: userId,
+    });
+  },
+
+  getEntry: async (date: string): Promise<{ content: string }> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest(
+      "GET",
+      `/writing/entry/${userId}/${date}`
+    );
+  },
+
+  updateEntry: async (date: string, content: string): Promise<void> => {
+    const userId = localStorage.getItem("name");
+    await window.electron.apiRequest("POST", `/writing/entry/${date}`, {
+      content,
+      user_id: userId,
+    });
+  },
 };
