@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain, Tray, nativeImage, Menu } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Tray,
+  nativeImage,
+  Menu,
+  globalShortcut,
+} from "electron";
+import axios from "axios";
 import path from "path";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -6,7 +15,6 @@ declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     height: 600,
@@ -17,20 +25,73 @@ const createWindow = (): void => {
     },
   });
 
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
-
-  mainWindow.on("closed", () => {
-    mainWindow = null;
+  // Register global shortcut
+  globalShortcut.register("Alt+Space", () => {
+    if (mainWindow) {
+      mainWindow.webContents.send("toggle-timer");
+    }
   });
 
+  // Clean up shortcuts when window is closed
+  mainWindow.on("closed", () => {
+    globalShortcut.unregisterAll();
+  });
+
+  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+
   try {
-    // For development, use a direct path to the icon
-    const iconPath = path.join(__dirname, "../src/logo-black.png");
+    // Get the absolute path to the icon
+    const iconPath = path.join(__dirname, "assets", "logo-black-Template.png");
 
-    tray = new Tray(nativeImage.createFromPath(iconPath));
-    tray.setToolTip("Flow Timer");
+    console.log("Attempting to load icon from:", iconPath);
 
-    // Add click handler
+    // Create a test image to verify it loads
+    const icon = nativeImage.createFromPath(iconPath);
+    const resizedIcon = icon.resize({
+      width: 16,
+      height: 16,
+      quality: "best",
+    });
+    resizedIcon.setTemplateImage(true);
+
+    console.log("Icon created successfully:", !icon.isEmpty());
+
+    // Create the tray
+    tray = new Tray(resizedIcon);
+
+    console.log("Tray created successfully");
+
+    tray.setToolTip("Flow");
+
+    // Create context menu
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Restart timer",
+        click: () => {
+          if (mainWindow) {
+            mainWindow.webContents.send("toggle-timer");
+          }
+        },
+      },
+      {
+        label: "Show App",
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+          }
+        },
+      },
+      {
+        label: "Quit",
+        click: () => {
+          app.quit();
+        },
+      },
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    // Add click handler for the tray icon
     tray.on("click", () => {
       if (mainWindow) {
         mainWindow.show();
@@ -38,37 +99,33 @@ const createWindow = (): void => {
     });
   } catch (error) {
     console.error("Failed to create tray:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
   }
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: "Show App",
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-        }
-      },
-    },
-    {
-      label: "Quit",
-      click: () => {
-        app.quit();
-      },
-    },
-  ]);
-
-  tray.setContextMenu(contextMenu);
-
-  tray.on("click", () => {
-    if (mainWindow) {
-      mainWindow.show();
-    }
-  });
 };
 
-ipcMain.on("update-tray-tooltip", (_event, tooltip: string) => {
+const API_BASE_URL = "http://127.0.0.1:8000";
+
+ipcMain.handle("api-request", async (_event, { method, endpoint, data }) => {
+  try {
+    const response = await axios({
+      method,
+      url: `${API_BASE_URL}${endpoint}`,
+      data: method !== "GET" ? data : undefined,
+      params: method === "GET" ? data : undefined,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error making ${method} request to ${endpoint}:`, error);
+    throw error;
+  }
+});
+
+ipcMain.on("update-tray", (_event, text: string) => {
   if (tray) {
-    tray.setToolTip(tooltip);
+    tray.setTitle(text);
   }
 });
 

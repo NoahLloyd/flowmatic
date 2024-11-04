@@ -7,5 +7,6 @@ interface Window {
   electron: {
     send: (channel: string, data?: any) => void;
     on: (channel: string, func: (...args: any[]) => void) => void;
+    apiRequest: (method: string, endpoint: string, data?: any) => Promise<any>;
   };
 }

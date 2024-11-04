@@ -18,9 +18,9 @@ type SidebarProps = {
 const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
   const icons = [
     { label: "Home", icon: Home },
-    { label: "Timer", icon: Clock },
+    { label: "Focus", icon: Clock },
     { label: "Tasks", icon: Check },
-    { label: "Stats", icon: BarChart2 },
+    { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];
 
@@ -30,7 +30,14 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
         onClick={() => onSelect("Settings")}
         className="p-4 shadow cursor-pointer bg-white bg-opacity-10 rounded-xl mb-4 flex items-center justify-between"
       >
-        <h1 className="text-lg font-medium text-slate-700">{title}</h1>
+        <div className="flex justift-center items-center">
+          <img
+            src="/assets/logo-black-Template.png"
+            alt="Logo"
+            className="w-6 h-6 mr-2"
+          />
+          <h1 className="text-lg font-medium text-slate-700">{title}</h1>
+        </div>
         <ChevronsUpDown className="w-5 h-5 text-slate-700" />
       </div>
       {icons.map((icon) => (
