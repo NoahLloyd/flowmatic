@@ -23,6 +23,7 @@ const PageContent = () => {
   } = useTimer();
   const {
     tasks,
+    isLoading: isLoadingTasks,
     handleAddTask,
     handleToggleComplete,
     handleDeleteTask,
@@ -74,6 +75,7 @@ const PageContent = () => {
       content = (
         <Tasks
           tasks={tasks}
+          isLoading={isLoadingTasks}
           onAddTask={handleAddTask}
           onToggleComplete={handleToggleComplete}
           onDelete={handleDeleteTask}

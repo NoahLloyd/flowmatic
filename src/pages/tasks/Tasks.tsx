@@ -7,6 +7,7 @@ import CompletedTasks from "./CompletedTasks";
 
 interface TasksProps {
   tasks: Task[];
+  isLoading: boolean;
   onAddTask: (title: string, type: TaskType) => void;
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
@@ -15,6 +16,7 @@ interface TasksProps {
 
 const Tasks: React.FC<TasksProps> = ({
   tasks,
+  isLoading,
   onAddTask,
   onToggleComplete,
   onDelete,
@@ -31,6 +33,10 @@ const Tasks: React.FC<TasksProps> = ({
       (a, b) =>
         (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0)
     );
+
+  if (isLoading) {
+    return <div className="w-full text-center">Loading tasks...</div>;
+  }
 
   return (
     <div className="w-full">

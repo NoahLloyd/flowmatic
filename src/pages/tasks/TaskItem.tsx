@@ -17,7 +17,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
   const types: TaskType[] = ["day", "week", "future"];
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg shadow-sm hover:shadow-md transition-shadow">
       <input
         type="checkbox"
         checked={task.completed}

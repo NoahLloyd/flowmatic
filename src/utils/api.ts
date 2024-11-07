@@ -1,5 +1,6 @@
 import { Session } from "src/types/Session";
 import { WritingEntries } from "src/types/Writing";
+import { Task } from "src/types/Task";
 
 export const api = {
   submitSession: (data: Session) =>
@@ -27,6 +28,35 @@ export const api = {
     const userId = localStorage.getItem("name");
     await window.electron.apiRequest("POST", `/writing/entry/${date}`, {
       content,
+      user_id: userId,
+    });
+  },
+  getUserTasks: async (): Promise<Task[]> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest("GET", "/tasks/user", {
+      user_id: userId,
+    });
+  },
+
+  createTask: async (taskData: Omit<Task, "id">): Promise<Task> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest("POST", "/tasks/new", {
+      ...taskData,
+      user_id: userId,
+    });
+  },
+
+  updateTask: async (taskId: string, updates: Partial<Task>): Promise<Task> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest("PUT", `/tasks/${taskId}`, {
+      ...updates,
+      user_id: userId,
+    });
+  },
+
+  deleteTask: async (taskId: string): Promise<void> => {
+    const userId = localStorage.getItem("name");
+    return await window.electron.apiRequest("DELETE", `/tasks/${taskId}`, {
       user_id: userId,
     });
   },

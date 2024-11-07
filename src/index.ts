@@ -106,7 +106,10 @@ const createWindow = (): void => {
   }
 };
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000" // local development server
+    : "https://flow-backend-9kgo.onrender.com"; // production server
 
 ipcMain.handle("api-request", async (_event, { method, endpoint, data }) => {
   try {
