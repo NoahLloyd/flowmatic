@@ -60,4 +60,22 @@ export const api = {
       user_id: userId,
     });
   },
+  updateSession: async (
+    sessionId: string,
+    data: Partial<Session>
+  ): Promise<Session> => {
+    return await window.electron.apiRequest(
+      "PUT",
+      `/session/update/${sessionId}`, // Changed from /session/update/${sessionId}
+      data
+    );
+  },
+
+  deleteSession: async (sessionId: string): Promise<void> => {
+    return await window.electron.apiRequest(
+      "DELETE",
+      `/session/delete/${sessionId}`, // Changed from /session/delete/${sessionId}
+      {}
+    );
+  },
 };

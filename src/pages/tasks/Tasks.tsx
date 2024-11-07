@@ -12,6 +12,7 @@ interface TasksProps {
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onChangeTaskType: (id: string, newType: TaskType) => void;
+  onUpdateTitle: (id: string, title: string) => void;
 }
 
 const Tasks: React.FC<TasksProps> = ({
@@ -21,6 +22,7 @@ const Tasks: React.FC<TasksProps> = ({
   onToggleComplete,
   onDelete,
   onChangeTaskType,
+  onUpdateTitle,
 }) => {
   const [selectedType, setSelectedType] = useState<TaskType>("day");
 
@@ -29,10 +31,11 @@ const Tasks: React.FC<TasksProps> = ({
   );
   const completedTasks = tasks
     .filter((task) => task.completed)
-    .sort(
-      (a, b) =>
-        (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0)
-    );
+    .sort((a, b) => {
+      const bTime = b.completedAt instanceof Date ? b.completedAt.getTime() : 0;
+      const aTime = a.completedAt instanceof Date ? a.completedAt.getTime() : 0;
+      return bTime - aTime;
+    });
 
   if (isLoading) {
     return <div className="w-full text-center">Loading tasks...</div>;
@@ -52,6 +55,7 @@ const Tasks: React.FC<TasksProps> = ({
         onToggleComplete={onToggleComplete}
         onDelete={onDelete}
         onChangeTaskType={onChangeTaskType}
+        onUpdateTitle={onUpdateTitle}
       />
       <h2 className="mt-8 mb-2 text-xl font-semibold text-slate-700">
         Completed Tasks
@@ -61,6 +65,8 @@ const Tasks: React.FC<TasksProps> = ({
           tasks={completedTasks}
           onDelete={onDelete}
           onChangeTaskType={onChangeTaskType}
+          onToggleComplete={onToggleComplete}
+          onUpdateTitle={onUpdateTitle}
         />
       </div>
     </div>

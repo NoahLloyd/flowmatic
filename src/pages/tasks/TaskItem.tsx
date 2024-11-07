@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Task, TaskType } from "../../types/Task";
 
 interface TaskItemProps {
@@ -6,6 +6,7 @@ interface TaskItemProps {
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
   onChangeTaskType: (id: string, type: TaskType) => void;
+  onUpdateTitle: (id: string, title: string) => void;
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({
@@ -13,8 +14,29 @@ const TaskItem: React.FC<TaskItemProps> = ({
   onToggleComplete,
   onDelete,
   onChangeTaskType,
+  onUpdateTitle,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(task.title);
   const types: TaskType[] = ["day", "week", "future"];
+
+  const handleSaveTitle = () => {
+    if (editedTitle.trim() && editedTitle !== task.title) {
+      onUpdateTitle(task.id, editedTitle);
+    } else {
+      setEditedTitle(task.title); // Reset to original if empty
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveTitle();
+    } else if (e.key === "Escape") {
+      setEditedTitle(task.title);
+      setIsEditing(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg shadow-sm hover:shadow-md transition-shadow">
@@ -25,9 +47,26 @@ const TaskItem: React.FC<TaskItemProps> = ({
         className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
       />
       <div className="flex-grow">
-        <span className={task.completed ? "line-through text-gray-400" : ""}>
-          {task.title}
-        </span>
+        {isEditing ? (
+          <input
+            type="text"
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onBlur={handleSaveTitle}
+            onKeyDown={handleKeyPress}
+            className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-500"
+            autoFocus
+          />
+        ) : (
+          <span
+            className={`cursor-pointer hover:text-gray-700 ${
+              task.completed ? "line-through text-gray-400" : ""
+            }`}
+            onClick={() => setIsEditing(true)}
+          >
+            {task.title}
+          </span>
+        )}
         {task.completedAt && (
           <div className="text-sm text-gray-500">
             Completed: {task.completedAt.toLocaleString()}
@@ -35,22 +74,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <select
-          value={task.type}
-          onChange={(e) =>
-            onChangeTaskType(task.id, e.target.value as TaskType)
-          }
-          className="text-sm rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-        >
-          {types.map((type) => (
-            <option key={type} value={type}>
+        {types
+          .filter((type) => type !== task.type)
+          .map((type) => (
+            <button
+              key={type}
+              onClick={() => onChangeTaskType(task.id, type)}
+              className="px-2 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+            >
               {type.charAt(0).toUpperCase() + type.slice(1)}
-            </option>
+            </button>
           ))}
-        </select>
         <button
           onClick={() => onDelete(task.id)}
-          className="text-red-500 hover:text-red-700"
+          className="p-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

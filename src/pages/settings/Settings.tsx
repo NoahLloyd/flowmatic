@@ -117,6 +117,22 @@ const Settings = () => {
           className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </section>
+      <section>
+        <section className="space-y-2">
+          <h2 className="text-xl font-semibold text-gray-800">To-Do List</h2>
+          <ul className="list-disc pl-5">
+            <li>
+              Start a task, list all tasks for the day, and start a 1-hour timer
+              when clicked
+            </li>
+            <li>Soundscape/lo-fi radio</li>
+            <li>Daily progress stars in menu bar</li>
+            <li>
+              Menu bar options for all 5 ratings and starting the timer again
+            </li>
+          </ul>
+        </section>
+      </section>
     </div>
   );
 };

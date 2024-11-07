@@ -1,8 +1,10 @@
 import React from "react";
 import TimerDisplay from "./TimerDisplay";
 import SessionForm from "./SessionForm";
-import SessionCard from "../../components/SessionCard";
+import SessionCard from "../../components/session/SessionCard";
 import { Session } from "../../types/Session";
+import SessionsOverview from "../../components/session/SessionsOverview";
+import SessionStats from "../../components/session/SessionStats";
 
 interface FocusProps {
   time: number;
@@ -13,8 +15,8 @@ interface FocusProps {
   sessions: Session[];
   isLoadingSessions: boolean;
   onSessionCreated: () => Promise<void>;
+  onSessionsUpdate: () => Promise<void>;
 }
-
 const Focus: React.FC<FocusProps> = ({
   time,
   isRunning,
@@ -24,43 +26,36 @@ const Focus: React.FC<FocusProps> = ({
   sessions,
   isLoadingSessions,
   onSessionCreated,
+  onSessionsUpdate,
 }) => {
   return (
-    <div className="">
-      <div className="flex-col space-y-4 lg:space-y-0 lg:space-x-4 flex lg:flex-row">
-        <TimerDisplay
-          time={time}
-          isRunning={isRunning}
-          onStartPause={onStartPause}
-          onReset={onReset}
-          onAdjustTime={onAdjustTime}
-        />
-        <SessionForm onSessionCreated={onSessionCreated} />
-      </div>
-      {isLoadingSessions ? (
-        <p>Loading sessions...</p>
-      ) : (
-        <div className="mt-4">
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
-            {sessions.map((session) => (
-              <SessionCard key={session.created_at} session={session} />
-            ))}
-          </div>
-          {sessions.length === 0 && (
-            <div className="text-center py-6 text-gray-500">
-              No sessions recorded yet. Start a focus session to track your
-              progress!
-            </div>
-          )}
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex justify-center flex-col xl:flex-row mb-8 space-x-0 xl:space-x-8 space-y-8 xl:space-y-0">
+        <div>
+          <TimerDisplay
+            time={time}
+            isRunning={isRunning}
+            onStartPause={onStartPause}
+            onReset={onReset}
+            onAdjustTime={onAdjustTime}
+          />
+          <SessionForm onSessionCreated={onSessionCreated} />
         </div>
-      )}
-      Start a task, list all tasks that are for day and when one is clicked
-      start a 1 hour timer where that task will automatically be connected to
-      this timing session <br></br>Soundscape/lo-fi radio<br></br>Daliy progress
-      stars in menu bar?<br></br>Menu bar options should be all 5 ratings and
-      starting the timer again so it starts counting
+        <div>
+          <SessionStats sessions={sessions} />
+        </div>
+        <div className="w-1/3">
+          <div className="px-4 py-2 border shadow-sm rounded-lg mb-2">
+            <h3 className="text-slate-700 font-medium">Sessions today</h3>
+          </div>
+          <SessionsOverview
+            sessions={sessions}
+            isLoading={isLoadingSessions}
+            onSessionsUpdate={onSessionsUpdate}
+          />
+        </div>
+      </div>
     </div>
   );
 };
-
 export default Focus;

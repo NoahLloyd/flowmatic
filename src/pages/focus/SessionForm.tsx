@@ -1,31 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../../utils/api";
+import { useTasks } from "../../hooks/useTasks";
 
 interface SessionFormProps {
   onSessionCreated: () => Promise<void>;
 }
 
 interface SessionFormData {
+  _id: string;
   user_id: string;
   notes: string;
   task: string;
   project: string;
   time: number;
   focus: number;
+  created_at: string;
 }
 
 const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
+  const { tasks } = useTasks();
   const [formData, setFormData] = useState<SessionFormData>({
+    _id: "",
     user_id: localStorage.getItem("name"),
     notes: "",
     task: "",
-    project: "1440",
-    time: 60,
+    project:
+      localStorage.getItem("defaultProject")?.replace(/^"|"$/g, "") || "1440",
+    time: Number(localStorage.getItem("defaultMinutes")) || 60,
     focus: 0,
+    created_at: new Date().toISOString(),
   });
 
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      project:
+        localStorage.getItem("defaultProject")?.replace(/^"|"$/g, "") || "1440",
+      time: Number(localStorage.getItem("defaultMinutes")) || 60,
+    }));
+  }, []);
+
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -50,12 +68,14 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
 
       // Reset form after successful submission
       setFormData({
+        _id: "",
         user_id: localStorage.getItem("name"),
         notes: "",
         task: "",
-        project: "1440",
-        time: 60,
+        project: localStorage.getItem("defaultProject") || "1440",
+        time: Number(localStorage.getItem("defaultMinutes")) || 60,
         focus: 0,
+        created_at: new Date().toISOString(),
       });
     } catch (error) {
       console.error("Error submitting session:", error);
@@ -78,8 +98,12 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
     { rating: 5, label: "Flow", color: "bg-indigo-800" },
   ];
 
+  const dayTasks = tasks.filter(
+    (task) => task.type === "day" && !task.completed
+  );
+
   return (
-    <div className="p-4 bg-white rounded-lg w-full lg:w-1/2 shadow border">
+    <div className="p-4 bg-white rounded-lg w-full shadow border">
       <form className="space-y-4">
         <div>
           <input
@@ -91,14 +115,19 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
           />
         </div>
         <div>
-          <input
-            type="text"
+          <select
             name="task"
             value={formData.task}
             onChange={handleInputChange}
-            placeholder="Task"
             className="w-full p-2 border rounded"
-          />
+          >
+            <option value="">Select a task</option>
+            {dayTasks.map((task) => (
+              <option key={task.id} value={task.title}>
+                {task.title}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <input

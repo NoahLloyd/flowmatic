@@ -78,6 +78,20 @@ export const useTasks = () => {
     }
   };
 
+  const handleUpdateTitle = async (id: string, newTitle: string) => {
+    try {
+      if (!newTitle.trim()) return; // Don't update if title is empty
+      await api.updateTask(id, { title: newTitle });
+      setTasks((prev) =>
+        prev.map((task) =>
+          task.id === id ? { ...task, title: newTitle } : task
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update task title:", error);
+    }
+  };
+
   return {
     tasks,
     isLoading,
@@ -85,5 +99,6 @@ export const useTasks = () => {
     handleToggleComplete,
     handleDeleteTask,
     handleChangeTaskType,
+    handleUpdateTitle,
   };
 };

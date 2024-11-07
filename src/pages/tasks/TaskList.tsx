@@ -6,13 +6,8 @@ interface TaskListProps {
   tasks: Task[];
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
-}
-
-interface TaskListProps {
-  tasks: Task[];
-  onToggleComplete: (id: string) => void;
-  onDelete: (id: string) => void;
   onChangeTaskType: (id: string, type: "day" | "week" | "future") => void;
+  onUpdateTitle: (id: string, title: string) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -20,6 +15,7 @@ const TaskList: React.FC<TaskListProps> = ({
   onToggleComplete,
   onDelete,
   onChangeTaskType,
+  onUpdateTitle,
 }) => {
   return (
     <div className="space-y-2">
@@ -30,6 +26,7 @@ const TaskList: React.FC<TaskListProps> = ({
           onToggleComplete={onToggleComplete}
           onDelete={onDelete}
           onChangeTaskType={onChangeTaskType}
+          onUpdateTitle={onUpdateTitle}
         />
       ))}
       {tasks.length === 0 && (

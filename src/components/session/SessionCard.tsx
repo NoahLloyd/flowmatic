@@ -1,5 +1,5 @@
 import React from "react";
-import { Session } from "../types/Session";
+import { Session } from "../../types/Session";
 
 interface SessionCardProps {
   session: Session;
@@ -26,7 +26,7 @@ const SessionCard: React.FC<SessionCardProps> = ({ session }) => {
   return (
     <div
       key={session.created_at}
-      className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+      className="bg-white w-full rounded-lg shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
     >
       <div className="flex items-center justify-between mb-3">
         <span

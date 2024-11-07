@@ -93,7 +93,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   const seconds = time % 60;
 
   return (
-    <div className="relative flex flex-col w-full lg:w-1/2 items-center justify-center p-4 border text-black shadow-lg rounded-lg overflow-hidden min-h-[300px]">
+    <div className="relative mb-4 flex flex-col w-full items-center justify-center p-4 border text-black shadow rounded-lg overflow-hidden min-h-[300px]">
       <div className="absolute inset-0 overflow-hidden">
         <svg
           viewBox="0 0 800 400"

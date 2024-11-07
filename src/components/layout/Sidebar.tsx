@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
           alt="Logo"
           className="w-8 h-8 mr-4"
         />
-        <h1 className="text-lg font-medium text-slate-700">Flowey AI</h1>
+        <h1 className="text-lg font-medium text-slate-700">Flowmatic</h1>
       </div>
 
       {icons.map((icon) => (

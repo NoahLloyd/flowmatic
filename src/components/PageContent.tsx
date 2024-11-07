@@ -28,6 +28,7 @@ const PageContent = () => {
     handleToggleComplete,
     handleDeleteTask,
     handleChangeTaskType,
+    handleUpdateTitle,
   } = useTasks();
 
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -68,6 +69,7 @@ const PageContent = () => {
           sessions={sessions}
           isLoadingSessions={isLoadingSessions}
           onSessionCreated={fetchSessions}
+          onSessionsUpdate={fetchSessions}
         />
       );
       break;
@@ -80,6 +82,7 @@ const PageContent = () => {
           onToggleComplete={handleToggleComplete}
           onDelete={handleDeleteTask}
           onChangeTaskType={handleChangeTaskType}
+          onUpdateTitle={handleUpdateTitle}
         />
       );
       break;
