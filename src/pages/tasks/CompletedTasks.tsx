@@ -53,7 +53,7 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
   };
 
   const handleStartEdit = (task: Task) => {
-    setEditingId(task.id);
+    setEditingId(task._id);
     setEditingTitle(task.title);
   };
 
@@ -66,25 +66,25 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
     <div className="space-y-2">
       {tasks.map((task) => (
         <div
-          key={task.id}
+          key={task._id}
           className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
         >
           <input
             type="checkbox"
             checked={true}
-            onChange={() => onToggleComplete(task.id)}
+            onChange={() => onToggleComplete(task._id)}
             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           <div className="flex-grow">
             <div className="flex items-center gap-2">
-              {editingId === task.id ? (
+              {editingId === task._id ? (
                 <input
                   type="text"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
-                  onBlur={() => handleSaveEdit(task.id)}
+                  onBlur={() => handleSaveEdit(task._id)}
                   onKeyPress={(e) =>
-                    e.key === "Enter" && handleSaveEdit(task.id)
+                    e.key === "Enter" && handleSaveEdit(task._id)
                   }
                   className="border rounded px-2 py-1 text-gray-700 focus:outline-none focus:border-blue-500"
                   autoFocus
@@ -115,14 +115,14 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
               .map((type) => (
                 <button
                   key={type}
-                  onClick={() => onChangeTaskType(task.id, type)}
+                  onClick={() => onChangeTaskType(task._id, type)}
                   className="px-2 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
             <button
-              onClick={() => onDelete(task.id)}
+              onClick={() => onDelete(task._id)}
               className="p-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100"
             >
               <svg

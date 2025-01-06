@@ -31,7 +31,7 @@ const Focus: React.FC<FocusProps> = ({
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-center flex-col xl:flex-row mb-8 space-x-0 xl:space-x-8 space-y-8 xl:space-y-0">
-        <div>
+        <div className="max-w-2/3">
           <TimerDisplay
             time={time}
             isRunning={isRunning}

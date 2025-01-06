@@ -89,7 +89,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
     if (!userId) return;
     setIsLocalLoading(true);
     try {
-      const fetchedSessions = await api.getUserSessions(userId);
+      const fetchedSessions = await api.getUserSessions();
       setLocalSessions(fetchedSessions);
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
@@ -136,7 +136,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full mx-auto">
       {isLoading ? (
         <p>Loading sessions...</p>
       ) : (

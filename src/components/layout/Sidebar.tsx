@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   User,
 } from "lucide-react";
+import logoImage from "../../assets/logo-black-Template.png";
 
 type SidebarProps = {
   selected: string;
@@ -30,11 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
   return (
     <div className="w-64 flex flex-col pr-4 space-y-4">
       <div className="p-4 flex items-center">
-        <img
-          src="/assets/logo-black-Template.png"
-          alt="Logo"
-          className="w-8 h-8 mr-4"
-        />
+        <img src={logoImage} alt="Logo" className="w-8 h-8 mr-4" />
         <h1 className="text-lg font-medium text-slate-700">Flowmatic</h1>
       </div>
 

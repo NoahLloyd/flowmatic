@@ -1,81 +1,96 @@
 import { Session } from "src/types/Session";
 import { WritingEntries } from "src/types/Writing";
 import { Task } from "src/types/Task";
+import { User } from "src/types/User";
+
+const withAuth = () => ({
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: localStorage.getItem("token")
+      ? `Bearer ${localStorage.getItem("token")}`
+      : undefined,
+  },
+});
 
 export const api = {
-  submitSession: (data: Session) =>
-    window.electron.apiRequest("POST", "/session/new", data),
+  // Auth endpoints
+  login: async (email: string, password: string) =>
+    window.electron.apiRequest("POST", "/auth/login", {
+      body: { email, password },
+      headers: { "Content-Type": "application/json" },
+    }),
 
-  getUserSessions: (userId: string) =>
-    window.electron.apiRequest("GET", `/session/user/${userId}`),
+  register: async (name: string, email: string, password: string) =>
+    window.electron.apiRequest("POST", "/auth/register", {
+      body: { name, email, password },
+      headers: { "Content-Type": "application/json" },
+    }),
 
-  getAllEntries: async (): Promise<WritingEntries> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest("GET", "/writing/entries", {
-      user_id: userId,
-    });
-  },
+  getCurrentUser: async () =>
+    window.electron.apiRequest("GET", "/auth/me", withAuth()),
 
-  getEntry: async (date: string): Promise<{ content: string }> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest(
-      "GET",
-      `/writing/entry/${userId}/${date}`
-    );
-  },
+  // Session endpoints
+  getUserSessions: async () =>
+    window.electron.apiRequest("GET", "/session/user", withAuth()),
 
-  updateEntry: async (date: string, content: string): Promise<void> => {
-    const userId = localStorage.getItem("name");
-    await window.electron.apiRequest("POST", `/writing/entry/${date}`, {
-      content,
-      user_id: userId,
-    });
-  },
-  getUserTasks: async (): Promise<Task[]> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest("GET", "/tasks/user", {
-      user_id: userId,
-    });
-  },
+  submitSession: async (data: Session) =>
+    window.electron.apiRequest("POST", "/session/new", {
+      body: data,
+      ...withAuth(),
+    }),
 
-  createTask: async (taskData: Omit<Task, "id">): Promise<Task> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest("POST", "/tasks/new", {
-      ...taskData,
-      user_id: userId,
-    });
-  },
+  updateSession: async (sessionId: string, data: Partial<Session>) =>
+    window.electron.apiRequest("PUT", `/session/update/${sessionId}`, {
+      body: data,
+      ...withAuth(),
+    }),
 
-  updateTask: async (taskId: string, updates: Partial<Task>): Promise<Task> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest("PUT", `/tasks/${taskId}`, {
-      ...updates,
-      user_id: userId,
-    });
-  },
-
-  deleteTask: async (taskId: string): Promise<void> => {
-    const userId = localStorage.getItem("name");
-    return await window.electron.apiRequest("DELETE", `/tasks/${taskId}`, {
-      user_id: userId,
-    });
-  },
-  updateSession: async (
-    sessionId: string,
-    data: Partial<Session>
-  ): Promise<Session> => {
-    return await window.electron.apiRequest(
-      "PUT",
-      `/session/update/${sessionId}`, // Changed from /session/update/${sessionId}
-      data
-    );
-  },
-
-  deleteSession: async (sessionId: string): Promise<void> => {
-    return await window.electron.apiRequest(
+  deleteSession: async (sessionId: string) =>
+    window.electron.apiRequest(
       "DELETE",
-      `/session/delete/${sessionId}`, // Changed from /session/delete/${sessionId}
-      {}
-    );
-  },
+      `/session/delete/${sessionId}`,
+      withAuth()
+    ),
+
+  // Task endpoints
+  getUserTasks: async (): Promise<Task[]> =>
+    window.electron.apiRequest("GET", "/tasks/user", withAuth()),
+
+  createTask: async (taskData: Omit<Task, "_id">): Promise<Task> =>
+    window.electron.apiRequest("POST", "/tasks/new", {
+      body: taskData,
+      ...withAuth(),
+    }),
+
+  updateTask: async (taskId: string, updates: Partial<Task>): Promise<Task> =>
+    window.electron.apiRequest("PUT", `/tasks/${taskId}`, {
+      body: updates,
+      ...withAuth(),
+    }),
+
+  deleteTask: async (taskId: string): Promise<void> =>
+    window.electron.apiRequest("DELETE", `/tasks/${taskId}`, withAuth()),
+
+  // Writing endpoints
+  getAllEntries: async (): Promise<WritingEntries> =>
+    window.electron.apiRequest("GET", "/writing/entries", withAuth()),
+
+  getEntry: async (date: string): Promise<{ content: string }> =>
+    window.electron.apiRequest("GET", `/writing/entry/${date}`, withAuth()),
+
+  updateEntry: async (date: string, content: string): Promise<void> =>
+    window.electron.apiRequest("POST", `/writing/entry/${date}`, {
+      body: { content },
+      ...withAuth(),
+    }),
+
+  // User preferences
+  updateUserPreferences: async (
+    userId: string,
+    preferences: Record<string, any>
+  ): Promise<User> =>
+    window.electron.apiRequest("PUT", `/user/${userId}/preferences`, {
+      body: { preferences },
+      ...withAuth(),
+    }),
 };

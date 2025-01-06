@@ -123,7 +123,7 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
           >
             <option value="">Select a task</option>
             {dayTasks.map((task) => (
-              <option key={task.id} value={task.title}>
+              <option key={task._id} value={task.title}>
                 {task.title}
               </option>
             ))}
@@ -159,7 +159,7 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
             >
               <div className={`${color} px-3 py-2 font-bold`}>{rating}</div>
               <div
-                className={`${color} bg-opacity-80 font-medium px-3 py-2 flex-1`}
+                className={`${color} bg-opacity-80 font-medium px-2.5 py-2 flex-1`}
               >
                 {label}
               </div>

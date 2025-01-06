@@ -16,6 +16,8 @@ const Writing = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
+  const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
+
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -35,6 +37,12 @@ const Writing = () => {
         const data = await api.getAllEntries();
         setEntries(data.entries);
         setStreak(data.streak);
+
+        // Convert entry dates to Date objects for highlighting
+        const dates = data.entries
+          .filter((entry) => entry.content?.trim()) // Only include entries with content
+          .map((entry) => new Date(entry.date));
+        setHighlightedDates(dates);
       } catch (error) {
         console.error("Failed to load entries:", error);
       }
@@ -171,6 +179,17 @@ const Writing = () => {
                 onChange={handleDateChange}
                 inline
                 maxDate={new Date()}
+                highlightDates={highlightedDates}
+                // Add custom styling for highlighted dates
+                dayClassName={(date) =>
+                  highlightedDates.some(
+                    (d) =>
+                      d.toISOString().split("T")[0] ===
+                      date.toISOString().split("T")[0]
+                  )
+                    ? "highlighted-date"
+                    : undefined
+                }
               />
             </div>
           )}

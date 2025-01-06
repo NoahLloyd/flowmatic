@@ -22,7 +22,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
 
   const handleSaveTitle = () => {
     if (editedTitle.trim() && editedTitle !== task.title) {
-      onUpdateTitle(task.id, editedTitle);
+      onUpdateTitle(task._id, editedTitle);
     } else {
       setEditedTitle(task.title); // Reset to original if empty
     }
@@ -43,7 +43,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
       <input
         type="checkbox"
         checked={task.completed}
-        onChange={() => onToggleComplete(task.id)}
+        onChange={() => onToggleComplete(task._id)}
         className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
       />
       <div className="flex-grow">
@@ -79,14 +79,14 @@ const TaskItem: React.FC<TaskItemProps> = ({
           .map((type) => (
             <button
               key={type}
-              onClick={() => onChangeTaskType(task.id, type)}
+              onClick={() => onChangeTaskType(task._id, type)}
               className="px-2 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
             >
               {type.charAt(0).toUpperCase() + type.slice(1)}
             </button>
           ))}
         <button
-          onClick={() => onDelete(task.id)}
+          onClick={() => onDelete(task._id)}
           className="p-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100"
         >
           <svg

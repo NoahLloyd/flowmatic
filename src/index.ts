@@ -23,7 +23,12 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
     },
+    icon: path.join(__dirname, "assets", "icon.jpg"), // Add this line for window icon
   });
+
+  if (process.platform === "darwin") {
+    app.dock.setIcon(path.join(__dirname, "assets", "icon.jpg"));
+  }
 
   // Register global shortcut
   globalShortcut.register("Alt+Space", () => {
@@ -105,20 +110,24 @@ const createWindow = (): void => {
     });
   }
 };
-const API_BASE_URL = "http://127.0.0.1:8000"; // local development server
-// const API_BASE_URL = "https://flow-backend-9kgo.onrender.com"; // production server
+// const API_BASE_URL = "http://127.0.0.1:8000"; // local development server
+const API_BASE_URL = "https://flow-backend-9kgo.onrender.com"; // production server
 
-ipcMain.handle("api-request", async (_event, { method, endpoint, data }) => {
+ipcMain.handle("api-request", async (_event, { method, endpoint, options }) => {
   try {
     const response = await axios({
       method,
       url: `${API_BASE_URL}${endpoint}`,
-      data: method !== "GET" ? data : undefined,
-      params: method === "GET" ? data : undefined,
+      headers: options?.headers, // Pass headers directly
+      data: options?.body, // Use body for request data
+      // Remove params as we're not using query parameters for auth
     });
     return response.data;
   } catch (error) {
     console.error(`Error making ${method} request to ${endpoint}:`, error);
+    if (axios.isAxiosError(error) && error.response) {
+      throw error.response.data;
+    }
     throw error;
   }
 });

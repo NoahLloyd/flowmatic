@@ -6,3 +6,29 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
 }
+
+.highlighted-date {
+  background-color: #fef3c7 !important; /* amber-100 */
+  border-radius: 0.25rem;
+}
+
+/* Override default DatePicker styles */
+.custom-calendar .react-datepicker__day {
+  color: #000000 !important; /* Force black text */
+}
+
+.custom-calendar .react-datepicker__day--selected,
+.custom-calendar .react-datepicker__day--keyboard-selected {
+  background-color: transparent !important; /* Remove default selection color */
+  color: #000000 !important;
+}
+
+.highlighted-date {
+  background-color: #fef3c7 !important; /* amber-100 */
+  color: #000000 !important;
+}
+
+/* Remove hover effects */
+.custom-calendar .react-datepicker__day:hover {
+  background-color: #fef3c7 !important;
+}

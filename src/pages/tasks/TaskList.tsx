@@ -21,7 +21,7 @@ const TaskList: React.FC<TaskListProps> = ({
     <div className="space-y-2">
       {tasks.map((task) => (
         <TaskItem
-          key={task.id}
+          key={task._id}
           task={task}
           onToggleComplete={onToggleComplete}
           onDelete={onDelete}

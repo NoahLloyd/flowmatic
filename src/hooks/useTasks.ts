@@ -24,7 +24,7 @@ export const useTasks = () => {
 
   const handleAddTask = async (title: string, type: TaskType) => {
     try {
-      const taskData: Omit<Task, "id"> = {
+      const taskData: Omit<Task, "_id"> = {
         title,
         type,
         completed: false,
@@ -41,7 +41,7 @@ export const useTasks = () => {
 
   const handleToggleComplete = async (id: string) => {
     try {
-      const task = tasks.find((t) => t.id === id);
+      const task = tasks.find((t) => t._id === id);
       if (!task) return;
 
       const updates = {
@@ -51,7 +51,7 @@ export const useTasks = () => {
 
       await api.updateTask(id, updates);
       setTasks((prev) =>
-        prev.map((task) => (task.id === id ? { ...task, ...updates } : task))
+        prev.map((task) => (task._id === id ? { ...task, ...updates } : task))
       );
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -61,7 +61,7 @@ export const useTasks = () => {
   const handleDeleteTask = async (id: string) => {
     try {
       await api.deleteTask(id);
-      setTasks((prev) => prev.filter((task) => task.id !== id));
+      setTasks((prev) => prev.filter((task) => task._id !== id));
     } catch (error) {
       console.error("Failed to delete task:", error);
     }
@@ -71,7 +71,9 @@ export const useTasks = () => {
     try {
       await api.updateTask(id, { type: newType });
       setTasks((prev) =>
-        prev.map((task) => (task.id === id ? { ...task, type: newType } : task))
+        prev.map((task) =>
+          task._id === id ? { ...task, type: newType } : task
+        )
       );
     } catch (error) {
       console.error("Failed to update task type:", error);
@@ -84,7 +86,7 @@ export const useTasks = () => {
       await api.updateTask(id, { title: newTitle });
       setTasks((prev) =>
         prev.map((task) =>
-          task.id === id ? { ...task, title: newTitle } : task
+          task._id === id ? { ...task, title: newTitle } : task
         )
       );
     } catch (error) {

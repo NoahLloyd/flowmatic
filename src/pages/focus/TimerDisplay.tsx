@@ -74,10 +74,11 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onAdjustTime,
 }) => {
   const [initialTime, setInitialTime] = useState(time);
-  const fromColor =
-    localStorage.getItem("fromColor" as string).slice(1, -1) || "blue";
-  const toColor =
-    localStorage.getItem("fromColor" as string).slice(1, -1) || "blue";
+  let fromColor = localStorage.getItem("fromColor");
+  let toColor = localStorage.getItem("toColor");
+
+  fromColor = fromColor ? fromColor.slice(1, -1) : "blue";
+  toColor = fromColor;
 
   useEffect(() => {
     if (!isRunning) {

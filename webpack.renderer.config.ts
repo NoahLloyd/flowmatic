@@ -12,6 +12,12 @@ rules.push({
   ],
 });
 
+// Add this new rule for images
+rules.push({
+  test: /\.(png|jpg|jpeg|gif|ico|icns)$/,
+  type: "asset/resource",
+});
+
 export const rendererConfig: Configuration = {
   module: {
     rules,
