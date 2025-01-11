@@ -5,6 +5,7 @@ import { Session } from "../../types/Session";
 import { api } from "../../utils/api";
 import { format } from "date-fns";
 import { Calendar, Brain, Clock } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 
 interface SessionStats {
   todayHours: number;
@@ -43,6 +44,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   const [hasMore, setHasMore] = useState(true);
   const [groupedSessions, setGroupedSessions] = useState<DayGroup[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth(); // Move hook to component level
 
   const sessions = propSessions || localSessions;
   const isLoading = propIsLoading ?? isLocalLoading;
@@ -154,7 +156,9 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
     if (!userId) return;
     setIsLocalLoading(true);
     try {
-      const fetchedSessions = await api.getUserSessions();
+      const fetchedSessions = await (userId === user?.name
+        ? api.getUserSessions()
+        : api.getUserSessionsById(userId));
       setLocalSessions((prev) => [...prev, ...fetchedSessions]);
       setHasMore(fetchedSessions.length > 0);
       setPage((p) => p + 1);

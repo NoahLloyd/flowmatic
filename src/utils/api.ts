@@ -33,6 +33,10 @@ export const api = {
   getUserSessions: async () =>
     window.electron.apiRequest("GET", "/session/user", withAuth()),
 
+  // Add new method for fetching any user's sessions
+  getUserSessionsById: async (userId: string) =>
+    window.electron.apiRequest("GET", `/session/user/${userId}`, withAuth()),
+
   submitSession: async (data: Session) =>
     window.electron.apiRequest("POST", "/session/new", {
       body: data,
