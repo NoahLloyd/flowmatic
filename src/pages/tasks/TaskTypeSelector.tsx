@@ -21,8 +21,8 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
           className={`px-4 py-2 rounded-lg font-medium transition-colors
             ${
               selectedType === type
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                ? "bg-blue-600 text-white dark:bg-blue-500"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             }`}
         >
           {type.charAt(0).toUpperCase() + type.slice(1)}

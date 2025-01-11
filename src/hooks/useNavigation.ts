@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 
 export const useNavigation = () => {
-  const [selected, setSelected] = useState<string>("Home");
+  const [selected, setSelected] = useState<string>("Compass");
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -13,11 +13,11 @@ export const useNavigation = () => {
       }
 
       switch (event.key.toLowerCase()) {
-        case "h":
-          setSelected("Home");
-          break;
         case "f":
-          setSelected("Focus");
+          setSelected("Friends");
+          break;
+        case "c":
+          setSelected("Compass");
           break;
         case "t":
           setSelected("Tasks");

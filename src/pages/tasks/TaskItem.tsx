@@ -39,12 +39,12 @@ const TaskItem: React.FC<TaskItemProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-md transition-shadow">
       <input
         type="checkbox"
         checked={task.completed}
         onChange={() => onToggleComplete(task._id)}
-        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
       />
       <div className="flex-grow">
         {isEditing ? (
@@ -54,13 +54,15 @@ const TaskItem: React.FC<TaskItemProps> = ({
             onChange={(e) => setEditedTitle(e.target.value)}
             onBlur={handleSaveTitle}
             onKeyDown={handleKeyPress}
-            className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-500"
+            className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             autoFocus
           />
         ) : (
           <span
-            className={`cursor-pointer hover:text-gray-700 ${
-              task.completed ? "line-through text-gray-400" : ""
+            className={`cursor-pointer hover:text-gray-700 dark:text-gray-200 dark:hover:text-gray-300 ${
+              task.completed
+                ? "line-through text-gray-400 dark:text-gray-500"
+                : ""
             }`}
             onClick={() => setIsEditing(true)}
           >
@@ -68,7 +70,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
           </span>
         )}
         {task.completedAt && (
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             Completed: {task.completedAt.toLocaleString()}
           </div>
         )}
@@ -80,14 +82,14 @@ const TaskItem: React.FC<TaskItemProps> = ({
             <button
               key={type}
               onClick={() => onChangeTaskType(task._id, type)}
-              className="px-2 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+              className="px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 dark:bg-gray-800"
             >
               {type.charAt(0).toUpperCase() + type.slice(1)}
             </button>
           ))}
         <button
           onClick={() => onDelete(task._id)}
-          className="p-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100"
+          className="p-1.5 rounded-md bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

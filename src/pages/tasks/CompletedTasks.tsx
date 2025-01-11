@@ -24,13 +24,13 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
   const getTagColor = (type: TaskType) => {
     switch (type) {
       case "day":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100";
       case "week":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100";
       case "future":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100";
     }
   };
 
@@ -67,13 +67,13 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
       {tasks.map((task) => (
         <div
           key={task._id}
-          className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+          className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
         >
           <input
             type="checkbox"
             checked={true}
             onChange={() => onToggleComplete(task._id)}
-            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
           />
           <div className="flex-grow">
             <div className="flex items-center gap-2">
@@ -86,12 +86,12 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
                   onKeyPress={(e) =>
                     e.key === "Enter" && handleSaveEdit(task._id)
                   }
-                  className="border rounded px-2 py-1 text-gray-700 focus:outline-none focus:border-blue-500"
+                  className="border dark:border-gray-600 rounded px-2 py-1 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
                   autoFocus
                 />
               ) : (
                 <span
-                  className="text-gray-400 cursor-pointer hover:text-gray-600"
+                  className="text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300"
                   onClick={() => handleStartEdit(task)}
                 >
                   {task.title}
@@ -105,7 +105,7 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
                 {task.type.charAt(0).toUpperCase() + task.type.slice(1)}
               </span>
             </div>
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {formatDate(task.completedAt)}
             </div>
           </div>
@@ -116,14 +116,14 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
                 <button
                   key={type}
                   onClick={() => onChangeTaskType(task._id, type)}
-                  className="px-2 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                  className="px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
             <button
               onClick={() => onDelete(task._id)}
-              className="p-1.5 rounded-md bg-red-50 text-red-500 hover:bg-red-100"
+              className="p-1.5 rounded-md bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

@@ -94,7 +94,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   const seconds = time % 60;
 
   return (
-    <div className="relative mb-4 flex flex-col w-full items-center justify-center p-4 border text-black shadow rounded-lg overflow-hidden min-h-[300px]">
+    <div className="relative mb-4 flex flex-col w-full items-center justify-center p-4 border dark:border-gray-700 text-black dark:text-white shadow rounded-lg overflow-hidden min-h-[300px] dark:bg-gray-800">
       <div className="absolute inset-0 overflow-hidden">
         <svg
           viewBox="0 0 800 400"
@@ -130,7 +130,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
       <div className="relative z-10">
         <motion.div
-          className="text-6xl font-bold mb-4 text-center"
+          className="text-6xl font-bold mb-4 text-center dark:text-white"
           animate={{ scale: isRunning ? [1, 1.02, 1] : 1 }}
           transition={{ repeat: Infinity, duration: 2 }}
         >
@@ -142,7 +142,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-lg transition-colors"
             onClick={() => onAdjustTime(-600)}
           >
             -10m
@@ -150,7 +150,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-lg transition-colors"
             onClick={() => onAdjustTime(-60)}
           >
             -1m
@@ -158,7 +158,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-lg transition-colors"
             onClick={() => onAdjustTime(60)}
           >
             +1m
@@ -166,7 +166,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+            className="px-4 py-2 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-lg transition-colors"
             onClick={() => onAdjustTime(600)}
           >
             +10m
@@ -177,24 +177,24 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            className="p-3 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-full transition-colors"
             onClick={onStartPause}
           >
             <AnimatePresence mode="wait">
               {isRunning ? (
-                <Pause size={32} className="text-gray-800" />
+                <Pause size={32} className="text-gray-800 dark:text-gray-200" />
               ) : (
-                <Play size={32} className="text-gray-800" />
+                <Play size={32} className="text-gray-800 dark:text-gray-200" />
               )}
             </AnimatePresence>
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="p-3 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            className="p-3 bg-white/20 hover:bg-white/30 dark:bg-gray-700/50 dark:hover:bg-gray-700/70 rounded-full transition-colors"
             onClick={onReset}
           >
-            <RefreshCw size={32} className="text-gray-800" />
+            <RefreshCw size={32} className="text-gray-800 dark:text-gray-200" />
           </motion.button>
         </div>
       </div>

@@ -30,7 +30,9 @@ const TaskList: React.FC<TaskListProps> = ({
         />
       ))}
       {tasks.length === 0 && (
-        <p className="text-center text-gray-500 py-4">No tasks yet</p>
+        <p className="text-center text-gray-500 dark:text-gray-400 py-4">
+          No tasks yet
+        </p>
       )}
     </div>
   );

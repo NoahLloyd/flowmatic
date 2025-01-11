@@ -38,7 +38,11 @@ const Tasks: React.FC<TasksProps> = ({
     });
 
   if (isLoading) {
-    return <div className="w-full text-center">Loading tasks...</div>;
+    return (
+      <div className="w-full text-center dark:text-slate-300">
+        Loading tasks...
+      </div>
+    );
   }
 
   return (
@@ -57,7 +61,7 @@ const Tasks: React.FC<TasksProps> = ({
         onChangeTaskType={onChangeTaskType}
         onUpdateTitle={onUpdateTitle}
       />
-      <h2 className="mt-8 mb-2 text-xl font-semibold text-slate-700">
+      <h2 className="mt-8 mb-2 text-xl font-semibold text-slate-700 dark:text-slate-200">
         Completed Tasks
       </h2>
       <div className="max-h-[400px] overflow-y-auto">

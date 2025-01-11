@@ -17,14 +17,16 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     <button
       className={`flex items-center space-x-2 px-4 my-0 py-3 rounded-xl transition duration-200 ease-in-out text-md ${
         isSelected
-          ? "bg-white bg-opacity-30 shadow"
-          : "hover:bg-white hover:bg-opacity-20"
+          ? "bg-white dark:bg-slate-800 bg-opacity-30 dark:bg-opacity-100 shadow"
+          : "hover:bg-white hover:bg-opacity-20 dark:hover:bg-slate-700"
       }`}
       onClick={() => onSelect(label)}
       style={{ border: "none", outline: "none" }}
     >
-      <Icon className="w-6 h-6 text-gray-500" />
-      <span className="text-gray-700 font-medium">{label}</span>
+      <Icon className="w-6 h-6 text-slate-700 dark:text-slate-200" />
+      <span className="text-slate-700 dark:text-slate-200 font-medium">
+        {label}
+      </span>
     </button>
   );
 };

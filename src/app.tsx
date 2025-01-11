@@ -2,15 +2,18 @@ import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import PageContent from "./components/PageContent";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 const App = () => {
   console.log("App component rendering");
   return (
     <StrictMode>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50">
-          <PageContent />
-        </div>
+        <ThemeProvider>
+          <div className="min-h-screen bg-gray-50">
+            <PageContent />
+          </div>
+        </ThemeProvider>
       </AuthProvider>
     </StrictMode>
   );

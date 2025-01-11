@@ -62,11 +62,7 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
     try {
       const response = await api.submitSession(submitData);
       console.log("Session submitted successfully:", response);
-
-      // Call the callback to refresh sessions in PageContent
       await onSessionCreated();
-
-      // Reset form after successful submission
       setFormData({
         _id: "",
         user_id: localStorage.getItem("name"),
@@ -84,16 +80,8 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
 
   const focusLevels = [
     { rating: 1, label: "Distracted", color: "bg-red-800" },
-    {
-      rating: 2,
-      label: "Browsing",
-      color: "bg-orange-800",
-    },
-    {
-      rating: 3,
-      label: "Attentive",
-      color: "bg-yellow-800",
-    },
+    { rating: 2, label: "Browsing", color: "bg-orange-800" },
+    { rating: 3, label: "Attentive", color: "bg-yellow-800" },
     { rating: 4, label: "Locked-in", color: "bg-green-800" },
     { rating: 5, label: "Flow", color: "bg-indigo-800" },
   ];
@@ -103,51 +91,49 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
   );
 
   return (
-    <div className="p-4 bg-white rounded-lg w-full shadow border">
+    <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-4 border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-all duration-200">
       <form className="space-y-4">
-        <div>
-          <input
-            name="notes"
-            value={formData.notes}
-            onChange={handleInputChange}
-            placeholder="Notes"
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <select
-            name="task"
-            value={formData.task}
-            onChange={handleInputChange}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">Select a task</option>
-            {dayTasks.map((task) => (
-              <option key={task._id} value={task.title}>
-                {task.title}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <input
-            type="text"
-            name="project"
-            value={formData.project}
-            onChange={handleInputChange}
-            placeholder="Project"
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <div>
-          <input
-            type="number"
-            name="time"
-            value={formData.time}
-            onChange={handleInputChange}
-            placeholder="Time (minutes)"
-            className="w-full p-2 border rounded"
-          />
+        <div className="flex gap-4">
+          <div className="flex-1 flex gap-4">
+            <select
+              name="task"
+              value={formData.task}
+              onChange={handleInputChange}
+              className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100"
+            >
+              <option value="">Select a task</option>
+              {dayTasks.map((task) => (
+                <option key={task._id} value={task.title}>
+                  {task.title}
+                </option>
+              ))}
+            </select>
+            <input
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              placeholder="Notes"
+              className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="project"
+              value={formData.project}
+              onChange={handleInputChange}
+              placeholder="Project"
+              className="w-20 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+            <input
+              type="number"
+              name="time"
+              value={formData.time}
+              onChange={handleInputChange}
+              placeholder="Min"
+              className="w-16 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+            />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2">
           {focusLevels.map(({ rating, label, color }) => (
@@ -155,7 +141,7 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
               key={rating}
               type="button"
               onClick={() => handleSubmit(rating)}
-              className="flex-1 flex text-xs text-white rounded hover:scale-105 transition-transform overflow-hidden"
+              className="flex-1 flex text-xs text-white rounded-lg hover:scale-105 transition-transform overflow-hidden shadow-sm"
             >
               <div className={`${color} px-3 py-2 font-bold`}>{rating}</div>
               <div

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Sidebar from "./Sidebar";
+import { useTheme } from "../../context/ThemeContext";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -8,12 +9,9 @@ type LayoutProps = {
 };
 
 const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
-  const name = JSON.parse(localStorage.getItem("name"));
-  const fromColor = JSON.parse(localStorage.getItem("fromColor")) || "#E8CBC0";
-  const toColor = JSON.parse(localStorage.getItem("toColor")) || "#636FA4";
-
-  console.log("fromColor:", fromColor); // Debugging line
-  console.log("toColor:", toColor); // Debugging line
+  const { isDarkMode } = useTheme();
+  const fromColor = isDarkMode ? "#1E293B" : "#E8CBC0"; // Changed dark mode color to match slate theme
+  const toColor = isDarkMode ? "#0F172A" : "#636FA4"; // Changed dark mode color to match slate theme
 
   return (
     <div
@@ -23,9 +21,13 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
       className="flex h-screen p-4"
     >
       {/* Sidebar with title */}
-      <Sidebar title={name} selected={selected} onSelect={setSelected} />
+      <Sidebar title="User" selected={selected} onSelect={setSelected} />
       {/* Main content area */}
-      <div className="flex-1 bg-white rounded-xl overflow-scroll p-6 shadow-lg">
+      <div
+        className={`flex-1 ${
+          isDarkMode ? "bg-slate-900" : "bg-white"
+        } rounded-xl overflow-scroll p-6 shadow-lg`}
+      >
         {children}
       </div>
     </div>

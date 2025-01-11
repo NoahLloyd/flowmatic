@@ -84,6 +84,29 @@ export const api = {
       ...withAuth(),
     }),
 
+  getDailySignals: async (date: string): Promise<Record<string, any>> =>
+    window.electron.apiRequest("GET", `/signals/daily/${date}`, withAuth()),
+
+  recordSignal: async (
+    date: string,
+    metric: string,
+    value: number | boolean
+  ): Promise<void> =>
+    window.electron.apiRequest("POST", "/signals/record", {
+      body: { date, metric, value },
+      ...withAuth(),
+    }),
+
+  getSignalRange: async (
+    startDate: string,
+    endDate: string
+  ): Promise<Record<string, any>> =>
+    window.electron.apiRequest(
+      "GET",
+      `/signals/range?start_date=${startDate}&end_date=${endDate}`,
+      withAuth()
+    ),
+
   // User preferences
   updateUserPreferences: async (
     userId: string,

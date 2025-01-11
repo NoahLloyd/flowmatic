@@ -142,15 +142,17 @@ const Writing = () => {
 
   return (
     <div
-      className={`max-w-4xl mx-auto p-8 ${
-        isTimerComplete ? "bg-amber-50" : ""
+      className={`max-w-4xl mx-auto p-8 dark:bg-slate-900 ${
+        isTimerComplete ? "bg-amber-50 dark:bg-amber-900/30" : ""
       }`}
     >
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg border border-slate-200">
+          <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             <Star className="w-5 h-5 text-yellow-500" />
-            <span className="text-slate-700">{streak} day streak</span>
+            <span className="text-slate-700 dark:text-slate-200">
+              {streak} day streak
+            </span>
           </div>
           <WritingTimer
             timeRemaining={timeRemaining}
@@ -163,11 +165,11 @@ const Writing = () => {
         <div className="relative flex items-center space-x-2">
           <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-            className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg border border-slate-200 hover:bg-slate-50"
+            className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
-            <Calendar className="w-4 h-4 text-slate-500" />
+            <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             {isSaving || hasPendingChanges ? (
-              <Loader className="w-4 h-4 text-slate-500" />
+              <Loader className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             ) : lastSaved ? (
               <Check className="w-4 h-4 text-green-500" />
             ) : null}
@@ -201,7 +203,7 @@ const Writing = () => {
           value={currentEntry}
           onChange={handleTextChange}
           placeholder="Write your thoughts here... Use # for headings, * for bold, - for lists..."
-          className="w-full h-[calc(100vh-12rem)] p-6 rounded-lg bg-white shadow-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-200 resize-none font-sans text-slate-700 text-lg leading-relaxed"
+          className="w-full h-[calc(100vh-12rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500"
           spellCheck="true"
         />
       </div>

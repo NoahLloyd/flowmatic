@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./layout/Layout";
-import Home from "../pages/home/Home";
-import Focus from "../pages/focus/Focus";
+import Friends from "../pages/friends/Friends";
+import Compass from "../pages/compass/Compass";
 import Tasks from "../pages/tasks/Tasks";
 import Insights from "../pages/insights/insights";
 import Settings from "../pages/settings/Settings";
@@ -47,7 +47,7 @@ const PageContent = () => {
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
       if (error.response?.status === 401) {
-        setSelected("Home");
+        setSelected("Compass");
       }
     } finally {
       setIsLoadingSessions(false);
@@ -59,7 +59,7 @@ const PageContent = () => {
       try {
         await api.getCurrentUser();
       } catch (error) {
-        setSelected("Home");
+        setSelected("Compass");
       } finally {
         setIsAuthChecking(false);
       }
@@ -81,12 +81,12 @@ const PageContent = () => {
 
   let content;
   switch (selected) {
-    case "Home":
-      content = <Home />;
+    case "Friends":
+      content = <Friends />;
       break;
-    case "Focus":
+    case "Compass":
       content = (
-        <Focus
+        <Compass
           time={timeRemaining}
           isRunning={isRunning}
           onStartPause={handleStartPause}
@@ -124,7 +124,7 @@ const PageContent = () => {
       content = <Settings />;
       break;
     default:
-      content = <Home />;
+      content = <Friends />;
       break;
   }
 
