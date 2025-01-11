@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 
-export const useWritingTimer = () => {
+export const useMorningTimer = () => {
   const [timeRemaining, setTimeRemaining] = useState(15);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isTimerComplete, setIsTimerComplete] = useState(false);
 
   useEffect(() => {
     const loadTimerState = () => {
-      const timerState = localStorage.getItem("WritingTimer");
+      const timerState = localStorage.getItem("MorningTimer");
       if (timerState) {
         const { startTime, pausedTimeRemaining, isRunning, isComplete } =
           JSON.parse(timerState);
@@ -33,7 +33,7 @@ export const useWritingTimer = () => {
     if (isTimerRunning) {
       const startTime = Date.now() - (15 - timeRemaining) * 60 * 1000;
       localStorage.setItem(
-        "WritingTimer",
+        "MorningTimer",
         JSON.stringify({
           startTime,
           isRunning: true,
@@ -50,7 +50,7 @@ export const useWritingTimer = () => {
           setIsTimerComplete(true);
           setIsTimerRunning(false);
           localStorage.setItem(
-            "WritingTimer",
+            "MorningTimer",
             JSON.stringify({
               startTime: null,
               isRunning: false,
@@ -64,7 +64,7 @@ export const useWritingTimer = () => {
       }, 1000);
     } else {
       localStorage.setItem(
-        "WritingTimer",
+        "MorningTimer",
         JSON.stringify({
           startTime: null,
           isRunning: false,
@@ -86,7 +86,7 @@ export const useWritingTimer = () => {
     setIsTimerRunning(false);
     setIsTimerComplete(false);
     localStorage.setItem(
-      "WritingTimer",
+      "MorningTimer",
       JSON.stringify({
         startTime: null,
         isRunning: false,

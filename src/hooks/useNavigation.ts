@@ -22,8 +22,8 @@ export const useNavigation = () => {
         case "t":
           setSelected("Tasks");
           break;
-        case "w":
-          setSelected("Writing");
+        case "m":
+          setSelected("Morning");
           break;
         case "i":
           setSelected("Insights");

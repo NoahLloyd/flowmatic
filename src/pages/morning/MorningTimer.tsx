@@ -1,7 +1,7 @@
 import React from "react";
 import { Timer, Pause, RefreshCw, Play } from "lucide-react";
 
-interface WritingTimerProps {
+interface MorningTimerProps {
   timeRemaining: number;
   isTimerRunning: boolean;
   isTimerComplete: boolean;
@@ -9,7 +9,7 @@ interface WritingTimerProps {
   onTimerReset: () => void;
 }
 
-const WritingTimer: React.FC<WritingTimerProps> = ({
+const MorningTimer: React.FC<MorningTimerProps> = ({
   timeRemaining,
   isTimerRunning,
   onTimerToggle,
@@ -41,4 +41,4 @@ const WritingTimer: React.FC<WritingTimerProps> = ({
   );
 };
 
-export default WritingTimer;
+export default MorningTimer;

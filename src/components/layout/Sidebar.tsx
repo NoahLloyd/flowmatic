@@ -3,7 +3,7 @@ import SidebarItem from "./SidebarItem";
 import {
   Users,
   Settings,
-  Pencil,
+  Sunrise,
   Check,
   Compass,
   BarChart2,
@@ -33,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
     { label: "Compass", icon: Compass },
     { label: "Friends", icon: Users },
     { label: "Tasks", icon: Check },
-    { label: "Writing", icon: Pencil },
+    { label: "Morning", icon: Sunrise },
     { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];

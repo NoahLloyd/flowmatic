@@ -5,7 +5,7 @@ import Compass from "../pages/compass/Compass";
 import Tasks from "../pages/tasks/Tasks";
 import Insights from "../pages/insights/insights";
 import Settings from "../pages/settings/Settings";
-import Writing from "../pages/writing/Writing";
+import Morning from "../pages/morning/Morning";
 import { useTimer } from "../hooks/useTimer";
 import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
@@ -112,8 +112,8 @@ const PageContent = () => {
         />
       );
       break;
-    case "Writing":
-      content = <Writing />;
+    case "Morning":
+      content = <Morning />;
       break;
     case "Insights":
       content = (

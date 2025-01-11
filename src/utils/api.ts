@@ -1,5 +1,5 @@
 import { Session } from "src/types/Session";
-import { WritingEntries } from "src/types/Writing";
+import { MorningEntries } from "src/types/Morning";
 import { Task } from "src/types/Task";
 import { User } from "src/types/User";
 
@@ -75,8 +75,8 @@ export const api = {
   deleteTask: async (taskId: string): Promise<void> =>
     window.electron.apiRequest("DELETE", `/tasks/${taskId}`, withAuth()),
 
-  // Writing endpoints
-  getAllEntries: async (): Promise<WritingEntries> =>
+  // Morning endpoints
+  getAllEntries: async (): Promise<MorningEntries> =>
     window.electron.apiRequest("GET", "/writing/entries", withAuth()),
 
   getEntry: async (date: string): Promise<{ content: string }> =>
@@ -116,7 +116,7 @@ export const api = {
     userId: string,
     preferences: Record<string, any>
   ): Promise<User> =>
-    window.electron.apiRequest("PUT", `/user/${userId}/preferences`, {
+    window.electron.apiRequest("PUT", `/auth/${userId}/preferences`, {
       body: { preferences },
       ...withAuth(),
     }),
