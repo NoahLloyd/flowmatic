@@ -79,14 +79,42 @@ export const api = {
   getAllEntries: async (): Promise<MorningEntries> =>
     window.electron.apiRequest("GET", "/writing/entries", withAuth()),
 
-  getEntry: async (date: string): Promise<{ content: string }> =>
-    window.electron.apiRequest("GET", `/writing/entry/${date}`, withAuth()),
+  getEntry: async (
+    date: string
+  ): Promise<{ content: string; activityContent?: any }> => {
+    const response = await window.electron.apiRequest(
+      "GET",
+      `/writing/entry/${date}`,
+      withAuth()
+    );
+    console.log("API getEntry raw response:", response);
+    return response;
+  },
 
-  updateEntry: async (date: string, content: string): Promise<void> =>
-    window.electron.apiRequest("POST", `/writing/entry/${date}`, {
-      body: { content },
-      ...withAuth(),
-    }),
+  updateEntry: async (
+    date: string,
+    content: string,
+    activityContent?: any
+  ): Promise<void> => {
+    const requestBody = {
+      content,
+      activityContent: activityContent || {}, // Ensure activityContent is never undefined
+    };
+
+    console.log("updateEntry request body:", requestBody);
+
+    const response = await window.electron.apiRequest(
+      "POST",
+      `/writing/entry/${date}`,
+      {
+        body: requestBody,
+        ...withAuth(),
+      }
+    );
+
+    console.log("updateEntry response:", response);
+    return response;
+  },
 
   getDailySignals: async (date: string): Promise<Record<string, any>> =>
     window.electron.apiRequest("GET", `/signals/daily/${date}`, withAuth()),

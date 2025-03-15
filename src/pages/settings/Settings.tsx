@@ -9,8 +9,10 @@ import {
   Clock,
   Palette,
   LogOut,
+  Sunrise,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
+import MorningSettings from "../morning/MorningSettings";
 
 const Settings = () => {
   const { user, updateUserPreferences, logout } = useAuth();
@@ -263,7 +265,7 @@ const Settings = () => {
                       type="color"
                       value={fromColor}
                       onChange={(e) => setFromColor(e.target.value)}
-                      className="h-8 w-8 p-0 border-0 rounded-md"
+                      className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
                     />
                     <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
                       {fromColor}
@@ -279,7 +281,7 @@ const Settings = () => {
                       type="color"
                       value={toColor}
                       onChange={(e) => setToColor(e.target.value)}
-                      className="h-8 w-8 p-0 border-0 rounded-md"
+                      className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
                     />
                     <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
                       {toColor}
@@ -300,6 +302,19 @@ const Settings = () => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Morning Page Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <Sunrise className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Morning Page
+          </h2>
+        </div>
+        <div className="p-5">
+          <MorningSettings />
         </div>
       </div>
 
