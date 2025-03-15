@@ -16,14 +16,25 @@ import logoImage from "../../assets/logo-black-Template.png";
 import logoDarkImage from "../../assets/logo-white-Template.png";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
+import SidebarTimer from "./SidebarTimer";
 
 type SidebarProps = {
   selected: string;
   onSelect: (label: string) => void;
   title: string;
+  timerProps?: {
+    isVisible: boolean;
+    time: number;
+    isBreakTimer?: boolean;
+  };
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  selected,
+  onSelect,
+  title,
+  timerProps,
+}) => {
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { user } = useAuth();
 
@@ -74,6 +85,13 @@ const Sidebar: React.FC<SidebarProps> = ({ selected, onSelect, title }) => {
       ))}
 
       <div className="flex-grow" />
+
+      {/* Timer display above the profile */}
+      {timerProps && (
+        <div className="mb-0" onClick={() => onSelect("Compass")}>
+          <SidebarTimer {...timerProps} />
+        </div>
+      )}
 
       <div
         onClick={() => onSelect("Settings")}

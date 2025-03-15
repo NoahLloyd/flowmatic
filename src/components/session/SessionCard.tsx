@@ -42,6 +42,18 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
   const focusColors = getFocusColor(session.focus);
 
+  // Format the creation time in 24-hour format (HH:MM)
+  const formatTimeString = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const timeString = formatTimeString(session.created_at);
+
   return (
     <div
       key={session.created_at}
@@ -70,9 +82,14 @@ const SessionCard: React.FC<SessionCardProps> = ({
             </span>
           )}
         </div>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {session.minutes}m
-        </span>
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <span>
+            {timeString.charAt(0) === "0"
+              ? timeString.substring(1)
+              : timeString}
+          </span>
+          <span>{session.minutes}</span>
+        </div>
       </div>
 
       {session.notes && (

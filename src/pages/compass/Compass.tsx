@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import TimerDisplay from "./TimerDisplay";
 import SessionForm from "./SessionForm";
 import SessionCard from "../../components/session/SessionCard";
@@ -6,6 +6,20 @@ import { Session } from "../../types/Session";
 import SessionsOverview from "../../components/session/SessionsOverview";
 import SessionStats from "../../components/session/SessionStats";
 import Signals from "./signal/Signals";
+import TimerCompleteModal from "../../components/session/TimerCompleteModal";
+import { api } from "../../utils/api";
+
+// Define the session form data interface
+interface SessionFormData {
+  _id: string;
+  user_id: string;
+  notes: string;
+  task: string;
+  project: string;
+  minutes: number;
+  focus: number;
+  created_at: string;
+}
 
 interface CompassProps {
   time: number;
@@ -13,6 +27,17 @@ interface CompassProps {
   onStartPause: () => void;
   onReset: () => void;
   onAdjustTime: (amount: number) => void;
+  onStartBreak?: (breakMinutes: number) => void;
+  onRestartTimer?: () => void;
+  isModalOpen?: boolean;
+  onCloseModal?: () => void;
+  // Break timer props
+  breakTimeRemaining?: number;
+  breakIsRunning?: boolean;
+  isBreakMode?: boolean;
+  onBreakTimerStartPause?: () => void;
+  onBreakTimerReset?: () => void;
+  onBreakTimerAdjust?: (amount: number) => void;
   sessions: Session[];
   isLoadingSessions: boolean;
   onSessionCreated: () => Promise<void>;
@@ -25,13 +50,55 @@ const Compass: React.FC<CompassProps> = ({
   onStartPause,
   onReset,
   onAdjustTime,
+  onStartBreak = () => {},
+  onRestartTimer = () => {},
+  isModalOpen = false,
+  onCloseModal = () => {},
+  // Break timer props
+  breakTimeRemaining = 0,
+  breakIsRunning = false,
+  isBreakMode = false,
+  onBreakTimerStartPause = () => {},
+  onBreakTimerReset = () => {},
+  onBreakTimerAdjust = () => {},
   sessions,
   isLoadingSessions,
   onSessionCreated,
   onSessionsUpdate,
 }) => {
+  const [submittingSession, setSubmittingSession] = useState(false);
+
+  // Create a function to handle focus rating submission from the modal
+  const handleSubmitFocusRating = async (sessionData: SessionFormData) => {
+    setSubmittingSession(true);
+    try {
+      // The sessionData now contains all form fields, so we use it directly
+      await api.submitSession(sessionData);
+
+      // Refresh sessions
+      await onSessionCreated();
+    } catch (error) {
+      console.error("Error submitting session:", error);
+    } finally {
+      setSubmittingSession(false);
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-6 bg-white dark:bg-gray-900">
+    <div className="flex h-full flex-col">
+      <TimerCompleteModal
+        isOpen={isModalOpen}
+        onClose={onCloseModal}
+        onSubmitSession={handleSubmitFocusRating}
+        onStartBreak={onStartBreak}
+        onRestartTimer={onRestartTimer}
+        breakTimeRemaining={breakTimeRemaining}
+        isBreakTimerRunning={breakIsRunning}
+        onBreakTimerStartPause={onBreakTimerStartPause}
+        onBreakTimerReset={onBreakTimerReset}
+        onBreakTimerAdjust={onBreakTimerAdjust}
+      />
+
       {/* Signals Section */}
       <div className="mb-8">
         <Signals />

@@ -1,31 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  Calendar,
-  Star,
-  Check,
-  Loader,
-  Settings,
-  Play,
-  Pause,
-  RotateCcw,
-} from "lucide-react";
+import { Calendar, Star, Check, Loader } from "lucide-react";
 import { api } from "../../utils/api";
 import { MorningEntry } from "../../types/Morning";
 import { useAuth } from "../../context/AuthContext";
 import { debounce } from "lodash";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import MorningSettings from "./MorningSettings";
-
-interface Exercise {
-  id: string;
-  name: string;
-  settings: {
-    timerDuration?: number;
-    affirmations?: string[];
-    visualizations?: string[];
-  };
-}
 
 const Morning = () => {
   const { user } = useAuth();
@@ -34,59 +14,13 @@ const Morning = () => {
   const [streak, setStreak] = useState(0);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [isTimerComplete, setIsTimerComplete] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-
-  // Get current day's exercises
-  const getCurrentDayExercises = (): Exercise[] => {
-    const dayOfWeek = new Date().toLocaleString("en-US", { weekday: "long" });
-    return user?.preferences?.morning?.schedule[dayOfWeek]?.exercises || [];
-  };
-
-  const currentExercise = getCurrentDayExercises()[currentExerciseIndex];
-
-  // Timer functions
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isTimerRunning && timeRemaining > 0) {
-      interval = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            setIsTimerRunning(false);
-            setIsTimerComplete(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isTimerRunning, timeRemaining]);
-
-  const handleTimerToggle = () => {
-    if (!isTimerRunning && timeRemaining === 0) {
-      // Start new timer
-      const duration = currentExercise?.settings?.timerDuration || 15;
-      setTimeRemaining(duration * 60);
-    }
-    setIsTimerRunning(!isTimerRunning);
-  };
-
-  const handleTimerReset = () => {
-    setIsTimerRunning(false);
-    setIsTimerComplete(false);
-    setTimeRemaining(0);
-  };
 
   // Load entries and streak on mount
   useEffect(() => {
@@ -196,102 +130,8 @@ const Morning = () => {
     setIsCalendarOpen(false);
   };
 
-  const handleNextExercise = () => {
-    const exercises = getCurrentDayExercises();
-    if (currentExerciseIndex < exercises.length - 1) {
-      setCurrentExerciseIndex((prev) => prev + 1);
-      handleTimerReset();
-      setCurrentEntry("");
-    }
-  };
-
-  const renderExerciseContent = () => {
-    if (!currentExercise) return null;
-
-    switch (currentExercise.id) {
-      case "consciousness":
-        return <div className="space-y-4"></div>;
-
-      case "affirmations":
-        return (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Daily Affirmations
-            </h2>
-            <div className="space-y-2">
-              {currentExercise.settings.affirmations?.map(
-                (affirmation, index) => (
-                  <div
-                    key={index}
-                    className="p-2 bg-slate-50 dark:bg-slate-800 rounded"
-                  >
-                    {affirmation}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "gratitude":
-        return (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Gratitude Practice
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Write about things you're grateful for today.
-            </p>
-          </div>
-        );
-
-      case "visualization":
-      case "negative-visualization":
-        return (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {currentExercise.id === "visualization"
-                ? "Visualization"
-                : "Negative Visualization"}
-            </h2>
-            <div className="space-y-2">
-              {currentExercise.settings.visualizations?.map(
-                (visualization, index) => (
-                  <div
-                    key={index}
-                    className="p-2 bg-slate-50 dark:bg-slate-800 dark:text-white rounded"
-                  >
-                    {visualization}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "breathing":
-        return (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Breathing Exercise
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400">
-              Focus on your breath and follow the timer.
-            </p>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
   return (
-    <div
-      className={`max-w-4xl mx-auto p-8 dark:bg-slate-900 ${
-        isTimerComplete ? "bg-amber-50 dark:bg-amber-900/30" : ""
-      }`}
-    >
+    <div className="max-w-4xl mx-auto p-8 dark:bg-slate-900">
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -300,48 +140,15 @@ const Morning = () => {
               {streak} day streak
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handleTimerToggle}
-              className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-            >
-              {isTimerRunning ? (
-                <Pause className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              ) : (
-                <Play className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              )}
-            </button>
-            {timeRemaining > 0 && (
-              <div className="px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                <span className="text-slate-700 dark:text-slate-200 font-medium">
-                  {Math.floor(timeRemaining / 60)} min
-                </span>
-              </div>
-            )}
-            {(isTimerRunning || timeRemaining > 0) && (
-              <button
-                onClick={handleTimerReset}
-                className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              >
-                <RotateCcw className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              </button>
-            )}
-          </div>
         </div>
         <div className="relative flex items-center space-x-2">
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-          >
-            <Settings className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-          </button>
           <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
             className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
             <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             {isSaving || hasPendingChanges ? (
-              <Loader className="w-4 h-4 text-slate-500 dark:text-slate-400 animate-spin" />
+              <Loader className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             ) : lastSaved ? (
               <Check className="w-4 h-4 text-green-500" />
             ) : null}
@@ -369,33 +176,15 @@ const Morning = () => {
         </div>
       </div>
 
-      {renderExerciseContent()}
-
       <div className="w-full mt-4">
         <textarea
           value={currentEntry}
           onChange={handleTextChange}
-          placeholder={`Write your ${
-            currentExercise?.name?.toLowerCase() || "morning"
-          } entry here...`}
+          placeholder="Write your morning entry here..."
           className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500"
           spellCheck="true"
         />
       </div>
-
-      {currentExerciseIndex < getCurrentDayExercises().length - 1 && (
-        <button
-          onClick={handleNextExercise}
-          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Next Exercise
-        </button>
-      )}
-
-      <MorningSettings
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
     </div>
   );
 };

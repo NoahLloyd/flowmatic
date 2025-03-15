@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Pause, Play, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../context/AuthContext";
 
 interface TimerDisplayProps {
   time: number;
@@ -73,12 +74,14 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onReset,
   onAdjustTime,
 }) => {
+  const { user } = useAuth();
+  // Always assume the initial time is 60 minutes (3600 seconds) for wave positioning
+  const standardInitialTime = 3600;
   const [initialTime, setInitialTime] = useState(time);
-  let fromColor = localStorage.getItem("fromColor");
-  let toColor = localStorage.getItem("toColor");
 
-  fromColor = fromColor ? fromColor.slice(1, -1) : "blue";
-  toColor = fromColor;
+  // Get colors from user preferences, fallback to defaults
+  const fromColor = user?.preferences?.fromColor || "#E8CBC0";
+  const toColor = user?.preferences?.toColor || "#636FA4";
 
   useEffect(() => {
     if (!isRunning) {
@@ -86,9 +89,12 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
     }
   }, [isRunning, time]);
 
+  // Calculate progress based on standard 60 minute session
   const progressPercentage = useMemo(() => {
-    return ((initialTime - time) / initialTime) * 100;
-  }, [time, initialTime]);
+    // Calculate how much time has passed from the standard 60 minutes
+    const timeElapsed = standardInitialTime - time;
+    return (timeElapsed / standardInitialTime) * 100;
+  }, [time]);
 
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
@@ -16,13 +16,36 @@ import { useAuth } from "../context/AuthContext";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
+
+  // Create a direct navigation function
+  const directNavigate = useCallback(
+    (page: string) => {
+      setSelected(page);
+    },
+    [setSelected]
+  );
+
   const {
-    timeRemaining,
+    timeRemaining: time,
     isRunning,
     handleStartPause,
     handleAdjustTime,
     handleReset,
-  } = useTimer();
+    handleStartBreak,
+    handleRestartTimer,
+    isModalOpen,
+    handleCloseModal,
+    // Break timer props
+    breakTimeRemaining,
+    breakIsRunning,
+    isBreakMode,
+    handleBreakTimerStartPause,
+    handleBreakTimerReset,
+    handleBreakTimerAdjust,
+    // Sidebar timer props - we don't need to pass these to Compass
+    // since they're accessed directly in Layout
+    synchronizeTimerState,
+  } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
     tasks,
@@ -75,6 +98,14 @@ const PageContent = () => {
     }
   }, [isAuthChecking]);
 
+  // Force synchronize timer state when selected page changes to Compass
+  useEffect(() => {
+    if (selected === "Compass") {
+      // Force reload timer state from localStorage to ensure everything is in sync
+      synchronizeTimerState();
+    }
+  }, [selected]); // Only re-run when selected page changes
+
   if (isAuthChecking) {
     return <div>Loading...</div>;
   }
@@ -87,11 +118,22 @@ const PageContent = () => {
     case "Compass":
       content = (
         <Compass
-          time={timeRemaining}
+          time={time}
           isRunning={isRunning}
           onStartPause={handleStartPause}
           onReset={handleReset}
           onAdjustTime={handleAdjustTime}
+          onStartBreak={handleStartBreak}
+          onRestartTimer={handleRestartTimer}
+          isModalOpen={isModalOpen}
+          onCloseModal={handleCloseModal}
+          // Break timer props
+          breakTimeRemaining={breakTimeRemaining}
+          breakIsRunning={breakIsRunning}
+          isBreakMode={isBreakMode}
+          onBreakTimerStartPause={handleBreakTimerStartPause}
+          onBreakTimerReset={handleBreakTimerReset}
+          onBreakTimerAdjust={handleBreakTimerAdjust}
           sessions={sessions}
           isLoadingSessions={isLoadingSessions}
           onSessionCreated={fetchSessions}

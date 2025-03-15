@@ -38,15 +38,37 @@ const TaskItem: React.FC<TaskItemProps> = ({
     }
   };
 
+  // Custom checkbox for better dark mode appearance
+  const CustomCheckbox = () => (
+    <div
+      onClick={() => onToggleComplete(task._id)}
+      className={`w-4 h-4 shrink-0 rounded flex items-center justify-center cursor-pointer border ${
+        task.completed
+          ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white"
+          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+      }`}
+    >
+      {task.completed && (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-3 w-3 text-white dark:text-gray-900"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+            clipRule="evenodd"
+          />
+        </svg>
+      )}
+    </div>
+  );
+
   return (
-    <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-      <input
-        type="checkbox"
-        checked={task.completed}
-        onChange={() => onToggleComplete(task._id)}
-        className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
-      />
-      <div className="flex-grow">
+    <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-800 transition-all hover:border-gray-300 dark:hover:border-gray-700">
+      <CustomCheckbox />
+      <div className="flex-grow min-w-0">
         {isEditing ? (
           <input
             type="text"
@@ -54,15 +76,13 @@ const TaskItem: React.FC<TaskItemProps> = ({
             onChange={(e) => setEditedTitle(e.target.value)}
             onBlur={handleSaveTitle}
             onKeyDown={handleKeyPress}
-            className="w-full px-2 py-1 border rounded focus:outline-none focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full p-2 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm"
             autoFocus
           />
         ) : (
           <span
-            className={`cursor-pointer hover:text-gray-700 dark:text-gray-200 dark:hover:text-gray-300 ${
-              task.completed
-                ? "line-through text-gray-400 dark:text-gray-500"
-                : ""
+            className={`cursor-pointer text-gray-800 dark:text-gray-200 text-sm ${
+              task.completed ? "text-gray-400 dark:text-gray-500" : ""
             }`}
             onClick={() => setIsEditing(true)}
           >
@@ -70,30 +90,31 @@ const TaskItem: React.FC<TaskItemProps> = ({
           </span>
         )}
         {task.completedAt && (
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            Completed: {task.completedAt.toLocaleString()}
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Completed: {new Date(task.completedAt).toLocaleString()}
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {types
           .filter((type) => type !== task.type)
           .map((type) => (
             <button
               key={type}
               onClick={() => onChangeTaskType(task._id, type)}
-              className="px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-200 dark:bg-gray-800"
+              className="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
             >
               {type.charAt(0).toUpperCase() + type.slice(1)}
             </button>
           ))}
         <button
           onClick={() => onDelete(task._id)}
-          className="p-1.5 rounded-md bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+          className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+          aria-label="Delete task"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
+            className="h-4 w-4"
             viewBox="0 0 20 20"
             fill="currentColor"
           >

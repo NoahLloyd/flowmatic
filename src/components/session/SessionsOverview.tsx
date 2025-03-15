@@ -48,20 +48,58 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
 
   const sessions = propSessions || localSessions;
   const isLoading = propIsLoading ?? isLocalLoading;
-
   const getFocusColor = (focus: number) => {
-    if (focus <= 3) return { bg: "bg-red-100", text: "text-red-700" };
-    if (focus <= 3.5) return { bg: "bg-orange-100", text: "text-orange-700" };
-    if (focus <= 4) return { bg: "bg-yellow-100", text: "text-yellow-700" };
-    if (focus <= 4.5) return { bg: "bg-green-100", text: "text-green-700" };
-    return { bg: "bg-indigo-100", text: "text-indigo-700" };
+    if (focus < 2)
+      return {
+        bg: "bg-red-100 dark:bg-red-900",
+        text: "text-red-700 dark:text-red-200",
+      };
+    if (focus < 3)
+      return {
+        bg: "bg-orange-100 dark:bg-orange-900",
+        text: "text-orange-700 dark:text-orange-200",
+      };
+    if (focus < 4)
+      return {
+        bg: "bg-yellow-100 dark:bg-yellow-900",
+        text: "text-yellow-700 dark:text-yellow-200",
+      };
+    if (focus < 5)
+      return {
+        bg: "bg-green-100 dark:bg-green-900",
+        text: "text-green-700 dark:text-green-200",
+      };
+    return {
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
+    };
   };
 
   const getHoursColor = (hours: number) => {
-    if (hours <= 2) return { bg: "bg-red-100", text: "text-red-700" };
-    if (hours <= 4) return { bg: "bg-orange-100", text: "text-orange-700" };
-    if (hours <= 6) return { bg: "bg-yellow-100", text: "text-yellow-700" };
-    return { bg: "bg-green-100", text: "text-green-700" };
+    if (hours < 2)
+      return {
+        bg: "bg-red-100 dark:bg-red-900",
+        text: "text-red-700 dark:text-red-200",
+      };
+    if (hours < 4)
+      return {
+        bg: "bg-orange-100 dark:bg-orange-900",
+        text: "text-orange-700 dark:text-orange-200",
+      };
+    if (hours < 6)
+      return {
+        bg: "bg-yellow-100 dark:bg-yellow-900",
+        text: "text-yellow-700 dark:text-yellow-200",
+      };
+    if (hours < 8)
+      return {
+        bg: "bg-green-100 dark:bg-green-900",
+        text: "text-green-700 dark:text-green-200",
+      };
+    return {
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
+    };
   };
 
   const groupSessionsByDay = (sessions: Session[]): DayGroup[] => {
@@ -223,9 +261,9 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
           style={{ scrollSnapType: "x mandatory" }}
         >
           <div className="inline-flex gap-4">
-            {groupedSessions.map((group) => (
+            {groupedSessions.map((group, groupIndex) => (
               <div
-                key={group.date.toISOString()}
+                key={`group-${group.date.toISOString()}-${groupIndex}`}
                 className="w-[250px] inline-block"
                 style={{ scrollSnapAlign: "start" }}
               >
@@ -241,7 +279,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full ${
                           getHoursColor(group.totalMinutes / 60).bg
-                        }`}
+                        } dark:bg-opacity-80`}
                       >
                         <Clock
                           className={`w-4 h-4 ${
@@ -262,7 +300,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full ${
                           getFocusColor(group.averageFocus).bg
-                        }`}
+                        } dark:bg-opacity-80`}
                       >
                         <Brain
                           className={`w-4 h-4 ${
@@ -281,9 +319,11 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
 
                 <div className="overflow-y-auto max-h-[260px]">
                   <div className="grid gap-3 grid-cols-1">
-                    {group.sessions.map((session) => (
+                    {group.sessions.map((session, sessionIndex) => (
                       <div
-                        key={session.created_at}
+                        key={`session-${
+                          session._id || session.created_at
+                        }-${sessionIndex}`}
                         onClick={
                           deleteItems
                             ? () => handleSessionClick(session)

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { TaskType } from "../../types/Task";
 
 interface TaskTypeSelectorProps {
@@ -12,20 +12,66 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
 }) => {
   const types: TaskType[] = ["day", "week", "future"];
 
+  // Keyboard shortcut mapping
+  const shortcuts = {
+    day: "1",
+    week: "2",
+    future: "3",
+  };
+
+  // Add keyboard event listeners for simple number keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if we're in an input field or textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      // Simple number key shortcuts - no command/ctrl needed
+      switch (e.key) {
+        case "1":
+          onTypeSelect("day");
+          break;
+        case "2":
+          onTypeSelect("week");
+          break;
+        case "3":
+          onTypeSelect("future");
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onTypeSelect]);
+
   return (
-    <div className="flex gap-2 mb-6">
+    <div className="flex gap-2 py-2">
       {types.map((type) => (
         <button
           key={type}
           onClick={() => onTypeSelect(type)}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-between gap-2
             ${
               selectedType === type
-                ? "bg-blue-600 text-white dark:bg-blue-500"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
             }`}
         >
-          {type.charAt(0).toUpperCase() + type.slice(1)}
+          <span>{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+          <kbd
+            className={`px-1 py-0.5 text-xs rounded ${
+              selectedType === type
+                ? "bg-gray-800 text-gray-300 dark:bg-gray-200 dark:text-gray-800"
+                : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+            } font-mono`}
+          >
+            {shortcuts[type]}
+          </kbd>
         </button>
       ))}
     </div>

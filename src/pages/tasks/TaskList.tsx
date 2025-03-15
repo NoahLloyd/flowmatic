@@ -18,7 +18,7 @@ const TaskList: React.FC<TaskListProps> = ({
   onUpdateTitle,
 }) => {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {tasks.map((task) => (
         <TaskItem
           key={task._id}
@@ -29,11 +29,6 @@ const TaskList: React.FC<TaskListProps> = ({
           onUpdateTitle={onUpdateTitle}
         />
       ))}
-      {tasks.length === 0 && (
-        <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-          No tasks yet
-        </p>
-      )}
     </div>
   );
 };

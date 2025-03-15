@@ -12,27 +12,11 @@ interface CompletedTasksProps {
 const CompletedTasks: React.FC<CompletedTasksProps> = ({
   tasks,
   onDelete,
-  onChangeTaskType,
   onToggleComplete,
   onUpdateTitle,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-
-  const types: TaskType[] = ["day", "week", "future"];
-
-  const getTagColor = (type: TaskType) => {
-    switch (type) {
-      case "day":
-        return "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100";
-      case "week":
-        return "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-100";
-      case "future":
-        return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100";
-      default:
-        return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100";
-    }
-  };
 
   const formatDate = (date: Date | null | string) => {
     if (!date) return "";
@@ -62,72 +46,72 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
     setEditingId(null);
   };
 
+  // Custom checkbox for better dark mode appearance
+  const CustomCheckbox = () => (
+    <div
+      className="w-4 h-4 shrink-0 rounded flex items-center justify-center cursor-pointer border bg-gray-900 dark:bg-white border-gray-900 dark:border-white"
+      onClick={() => {}} // Just for consistency, doesn't need functionality
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-3 w-3 text-white dark:text-gray-900"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fillRule="evenodd"
+          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </div>
+  );
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {tasks.map((task) => (
         <div
           key={task._id}
-          className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+          className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-800 transition-all"
         >
-          <input
-            type="checkbox"
-            checked={true}
-            onChange={() => onToggleComplete(task._id)}
-            className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400"
-          />
-          <div className="flex-grow">
-            <div className="flex items-center gap-2">
-              {editingId === task._id ? (
-                <input
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  onBlur={() => handleSaveEdit(task._id)}
-                  onKeyPress={(e) =>
-                    e.key === "Enter" && handleSaveEdit(task._id)
-                  }
-                  className="border dark:border-gray-600 rounded px-2 py-1 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400"
-                  autoFocus
-                />
-              ) : (
-                <span
-                  className="text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300"
-                  onClick={() => handleStartEdit(task)}
-                >
-                  {task.title}
-                </span>
-              )}
-              <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${getTagColor(
-                  task.type
-                )}`}
-              >
-                {task.type.charAt(0).toUpperCase() + task.type.slice(1)}
-              </span>
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {formatDate(task.completedAt)}
-            </div>
+          <div className="shrink-0" onClick={() => onToggleComplete(task._id)}>
+            <CustomCheckbox />
           </div>
-          <div className="flex items-center gap-2">
-            {types
-              .filter((type) => type !== task.type)
-              .map((type) => (
-                <button
-                  key={type}
-                  onClick={() => onChangeTaskType(task._id, type)}
-                  className="px-2 py-1 text-sm rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-              ))}
+          <div className="flex-grow min-w-0">
+            {editingId === task._id ? (
+              <input
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={() => handleSaveEdit(task._id)}
+                onKeyPress={(e) =>
+                  e.key === "Enter" && handleSaveEdit(task._id)
+                }
+                className="p-2 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm"
+                autoFocus
+              />
+            ) : (
+              <span
+                className="text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400 text-sm"
+                onClick={() => handleStartEdit(task)}
+              >
+                {task.title}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {formatDate(task.completedAt)}
+            </span>
             <button
               onClick={() => onDelete(task._id)}
-              className="p-1.5 rounded-md bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50"
+              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              aria-label="Delete task"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
+                className="h-4 w-4"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >

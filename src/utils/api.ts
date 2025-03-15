@@ -117,7 +117,7 @@ export const api = {
     preferences: Record<string, any>
   ): Promise<User> =>
     window.electron.apiRequest("PUT", `/auth/${userId}/preferences`, {
-      body: { preferences },
+      body: preferences,
       ...withAuth(),
     }),
 };

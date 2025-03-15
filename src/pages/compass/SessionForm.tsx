@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../utils/api";
 import { useTasks } from "../../hooks/useTasks";
+import { Session } from "../../types/Session";
+import { useAuth } from "../../context/AuthContext";
 
 interface SessionFormProps {
   onSessionCreated: () => Promise<void>;
@@ -19,26 +21,32 @@ interface SessionFormData {
 
 const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
   const { tasks } = useTasks();
+  const { user } = useAuth();
+
+  // Get user's preferred settings from preferences
+  const defaultProject = user?.preferences?.defaultProject || "";
+  const defaultMinutes = user?.preferences?.defaultMinutes || 60;
+
   const [formData, setFormData] = useState<SessionFormData>({
     _id: "",
-    user_id: localStorage.getItem("name"),
+    user_id: user?._id || "",
     notes: "",
     task: "",
-    project:
-      localStorage.getItem("defaultProject")?.replace(/^"|"$/g, "") || "1440",
-    time: Number(localStorage.getItem("defaultMinutes")) || 60,
+    project: defaultProject,
+    time: defaultMinutes,
     focus: 0,
     created_at: new Date().toISOString(),
   });
 
+  // Update form data when user preferences change
   useEffect(() => {
-    setFormData((prev) => ({
+    setFormData((prev: SessionFormData) => ({
       ...prev,
-      project:
-        localStorage.getItem("defaultProject")?.replace(/^"|"$/g, "") || "1440",
-      time: Number(localStorage.getItem("defaultMinutes")) || 60,
+      user_id: user?._id || "",
+      project: defaultProject,
+      time: defaultMinutes,
     }));
-  }, []);
+  }, [user, defaultProject, defaultMinutes]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -46,7 +54,7 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
     >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData((prev: SessionFormData) => ({
       ...prev,
       [name]: value,
     }));
@@ -65,11 +73,11 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
       await onSessionCreated();
       setFormData({
         _id: "",
-        user_id: localStorage.getItem("name"),
+        user_id: user?._id || "",
         notes: "",
         task: "",
-        project: localStorage.getItem("defaultProject") || "1440",
-        time: Number(localStorage.getItem("defaultMinutes")) || 60,
+        project: defaultProject,
+        time: defaultMinutes,
         focus: 0,
         created_at: new Date().toISOString(),
       });
