@@ -1,11 +1,48 @@
 import React from "react";
 import { Session } from "../../types/Session";
+import { useAuth } from "../../context/AuthContext";
 
 interface SessionStatsProps {
   sessions: Session[];
 }
 
 const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
+  const { user } = useAuth();
+
+  // Get user daily goals or use default value (4)
+  const getDailyTarget = () => {
+    // Get the current day of week (0 = Sunday, 1 = Monday, etc.)
+    const day = new Date().getDay();
+    // Convert to our day format (monday, tuesday, etc.)
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayName = dayNames[day];
+
+    // Get daily hours goals from user preferences or use default
+    if (
+      user?.preferences?.dailyHoursGoals &&
+      dayName in user.preferences.dailyHoursGoals
+    ) {
+      return user.preferences.dailyHoursGoals[dayName];
+    }
+    return 4; // Default if not set
+  };
+
+  // Get user yearly goal or use default
+  const getYearlyTarget = () => {
+    if (user?.preferences?.yearlyHoursGoal?.hoursPerYear) {
+      return user.preferences.yearlyHoursGoal.hoursPerYear;
+    }
+    return 1400; // Default if not set
+  };
+
   // Calculate today's stats
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Set to start of day
@@ -19,7 +56,7 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
     0
   );
 
-  const dailyTarget = 4; // Target hours per day
+  const dailyTarget = getDailyTarget(); // Get user's daily target
 
   // Calculate expected progress based on current time (9 AM - 4 PM workday)
   const now = new Date();
@@ -58,6 +95,30 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
   const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1; // Convert to Monday-based
   weekStart.setDate(weekStart.getDate() - daysFromMonday); // Go back to Monday
 
+  // Calculate weekly target based on daily goals for each day of the week
+  const getWeeklyTarget = () => {
+    // If user doesn't have preferences, use default (4 hours * 7 days)
+    if (!user?.preferences?.dailyHoursGoals) {
+      return 28;
+    }
+
+    // Sum up the daily goals for each day of the week
+    const dayNames = [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    return dayNames.reduce((sum, day) => {
+      return sum + (user.preferences.dailyHoursGoals[day] || 4);
+    }, 0);
+  };
+
+  const weeklyTarget = getWeeklyTarget();
+
   const weekSessions = sessions.filter(
     (session) => new Date(session.created_at) >= weekStart
   );
@@ -67,12 +128,37 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
     0
   );
 
-  // Use 7-day workweek (4 hours per day)
-  const weeklyTarget = 28; // 4 hours * 7 days
-
   // Calculate expected hours based on days passed and current day progress
   const fullDaysPassed = daysFromMonday;
-  const expectedWeeklyHours = fullDaysPassed * dailyTarget + expectedDailyHours;
+
+  // Calculate expected weekly hours based on specific daily targets for passed days
+  const calculateExpectedWeeklyHours = () => {
+    if (!user?.preferences?.dailyHoursGoals) {
+      return fullDaysPassed * 4 + expectedDailyHours; // Default calculation
+    }
+
+    // Get the days that have passed this week
+    const dayNames = [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    const passedDays = dayNames.slice(0, daysFromMonday);
+
+    // Sum up target hours for passed days
+    const passedDaysSum = passedDays.reduce((sum, day) => {
+      return sum + (user.preferences.dailyHoursGoals[day] || 4);
+    }, 0);
+
+    // Add expected hours for current day
+    return passedDaysSum + expectedDailyHours;
+  };
+
+  const expectedWeeklyHours = calculateExpectedWeeklyHours();
   const weeklyHoursOffset = hoursThisWeek - expectedWeeklyHours;
 
   // Remove the cap to allow exceeding 100%
@@ -89,12 +175,21 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
   const hoursThisWeekFormatted = hoursThisWeek.toFixed(1).replace(/\.0$/, "");
 
   // Calculate yearly progress
-  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+  // Get the user's configured year start date or default to Jan 1
+  const getYearStartDate = () => {
+    if (user?.preferences?.yearlyHoursGoal?.startDate) {
+      return new Date(user.preferences.yearlyHoursGoal.startDate);
+    }
+    return new Date(new Date().getFullYear(), 0, 1); // Default to Jan 1
+  };
+
+  const yearStart = getYearStartDate();
   const yearlyHours = sessions
     .filter((session) => new Date(session.created_at) >= yearStart)
     .reduce((acc, session) => acc + session.minutes / 60, 0);
 
-  const yearTarget = 1500;
+  const yearTarget = getYearlyTarget(); // Get user's yearly target
+
   const dayOfYear = Math.floor(
     (new Date().getTime() - yearStart.getTime()) / (24 * 60 * 60 * 1000)
   );

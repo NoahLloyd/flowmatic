@@ -139,6 +139,27 @@ export const api = {
       withAuth()
     ),
 
+  getAllSignalHistory: async (
+    startDate: string,
+    endDate: string
+  ): Promise<Record<string, any>> => {
+    console.log(
+      `API Request: Fetching all signal history from ${startDate} to ${endDate}`
+    );
+    try {
+      const response = await window.electron.apiRequest(
+        "GET",
+        `/signals/history?start_date=${startDate}&end_date=${endDate}`,
+        withAuth()
+      );
+      console.log("API Response: getAllSignalHistory raw data:", response);
+      return response;
+    } catch (error) {
+      console.error("API Error in getAllSignalHistory:", error);
+      throw error;
+    }
+  },
+
   // User preferences
   updateUserPreferences: async (
     userId: string,

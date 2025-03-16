@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeftRight,
@@ -10,13 +10,18 @@ import {
   Palette,
   LogOut,
   Sunrise,
+  Calendar,
+  BarChart,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import MorningSettings from "../morning/MorningSettings";
+import WorkingHoursSettings from "./components/WorkingHoursSettings";
+import SignalSettings from "./components/SignalSettings";
 
 const Settings = () => {
   const { user, updateUserPreferences, logout } = useAuth();
   const { isDarkMode } = useTheme();
+  const initialMountRef = useRef(true);
 
   // Default color values based on theme
   const defaultLightFromColor = "#E8CBC0";
@@ -57,6 +62,11 @@ const Settings = () => {
           (isDarkMode ? defaultDarkToColor : defaultLightToColor)
       );
     }
+
+    // Mark as initialized after first mount
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+    }
   }, [user, isDarkMode]);
 
   const handleSavePreferences = async () => {
@@ -64,16 +74,49 @@ const Settings = () => {
       setIsSaving(true);
       setSaveMessage({ type: "", text: "" });
 
+      // Get the values from all child components
+      const workingHoursSettings = (window as any).__workingHoursSettings || {};
+      const signalSettings = (window as any).__signalSettings || {};
+      const morningSettings = (window as any).__morningSettings || {};
+
+      // Combine all preferences into one object
       const updatedPreferences = {
         ...user?.preferences,
+        // Parent component settings
         defaultProject,
         defaultMinutes,
         fromColor,
         toColor,
+
+        // Working hours settings
+        ...(workingHoursSettings.dailyHoursGoals
+          ? { dailyHoursGoals: workingHoursSettings.dailyHoursGoals }
+          : {}),
+        ...(workingHoursSettings.yearlyHoursGoal
+          ? { yearlyHoursGoal: workingHoursSettings.yearlyHoursGoal }
+          : {}),
+
+        // Signal settings
+        ...(signalSettings.activeSignals
+          ? { activeSignals: signalSettings.activeSignals }
+          : {}),
+        ...(signalSettings.signalGoals
+          ? { signalGoals: signalSettings.signalGoals }
+          : {}),
+
+        // Morning settings
+        ...(morningSettings.weeklyMorningSchedule
+          ? { weeklyMorningSchedule: morningSettings.weeklyMorningSchedule }
+          : {}),
       };
 
       await updateUserPreferences(updatedPreferences);
-      setSaveMessage({ type: "success", text: "Settings saved successfully!" });
+      setSaveMessage({
+        type: "success",
+        text: "All settings saved successfully!",
+      });
+
+      console.log("All settings saved successfully!");
     } catch (error) {
       console.error("Failed to save preferences:", error);
       setSaveMessage({
@@ -302,6 +345,32 @@ const Settings = () => {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Working Hours Goals Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <Calendar className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Focus Goals
+          </h2>
+        </div>
+        <div className="p-5">
+          <WorkingHoursSettings />
+        </div>
+      </div>
+
+      {/* Signal Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <BarChart className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Signal Settings
+          </h2>
+        </div>
+        <div className="p-5">
+          <SignalSettings />
         </div>
       </div>
 

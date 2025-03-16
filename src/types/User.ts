@@ -1,5 +1,20 @@
 import { MorningActivity, WeeklyMorningSchedule } from "./Morning";
 
+export interface DailyHoursGoal {
+  monday: number;
+  tuesday: number;
+  wednesday: number;
+  thursday: number;
+  friday: number;
+  saturday: number;
+  sunday: number;
+}
+
+export interface YearlyGoal {
+  hoursPerYear: number;
+  startDate: string; // ISO date string
+}
+
 interface UserPreferences {
   defaultProject?: string;
   defaultMinutes?: number;
@@ -7,6 +22,10 @@ interface UserPreferences {
   toColor?: string;
   morningActivities?: MorningActivity[];
   weeklyMorningSchedule?: WeeklyMorningSchedule;
+  dailyHoursGoals?: DailyHoursGoal;
+  yearlyHoursGoal?: YearlyGoal;
+  signalGoals?: Record<string, number>;
+  activeSignals?: string[];
 }
 
 export interface User {

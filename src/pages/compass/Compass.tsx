@@ -8,6 +8,7 @@ import SessionStats from "../../components/session/SessionStats";
 import Signals from "./signal/Signals";
 import TimerCompleteModal from "../../components/session/TimerCompleteModal";
 import { api } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 
 // Define the session form data interface
 interface SessionFormData {
@@ -19,6 +20,13 @@ interface SessionFormData {
   minutes: number;
   focus: number;
   created_at: string;
+}
+
+// Define the stats interface
+interface SessionStats {
+  todayHours: number;
+  weekHours: number;
+  averageFocus: number;
 }
 
 interface CompassProps {
@@ -67,6 +75,40 @@ const Compass: React.FC<CompassProps> = ({
   onSessionsUpdate,
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
+  const [stats, setStats] = useState<SessionStats>({
+    todayHours: 0,
+    weekHours: 0,
+    averageFocus: 0,
+  });
+  const { user } = useAuth();
+
+  // Function to get today's focus goal from user preferences
+  const getDailyGoal = () => {
+    // Get current day
+    const day = new Date().getDay();
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayName = dayNames[day];
+
+    // Check if user has preferences set
+    if (
+      user?.preferences?.dailyHoursGoals &&
+      dayName in user.preferences.dailyHoursGoals
+    ) {
+      return user.preferences.dailyHoursGoals[dayName];
+    }
+    return 4; // Default if not set
+  };
+
+  // Get the user's daily focus goal
+  const dailyGoal = getDailyGoal();
 
   // Create a function to handle focus rating submission from the modal
   const handleSubmitFocusRating = async (sessionData: SessionFormData) => {
@@ -82,6 +124,11 @@ const Compass: React.FC<CompassProps> = ({
     } finally {
       setSubmittingSession(false);
     }
+  };
+
+  // Function to handle stats updates
+  const handleStatsCalculated = (newStats: SessionStats) => {
+    setStats(newStats);
   };
 
   return (
@@ -128,6 +175,7 @@ const Compass: React.FC<CompassProps> = ({
                 sessions={sessions}
                 isLoading={isLoadingSessions}
                 onSessionsUpdate={onSessionsUpdate}
+                onStatsCalculated={handleStatsCalculated}
               />
             </div>
           </div>

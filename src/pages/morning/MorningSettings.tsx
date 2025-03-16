@@ -44,12 +44,8 @@ const DAYS_OF_WEEK: DayOfWeek[] = [
 ];
 
 const MorningSettings = () => {
-  const { user, updateUserPreferences } = useAuth();
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{
-    type: string;
-    text: string;
-  }>({ type: "", text: "" });
+  const { user } = useAuth();
+  const [successMessage, setSuccessMessage] = useState<string>("");
 
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>("monday");
 
@@ -90,6 +86,14 @@ const MorningSettings = () => {
       setWeeklySchedule(migratedSchedule);
     }
   }, [user]);
+
+  // Store current values for the parent component to access
+  React.useEffect(() => {
+    // @ts-ignore - This is a hack to expose state to parent component
+    window.__morningSettings = {
+      weeklyMorningSchedule: weeklySchedule,
+    };
+  }, [weeklySchedule]);
 
   // Get activities for the currently selected day
   const activities = weeklySchedule[selectedDay] || [];
@@ -193,49 +197,15 @@ const MorningSettings = () => {
 
     setWeeklySchedule(updatedSchedule);
 
-    setSaveMessage({
-      type: "success",
-      text: `Applied ${formatDayName(
-        selectedDay
-      )}'s routine to all days of the week`,
-    });
+    // Show success message
+    setSuccessMessage(
+      `Applied ${formatDayName(selectedDay)}'s routine to all days of the week`
+    );
 
     // Clear message after 3 seconds
     setTimeout(() => {
-      setSaveMessage({ type: "", text: "" });
+      setSuccessMessage("");
     }, 3000);
-  };
-
-  // Save preferences
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      setSaveMessage({ type: "", text: "" });
-
-      const updatedPreferences = {
-        ...user?.preferences,
-        weeklyMorningSchedule: weeklySchedule,
-      };
-
-      await updateUserPreferences(updatedPreferences);
-      setSaveMessage({
-        type: "success",
-        text: "Morning settings saved successfully!",
-      });
-    } catch (error) {
-      console.error("Failed to save preferences:", error);
-      setSaveMessage({
-        type: "error",
-        text: "Failed to save settings. Please try again.",
-      });
-    } finally {
-      setIsSaving(false);
-
-      // Clear message after 3 seconds
-      setTimeout(() => {
-        setSaveMessage({ type: "", text: "" });
-      }, 3000);
-    }
   };
 
   // Get icon for activity type
@@ -260,25 +230,12 @@ const MorningSettings = () => {
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200">
           Morning Page Settings
         </h2>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="px-4 py-2 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 rounded-lg flex items-center space-x-2 hover:bg-slate-700 dark:hover:bg-slate-300 disabled:opacity-50"
-        >
-          {isSaving ? "Saving..." : "Save Settings"}
-        </button>
       </div>
 
       {/* Notification message */}
-      {saveMessage.text && (
-        <div
-          className={`p-3 rounded-lg text-sm flex items-center ${
-            saveMessage.type === "success"
-              ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800"
-              : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
-          }`}
-        >
-          {saveMessage.text}
+      {successMessage && (
+        <div className="p-3 rounded-lg text-sm flex items-center bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800">
+          {successMessage}
         </div>
       )}
 

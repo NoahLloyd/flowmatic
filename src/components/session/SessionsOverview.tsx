@@ -43,11 +43,44 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [groupedSessions, setGroupedSessions] = useState<DayGroup[]>([]);
+  const [stats, setStats] = useState<SessionStats>({
+    todayHours: 0,
+    weekHours: 0,
+    averageFocus: 0,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth(); // Move hook to component level
 
   const sessions = propSessions || localSessions;
   const isLoading = propIsLoading ?? isLocalLoading;
+
+  // Get daily goal from user's preferences
+  const getDailyGoal = () => {
+    // Get current day
+    const day = new Date().getDay();
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayName = dayNames[day];
+
+    // Check if user has preferences set
+    if (
+      user?.preferences?.dailyHoursGoals &&
+      dayName in user.preferences.dailyHoursGoals
+    ) {
+      return user.preferences.dailyHoursGoals[dayName];
+    }
+    return 4; // Default if not set
+  };
+
+  const dailyGoal = getDailyGoal();
+
   const getFocusColor = (focus: number) => {
     if (focus < 2)
       return {
@@ -145,9 +178,10 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   useEffect(() => {
     if (sessions.length > 0) {
       setGroupedSessions(groupSessionsByDay(sessions));
+      const calculatedStats = calculateStats(sessions);
+      setStats(calculatedStats);
       if (onStatsCalculated) {
-        const stats = calculateStats(sessions);
-        onStatsCalculated(stats);
+        onStatsCalculated(calculatedStats);
       }
     }
   }, [sessions, onStatsCalculated]);
@@ -321,25 +355,37 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-y-auto max-h-[280px]">
+                <div className="overflow-y-auto h-[280px]">
                   <div className="grid gap-2 grid-cols-1">
-                    {group.sessions.map((session, sessionIndex) => (
-                      <div
-                        key={`session-${
-                          session._id || session.created_at
-                        }-${sessionIndex}`}
-                        onClick={
-                          deleteItems
-                            ? () => handleSessionClick(session)
-                            : undefined
-                        }
-                        className={`${
-                          deleteItems ? "cursor-pointer" : ""
-                        } w-full transition-all hover:scale-[1.01]`}
-                      >
-                        <SessionCard session={session} small={true} />
-                      </div>
-                    ))}
+                    {group.sessions.map((session, sessionIndex) => {
+                      // Check if this session is from today to pass today's data
+                      const isToday =
+                        new Date(session.created_at).toDateString() ===
+                        new Date().toDateString();
+
+                      return (
+                        <div
+                          key={`session-${
+                            session._id || session.created_at
+                          }-${sessionIndex}`}
+                          onClick={
+                            deleteItems
+                              ? () => handleSessionClick(session)
+                              : undefined
+                          }
+                          className={`${
+                            deleteItems ? "cursor-pointer" : ""
+                          } w-full transition-all hover:scale-[1.01]`}
+                        >
+                          <SessionCard
+                            session={session}
+                            small={true}
+                            todaysHours={isToday ? stats.todayHours : undefined}
+                            todaysGoal={isToday ? dailyGoal : undefined}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

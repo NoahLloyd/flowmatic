@@ -1,15 +1,46 @@
 import React from "react";
 import { Session } from "../../types/Session";
+import { useAuth } from "../../context/AuthContext";
 
 interface SessionCardProps {
   session: Session;
   small?: boolean;
+  todaysHours?: number;
+  todaysGoal?: number;
 }
 
 const SessionCard: React.FC<SessionCardProps> = ({
   session,
   small = false,
+  todaysHours,
+  todaysGoal,
 }) => {
+  const { user } = useAuth();
+
+  const getDailyGoal = () => {
+    const day = new Date().getDay();
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayName = dayNames[day];
+
+    if (
+      user?.preferences?.dailyHoursGoals &&
+      dayName in user.preferences.dailyHoursGoals
+    ) {
+      return user.preferences.dailyHoursGoals[dayName];
+    }
+    return 4;
+  };
+
+  const dailyGoal = todaysGoal || getDailyGoal();
+
   const getFocusColor = (focus: number) => {
     switch (focus) {
       case 5:
@@ -42,7 +73,6 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
   const focusColors = getFocusColor(session.focus);
 
-  // Format the creation time in 24-hour format (HH:MM)
   const formatTimeString = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString("en-GB", {
@@ -53,6 +83,11 @@ const SessionCard: React.FC<SessionCardProps> = ({
   };
 
   const timeString = formatTimeString(session.created_at);
+
+  const focusProgressPercent =
+    todaysHours && dailyGoal
+      ? Math.min(100, Math.round((todaysHours / dailyGoal) * 100))
+      : null;
 
   return (
     <div
@@ -149,6 +184,40 @@ const SessionCard: React.FC<SessionCardProps> = ({
               })}`;
             })()}
           </div>
+
+          {todaysHours !== undefined && (
+            <div className="inline-flex items-center px-2.5 py-1 bg-gray-50 dark:bg-gray-800/50 rounded-md text-gray-700 dark:text-gray-300">
+              <svg
+                className="w-4 h-4 mr-1.5 text-gray-500 dark:text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <div className="flex items-center gap-1">
+                <span>
+                  {todaysHours.toFixed(1).replace(/\.0$/, "")}/{dailyGoal}h
+                </span>
+                {focusProgressPercent !== null && (
+                  <span
+                    className={`text-xs ml-1 px-1.5 py-0.5 rounded ${
+                      focusProgressPercent >= 100
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                        : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    }`}
+                  >
+                    {focusProgressPercent}%
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -93,8 +93,6 @@ const PageContent = () => {
   useEffect(() => {
     if (!isAuthChecking) {
       fetchSessions();
-      const keepAliveInterval = setInterval(fetchSessions, 10 * 60 * 1000);
-      return () => clearInterval(keepAliveInterval);
     }
   }, [isAuthChecking]);
 
