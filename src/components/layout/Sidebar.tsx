@@ -15,6 +15,7 @@ import {
   BookOpen,
   Trophy,
   Flame,
+  Activity,
 } from "lucide-react";
 import logoImage from "../../assets/logo-black-Template.png";
 import logoDarkImage from "../../assets/logo-white-Template.png";
@@ -23,6 +24,8 @@ import { useAuth } from "../../context/AuthContext";
 import SidebarTimer from "./SidebarTimer";
 import { api } from "../../utils/api";
 import { Session } from "../../types/Session";
+import { AVAILABLE_SIGNALS } from "../../pages/settings/components/SignalSettings";
+import { useSignals } from "../../context/SignalsContext";
 
 type SidebarProps = {
   selected: string;
@@ -49,6 +52,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [sessions, setSessions] = useState<Session[]>([]);
   // For testing: set to true to simulate under 4 hours
   const [testUnderFourHours, setTestUnderFourHours] = useState(false);
+
+  // Use the SignalsContext instead of local state for signals
+  const { signals, signalScore, totalSignals, completedSignals, updateSignal } =
+    useSignals();
 
   const displayName = user?.email ? user.email.split("@")[0] : title;
 
@@ -317,6 +324,64 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
+      {/* Signal Score Visualization */}
+      <div
+        onClick={() => onSelect("Compass")}
+        className={`mb-0 px-4 py-3 cursor-pointer rounded-xl border ${
+          signalScore >= 80
+            ? "bg-green-50/30 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+            : "bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700"
+        } hover:bg-white/15 dark:hover:bg-slate-700/80`}
+      >
+        <div className="flex justify-between items-center mb-1">
+          <div className="flex items-center">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Signals
+            </span>
+            {signalScore >= 80 && (
+              <div className="ml-2">
+                <Trophy
+                  className="w-3 h-3 text-yellow-500 dark:text-yellow-400"
+                  style={{ display: "inline" }}
+                />
+              </div>
+            )}
+          </div>
+
+          <span
+            className={`text-xs font-semibold ${
+              signalScore >= 80
+                ? "text-green-600 dark:text-green-400"
+                : "text-slate-700 dark:text-slate-300"
+            }`}
+          >
+            {signalScore}%
+            {totalSignals > 0 && (
+              <span className="text-slate-500 dark:text-slate-400">
+                {" "}
+                ({completedSignals}/{totalSignals})
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full ${
+              signalScore >= 80
+                ? "bg-green-500 dark:bg-green-600"
+                : signalScore >= 60
+                ? "bg-green-500 dark:bg-green-600"
+                : signalScore >= 40
+                ? "bg-yellow-500 dark:bg-yellow-600"
+                : "bg-red-500 dark:bg-red-600"
+            }`}
+            style={{ width: `${signalScore}%` }}
+          >
+            {/* No shimmer effect */}
+          </div>
+        </div>
+      </div>
+
       {/* Hours Today Visualization - All animations removed */}
       <div
         onClick={() => onSelect("Compass")}
@@ -329,7 +394,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex justify-between items-center mb-1">
           <div className="flex items-center">
             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Hours Today
+              Hours
             </span>
             {exceededGoal && (
               <div className="ml-2">
@@ -342,14 +407,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Current Streak Display */}
-          {streak > 0 && (
+          {/* {streak > 0 && (
             <div className="flex items-center absolute right-4 top-1">
               <Flame className="w-3 h-3 text-orange-500 dark:text-orange-400 mr-1" />
               <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
                 {streak}d
               </span>
             </div>
-          )}
+          )} */}
 
           <span
             className={`text-xs font-semibold ${

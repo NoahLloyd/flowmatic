@@ -1,5 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from "react";
 import { Signal, SignalStatus } from "../../../types/Signal";
+import { useSignals } from "../../../context/SignalsContext";
 
 interface SignalCardProps {
   metric: string;
@@ -32,6 +33,7 @@ const SignalCard = ({
 }: SignalCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
+  const { updateSignal } = useSignals();
 
   // Get a formatted string representing how long ago the timestamp was
   const getTimeAgo = (timestamp: string | Date): string => {
@@ -63,13 +65,14 @@ const SignalCard = ({
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      onChange(Number(tempValue));
+      handleValueChange(Number(tempValue));
       setIsEditing(false);
     }
   };
 
   const handleValueChange = (newValue: number | boolean) => {
     onChange(newValue);
+    updateSignal(metric, newValue);
   };
 
   // Format the value for display

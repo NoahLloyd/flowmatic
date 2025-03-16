@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Sidebar from "./Sidebar";
 import { useTheme } from "../../context/ThemeContext";
 import SidebarTimer from "./SidebarTimer";
@@ -28,28 +28,65 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     timeRemaining,
     breakTimeRemaining,
     isBreakMode,
+    isRunning,
+    breakIsRunning,
     showInSidebar,
     synchronizeTimerState,
   } = useTimer();
 
   // Force sync timer state when Layout mounts/updates
-  React.useEffect(() => {
+  useEffect(() => {
     // This ensures timer state is always fresh in the sidebar
     synchronizeTimerState();
+
+    // Set up a more frequent check for timer state changes
+    const syncInterval = setInterval(() => {
+      synchronizeTimerState();
+    }, 1000); // Check every second to ensure timely updates
+
     // We only want this to run once on mount and when the selected page changes
     // Don't include synchronizeTimerState in dependencies to avoid infinite loops
+    return () => {
+      clearInterval(syncInterval);
+    };
   }, [selected]); // Only re-run when selected page changes
 
+  // Set up a listener for storage events to handle changes from other components
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "timerState") {
+        console.log("Timer state changed in localStorage, syncing...");
+        synchronizeTimerState();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [synchronizeTimerState]);
+
   // Determine if we should show the timer in the sidebar
-  // 1. Always show if showInSidebar is true
-  // 2. Show if not on Compass page and there's an active session (running or paused)
+  // - Show only if timer is actually running (not paused)
+  // - And either 1) showInSidebar flag is true, or 2) not on Compass page with active timer
   const displaySidebarTimer =
-    showInSidebar ||
-    (selected !== "Compass" &&
-      // For normal timer: either it's running or has remaining time
-      (timeRemaining > 0 ||
-        // For break timer: either it's running or has remaining time
-        (isBreakMode && breakTimeRemaining > 0)));
+    (isRunning || (isBreakMode && breakIsRunning)) && // Only show when timer is actively running
+    (showInSidebar ||
+      (selected !== "Compass" &&
+        // For normal timer: either it's running or has remaining time
+        (timeRemaining > 0 ||
+          // For break timer: either it's running or has remaining time
+          (isBreakMode && breakTimeRemaining > 0))));
+
+  console.log("Sidebar timer visibility:", {
+    displaySidebarTimer,
+    isRunning,
+    breakIsRunning,
+    isBreakMode,
+    showInSidebar,
+    timeRemaining,
+    breakTimeRemaining,
+  });
 
   return (
     <div
@@ -85,4 +122,5 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     </div>
   );
 };
+
 export default Layout;

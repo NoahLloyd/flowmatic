@@ -110,8 +110,8 @@ const createWindow = (): void => {
     });
   }
 };
-const API_BASE_URL = "http://127.0.0.1:8000"; // local development server
-// const API_BASE_URL = "https://flow-backend-9kgo.onrender.com"; // production server
+// const API_BASE_URL = "http://127.0.0.1:8000"; // local development server
+const API_BASE_URL = "https://flow-backend-9kgo.onrender.com"; // production server
 
 ipcMain.handle("api-request", async (_event, { method, endpoint, options }) => {
   try {

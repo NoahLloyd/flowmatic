@@ -4,93 +4,77 @@ import { api } from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
 import { AVAILABLE_SIGNALS } from "../../../pages/settings/components/SignalSettings";
 import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
+import { useSignals } from "../../../context/SignalsContext";
 
 type SignalKey = keyof typeof AVAILABLE_SIGNALS;
 
-// Define unit mapping for different signal types
+// Define units for different signals
 const SIGNAL_UNITS: Record<string, string> = {
-  minutesToOffice: "min",
   waterIntake: "ml",
-  sleep: "hours",
-  steps: "steps",
+  minutesToOffice: "min",
 };
 
 const Signals: React.FC = () => {
   const { user } = useAuth();
-  const [signals, setSignals] = useState<Record<string, number | boolean>>({});
+  // Use the Signals context instead of local state
+  const { signals, updateSignal, refreshSignals } = useSignals();
+
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
-  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  // Get today's date in YYYY-MM-DD format
   const today = new Date().toISOString().split("T")[0];
 
+  // Initial load of signal history
   useEffect(() => {
-    loadDailySignals();
     loadSignalHistory();
-  }, []);
-
-  const loadDailySignals = async () => {
-    try {
-      const data = await api.getDailySignals(today);
-      setSignals(data);
-    } catch (error) {
-      console.error("Failed to load signals:", error);
-    }
-  };
+  }, [user]);
 
   const loadSignalHistory = async () => {
+    if (!user) return;
+
+    setIsHistoryLoading(true);
     try {
-      setIsHistoryLoading(true);
+      // Get dates for the last week (7 days)
+      const dates = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().split("T")[0]);
+      }
 
-      // Calculate date range for the past 7 days
-      const endDate = today;
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 6); // 7 days including today
-      const startDateStr = startDate.toISOString().split("T")[0];
+      // Get the starting date (7 days ago)
+      const startDate = dates[0];
+      // Get ending date (today)
+      const endDate = dates[dates.length - 1];
 
-      console.log(`Fetching signal history from ${startDateStr} to ${endDate}`);
+      console.log(`Loading signal history from ${startDate} to ${endDate}`);
 
-      // Call the API to get all signal history in one call
-      const historyDataArray = await api.getAllSignalHistory(
-        startDateStr,
-        endDate
-      );
+      // Fetch all signal history for the week
+      const historyData = await api.getAllSignalHistory(startDate, endDate);
 
-      // Debug log to see the actual response structure
-      console.log("API Response - All Signal History:", historyDataArray);
+      console.log("Received signal history:", historyData);
 
-      // Transform the array of records into an object grouped by metric
-      const transformedHistory: AllSignalsHistory = {};
+      // Process the history data into a more usable format
+      // Group by metric (signal type)
+      const groupedHistory: AllSignalsHistory = {};
 
-      // Check if the response is an array
-      if (Array.isArray(historyDataArray)) {
-        historyDataArray.forEach((record) => {
-          if (record.metric && record.date && record.value !== undefined) {
-            // Initialize the array for this metric if it doesn't exist
-            if (!transformedHistory[record.metric]) {
-              transformedHistory[record.metric] = [];
-            }
+      if (Array.isArray(historyData)) {
+        historyData.forEach((item) => {
+          const metric = item.metric;
 
-            // Add this record to the appropriate metric array
-            transformedHistory[record.metric].push({
-              date: record.date,
-              value: record.value,
-            });
+          if (!groupedHistory[metric]) {
+            groupedHistory[metric] = [];
           }
+
+          groupedHistory[metric].push({
+            date: item.date,
+            value: item.value,
+          });
         });
       }
 
-      console.log("Transformed history data:", transformedHistory);
-      console.log("Transformed history keys:", Object.keys(transformedHistory));
-
-      // Sample the transformed data
-      const sampleKey = Object.keys(transformedHistory)[0];
-      if (sampleKey) {
-        console.log(
-          `Sample ${sampleKey} history:`,
-          transformedHistory[sampleKey]
-        );
-      }
-
-      setSignalHistory(transformedHistory);
+      setSignalHistory(groupedHistory);
     } catch (error) {
       console.error("Failed to load signal history:", error);
     } finally {
@@ -103,8 +87,8 @@ const Signals: React.FC = () => {
     value: number | boolean
   ) => {
     try {
-      await api.recordSignal(today, metric, value);
-      setSignals((prev) => ({ ...prev, [metric]: value }));
+      // Use the updateSignal function from the context
+      await updateSignal(metric, value);
 
       // Refresh history after a small delay to allow backend to update
       setTimeout(() => {

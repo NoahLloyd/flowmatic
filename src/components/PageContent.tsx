@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
@@ -26,6 +26,90 @@ const PageContent = () => {
     },
     [setSelected]
   );
+
+  // Add keyboard handler for global navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if focused on input elements
+      if (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement ||
+        (document.activeElement &&
+          document.activeElement.hasAttribute("contenteditable"))
+      ) {
+        return;
+      }
+
+      const scrollAmount = window.innerHeight * 0.75; // 75% of viewport height
+
+      if (e.key === "j" || e.key === "k") {
+        // Get the element under mouse position
+        const x = (window.event as MouseEvent)?.clientX || 0;
+        const y = (window.event as MouseEvent)?.clientY || 0;
+        let elementUnderMouse = document.elementFromPoint(x, y);
+
+        // Find the nearest scrollable parent
+        let scrollableElement = null;
+        let currentElement = elementUnderMouse;
+
+        // If there's no element under mouse, use the main content area
+        if (!currentElement) {
+          // Find the main content area with overflow-scroll
+          const mainContentArea = document.querySelector(".overflow-scroll");
+          if (mainContentArea) {
+            scrollableElement = mainContentArea;
+          } else {
+            // Fallback to document.documentElement
+            scrollableElement = document.documentElement;
+          }
+        } else {
+          // Traverse up to find scrollable parent
+          while (currentElement && !scrollableElement) {
+            // Check if element is scrollable
+            const styles = window.getComputedStyle(currentElement);
+            const overflow =
+              styles.getPropertyValue("overflow") ||
+              styles.getPropertyValue("overflow-y");
+
+            const hasScroll =
+              overflow === "auto" ||
+              overflow === "scroll" ||
+              currentElement.scrollHeight > currentElement.clientHeight;
+
+            if (hasScroll && currentElement.scrollHeight > 0) {
+              scrollableElement = currentElement;
+              break;
+            }
+
+            currentElement = currentElement.parentElement;
+          }
+
+          // If no scrollable parent found, use the main content area
+          if (!scrollableElement) {
+            const mainContentArea = document.querySelector(".overflow-scroll");
+            scrollableElement = mainContentArea || document.documentElement;
+          }
+        }
+
+        // Now scroll the identified element
+        if (scrollableElement) {
+          const direction = e.key === "j" ? 1 : -1;
+          scrollableElement.scrollBy({
+            top: direction * scrollAmount,
+            behavior: "smooth",
+          });
+          e.preventDefault(); // Prevent default scrolling
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const {
     timeRemaining: time,

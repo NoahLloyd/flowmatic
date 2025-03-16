@@ -15,6 +15,27 @@ interface TimerState {
   minimized?: boolean;
 }
 
+// Helper function to save timer state and ensure events are properly dispatched
+const saveTimerState = (state: TimerState) => {
+  const stateStr = JSON.stringify(state);
+  localStorage.setItem("timerState", stateStr);
+
+  // Dispatch a storage event to notify other components
+  // This is necessary because localStorage events don't fire in the same window
+  // that made the change
+  try {
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: "timerState",
+        newValue: stateStr,
+        storageArea: localStorage,
+      })
+    );
+  } catch (e) {
+    console.error("Failed to dispatch storage event:", e);
+  }
+};
+
 export const useTimer = (directNavigate?: (page: string) => void) => {
   const { user } = useAuth();
 
@@ -66,6 +87,14 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   };
 
   useEffect(() => {
+    console.log("Timer useEffect running with states:", {
+      isRunning,
+      isBreakMode,
+      breakIsRunning,
+      startTime,
+      breakStartTime,
+    });
+
     const storedState = localStorage.getItem("timerState");
     if (storedState) {
       const parsedState = JSON.parse(storedState) as TimerState;
@@ -91,7 +120,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           );
           const remaining = Math.max(
             0,
-            parsedState.breakDuration || 300 - elapsed
+            (parsedState.breakDuration || 300) - elapsed
           );
           setBreakTimeRemaining(remaining);
 
@@ -117,19 +146,22 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       }
     }
 
-    // Clear any existing intervals
+    // Clear any existing intervals to prevent duplicates
     if (intervalId) {
+      console.log("Clearing existing main timer interval");
       clearInterval(intervalId);
       setIntervalId(null);
     }
 
     if (breakIntervalId) {
+      console.log("Clearing existing break timer interval");
       clearInterval(breakIntervalId);
       setBreakIntervalId(null);
     }
 
-    // Setup main timer interval
+    // Setup main timer interval only if it's running
     if (isRunning && startTime) {
+      console.log("Setting up main timer interval");
       const id = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         const remaining = Math.max(0, duration - elapsed);
@@ -145,7 +177,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning,
           minimized: showInSidebar,
         };
-        localStorage.setItem("timerState", JSON.stringify(timerState));
+        saveTimerState(timerState);
         const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
 
         window.electron.send("update-tray", minutesLeft);
@@ -157,10 +189,24 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       }, 1000);
 
       setIntervalId(id);
+    } else if (!isRunning) {
+      // If not running, make sure we update localStorage to reflect that
+      const timerState: TimerState = {
+        duration,
+        startTime: null,
+        isRunning: false,
+        isBreakMode,
+        breakDuration,
+        breakStartTime,
+        breakIsRunning,
+        minimized: showInSidebar,
+      };
+      saveTimerState(timerState);
     }
 
-    // Setup break timer interval
+    // Setup break timer interval only if it's running
     if (breakIsRunning && breakStartTime) {
+      console.log("Setting up break timer interval");
       const id = setInterval(() => {
         const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
         const remaining = Math.max(0, breakDuration - elapsed);
@@ -176,7 +222,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning: true,
           minimized: showInSidebar,
         };
-        localStorage.setItem("timerState", JSON.stringify(timerState));
+        saveTimerState(timerState);
 
         if (remaining <= 0) {
           // Break timer has reached zero
@@ -185,9 +231,23 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       }, 1000);
 
       setBreakIntervalId(id);
+    } else if (!breakIsRunning && isBreakMode) {
+      // If break timer is not running but we're in break mode, update localStorage
+      const timerState: TimerState = {
+        duration,
+        startTime,
+        isRunning,
+        isBreakMode: true,
+        breakDuration,
+        breakStartTime: null,
+        breakIsRunning: false,
+        minimized: showInSidebar,
+      };
+      saveTimerState(timerState);
     }
 
     return () => {
+      console.log("Cleaning up timer intervals");
       if (intervalId) {
         clearInterval(intervalId);
       }
@@ -199,10 +259,10 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     isRunning,
     startTime,
     duration,
+    isBreakMode,
     breakIsRunning,
     breakStartTime,
     breakDuration,
-    showInSidebar,
   ]);
 
   // Add a dedicated effect for navigation after timer completion
@@ -281,7 +341,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       isBreakMode: false,
       minimized: false,
     };
-    localStorage.setItem("timerState", JSON.stringify(timerState));
+    saveTimerState(timerState);
   };
 
   // Create a universal timer toggle function that both sidebar and main timer will use
@@ -335,7 +395,13 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning: newBreakIsRunning,
           minimized: showInSidebar,
         };
-        localStorage.setItem("timerState", JSON.stringify(timerState));
+        saveTimerState(timerState);
+
+        // Force clear any existing interval when pausing
+        if (!newBreakIsRunning && breakIntervalId) {
+          clearInterval(breakIntervalId);
+          setBreakIntervalId(null);
+        }
 
         return newBreakIsRunning;
       });
@@ -346,7 +412,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
         if (newIsRunning) {
           // Starting the timer - use either existing start time or create new one
-          setStartTime(Date.now());
+          const newStartTime = Date.now() - (duration - timeRemaining) * 1000;
+          setStartTime(newStartTime);
         } else {
           // Pausing the timer - save current time remaining as the new duration
           setDuration(timeRemaining);
@@ -362,7 +429,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         // Always save state to localStorage with current sidebar visibility
         const timerState: TimerState = {
           duration: newIsRunning ? duration : timeRemaining,
-          startTime: newIsRunning ? Date.now() : null,
+          startTime: newIsRunning
+            ? Date.now() - (duration - timeRemaining) * 1000
+            : null,
           isRunning: newIsRunning,
           isBreakMode,
           breakDuration,
@@ -370,7 +439,13 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning,
           minimized: showInSidebar,
         };
-        localStorage.setItem("timerState", JSON.stringify(timerState));
+        saveTimerState(timerState);
+
+        // Force clear any existing interval when pausing
+        if (!newIsRunning && intervalId) {
+          clearInterval(intervalId);
+          setIntervalId(null);
+        }
 
         return newIsRunning;
       });
@@ -403,7 +478,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakIsRunning,
         minimized: showInSidebar,
       };
-      localStorage.setItem("timerState", JSON.stringify(timerState));
+      saveTimerState(timerState);
     } else {
       const newTime = Math.max(duration + amount, 0);
       setDuration(newTime);
@@ -419,7 +494,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakIsRunning,
         minimized: showInSidebar,
       };
-      localStorage.setItem("timerState", JSON.stringify(timerState));
+      saveTimerState(timerState);
     }
   };
 
@@ -457,7 +532,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       breakIsRunning: true,
       minimized: showInSidebar,
     };
-    localStorage.setItem("timerState", JSON.stringify(timerState));
+    saveTimerState(timerState);
 
     // Update tray
     window.electron.send("update-tray", ` Break: ${breakMinutes}m`);
@@ -485,7 +560,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       isBreakMode: false,
       minimized: false,
     };
-    localStorage.setItem("timerState", JSON.stringify(timerState));
+    saveTimerState(timerState);
 
     // Update tray
     window.electron.send("update-tray", ` ${defaultMinutes}m`);
@@ -510,7 +585,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakIsRunning,
         minimized: true,
       };
-      localStorage.setItem("timerState", JSON.stringify(timerState));
+      saveTimerState(timerState);
     }
   };
 
@@ -543,7 +618,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     };
 
     // Save to localStorage to persist the change
-    localStorage.setItem("timerState", JSON.stringify(timerState));
+    saveTimerState(timerState);
   };
 
   // Function to adjust break timer
@@ -574,7 +649,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakIsRunning: true,
         minimized: showInSidebar,
       };
-      localStorage.setItem("timerState", JSON.stringify(timerState));
+      saveTimerState(timerState);
     } else {
       // Adjust paused timer
       const newBreakTime = Math.max(breakTimeRemaining + amount, 0);
@@ -591,7 +666,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakIsRunning: false,
         minimized: showInSidebar,
       };
-      localStorage.setItem("timerState", JSON.stringify(timerState));
+      saveTimerState(timerState);
     }
   };
 
@@ -623,7 +698,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       isBreakMode: false,
       minimized: false,
     };
-    localStorage.setItem("timerState", JSON.stringify(timerState));
+    saveTimerState(timerState);
   };
 
   const showNotification = (message: string) => {
@@ -649,6 +724,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState) as TimerState;
+        console.log("Synchronizing with stored state:", parsedState);
+
+        // Clear any existing intervals first to prevent conflicts
+        if (intervalId) {
+          clearInterval(intervalId);
+          setIntervalId(null);
+        }
+        if (breakIntervalId) {
+          clearInterval(breakIntervalId);
+          setBreakIntervalId(null);
+        }
 
         // Set all timer states based on localStorage
         setDuration(parsedState.duration);
