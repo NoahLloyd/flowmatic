@@ -54,10 +54,11 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   const sessions = propSessions || localSessions;
   const isLoading = propIsLoading ?? isLocalLoading;
 
-  // Get daily goal from user's preferences
-  const getDailyGoal = () => {
-    // Get current day
-    const day = new Date().getDay();
+  // Get daily goal from user's preferences for a specific day
+  const getDailyGoal = (date: Date) => {
+    // Get the day of week (0 = Sunday, 1 = Monday, etc.)
+    const day = date.getDay();
+    // Convert to our day format (monday, tuesday, etc.)
     const dayNames = [
       "sunday",
       "monday",
@@ -79,7 +80,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
     return 4; // Default if not set
   };
 
-  const dailyGoal = getDailyGoal();
+  const dailyGoal = getDailyGoal(new Date());
 
   const getFocusColor = (focus: number) => {
     if (focus < 2)
@@ -108,23 +109,30 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
     };
   };
 
-  const getHoursColor = (hours: number) => {
-    if (hours < 2)
+  const getHoursColor = (hours: number, date: Date) => {
+    // Get the daily goal for this specific day
+    const dailyGoal = getDailyGoal(date);
+
+    // Calculate percentage of goal achieved
+    const percentage = (hours / dailyGoal) * 100;
+
+    // Color based on percentage of goal
+    if (percentage < 25)
       return {
         bg: "bg-red-100 dark:bg-red-900",
         text: "text-red-700 dark:text-red-200",
       };
-    if (hours < 4)
+    if (percentage < 50)
       return {
         bg: "bg-orange-100 dark:bg-orange-900",
         text: "text-orange-700 dark:text-orange-200",
       };
-    if (hours < 6)
+    if (percentage < 75)
       return {
         bg: "bg-yellow-100 dark:bg-yellow-900",
         text: "text-yellow-700 dark:text-yellow-200",
       };
-    if (hours < 8)
+    if (percentage < 100)
       return {
         bg: "bg-green-100 dark:bg-green-900",
         text: "text-green-700 dark:text-green-200",
@@ -286,7 +294,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   return (
     <div className="w-full h-full">
       {isLoading && page === 1 ? (
-        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-center h-[352px] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900">
           Loading sessions...
         </div>
       ) : (
@@ -314,17 +322,19 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                     <div className="flex gap-2 text-xs">
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full ${
-                          getHoursColor(group.totalMinutes / 60).bg
+                          getHoursColor(group.totalMinutes / 60, group.date).bg
                         }`}
                       >
                         <Clock
                           className={`w-3.5 h-3.5 ${
-                            getHoursColor(group.totalMinutes / 60).text
+                            getHoursColor(group.totalMinutes / 60, group.date)
+                              .text
                           }`}
                         />
                         <span
                           className={`font-medium ${
-                            getHoursColor(group.totalMinutes / 60).text
+                            getHoursColor(group.totalMinutes / 60, group.date)
+                              .text
                           }`}
                         >
                           {(group.totalMinutes / 60)
@@ -390,19 +400,6 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                 </div>
               </div>
             ))}
-
-            {groupedSessions.length === 0 && (
-              <div className="text-center py-4 px-6 text-gray-500 dark:text-gray-400 w-full">
-                No sessions recorded yet. Complete your first focused session to
-                see it here.
-              </div>
-            )}
-
-            {isLoading && page > 1 && (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400 w-full">
-                Loading more sessions...
-              </div>
-            )}
           </div>
         </div>
       )}

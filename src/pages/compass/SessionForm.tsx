@@ -6,6 +6,8 @@ import { useAuth } from "../../context/AuthContext";
 
 interface SessionFormProps {
   onSessionCreated: () => Promise<void>;
+  todaysHours?: number;
+  todaysGoal?: number;
 }
 
 interface SessionFormData {
@@ -19,13 +21,46 @@ interface SessionFormData {
   created_at: string;
 }
 
-const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
+const SessionForm: React.FC<SessionFormProps> = ({
+  onSessionCreated,
+  todaysHours = 0,
+  todaysGoal,
+}) => {
   const { tasks } = useTasks();
   const { user } = useAuth();
 
   // Get user's preferred settings from preferences
   const defaultProject = user?.preferences?.defaultProject || "";
   const defaultMinutes = user?.preferences?.defaultMinutes || 60;
+
+  // Get daily goal from user's preferences if not provided
+  const getDailyGoal = () => {
+    if (todaysGoal) return todaysGoal;
+
+    // Get current day
+    const day = new Date().getDay();
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayName = dayNames[day];
+
+    // Check if user has preferences set
+    if (
+      user?.preferences?.dailyHoursGoals &&
+      dayName in user.preferences.dailyHoursGoals
+    ) {
+      return user.preferences.dailyHoursGoals[dayName];
+    }
+    return 4; // Default if not set
+  };
+
+  const dailyGoal = getDailyGoal();
 
   const [formData, setFormData] = useState<SessionFormData>({
     _id: "",

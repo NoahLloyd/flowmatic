@@ -6,6 +6,7 @@ import Tasks from "../pages/tasks/Tasks";
 import Insights from "../pages/insights/insights";
 import Settings from "../pages/settings/Settings";
 import Morning from "../pages/morning/Morning";
+import Notes from "../pages/notes/Notes";
 import { useTimer } from "../hooks/useTimer";
 import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
@@ -13,6 +14,7 @@ import { api } from "../utils/api";
 import { Session } from "../types/Session";
 import Auth from "../pages/auth/Auth";
 import { useAuth } from "../context/AuthContext";
+import Articles from "../pages/articles/Articles";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
@@ -155,6 +157,9 @@ const PageContent = () => {
     case "Morning":
       content = <Morning />;
       break;
+    case "Notes":
+      content = <Notes />;
+      break;
     case "Insights":
       content = (
         <Insights sessions={sessions} isLoadingSessions={isLoadingSessions} />
@@ -162,6 +167,9 @@ const PageContent = () => {
       break;
     case "Settings":
       content = <Settings />;
+      break;
+    case "Articles":
+      content = <Articles />;
       break;
     default:
       content = <Friends />;

@@ -1,0 +1,112 @@
+/* TipTap Editor Styling */
+.tiptap-editor {
+  min-height: 400px;
+}
+
+.tiptap-editor:focus {
+  outline: none;
+}
+
+.tiptap-editor h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor h2 {
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor h3 {
+  font-size: 1.3em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor p {
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.tiptap-editor ul li,
+.tiptap-editor ol li {
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor blockquote {
+  border-left: 3px solid #e2e8f0;
+  padding-left: 1em;
+  margin-left: 0;
+  margin-right: 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.tiptap-editor code {
+  background-color: #f3f4f6;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.tiptap-editor pre {
+  background-color: #f3f4f6;
+  padding: 1em;
+  border-radius: 5px;
+  margin-bottom: 1em;
+  overflow-x: auto;
+}
+
+.tiptap-editor pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.tiptap-editor a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.tiptap-editor a:hover {
+  color: #2563eb;
+}
+
+/* Dark mode adjustments */
+.dark .tiptap-editor {
+  color: #fff;
+}
+
+.dark .tiptap-editor h1,
+.dark .tiptap-editor h2,
+.dark .tiptap-editor h3,
+.dark .tiptap-editor p,
+.dark .tiptap-editor li {
+  color: #fff;
+}
+
+.dark .tiptap-editor code {
+  background-color: #374151;
+  color: #e5e7eb;
+}
+
+.dark .tiptap-editor pre {
+  background-color: #1f2937;
+}
+
+.dark .tiptap-editor blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+.dark .tiptap-editor a {
+  color: #60a5fa;
+}
+
+.dark .tiptap-editor a:hover {
+  color: #93c5fd;
+}
