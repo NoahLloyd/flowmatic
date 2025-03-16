@@ -87,11 +87,36 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
   };
 
   const focusLevels = [
-    { rating: 1, label: "Distracted", color: "bg-red-800" },
-    { rating: 2, label: "Browsing", color: "bg-orange-800" },
-    { rating: 3, label: "Attentive", color: "bg-yellow-800" },
-    { rating: 4, label: "Locked-in", color: "bg-green-800" },
-    { rating: 5, label: "Flow", color: "bg-indigo-800" },
+    {
+      rating: 1,
+      label: "Distracted",
+      bg: "bg-red-100 dark:bg-red-900",
+      text: "text-red-700 dark:text-red-200",
+    },
+    {
+      rating: 2,
+      label: "Browsing",
+      bg: "bg-orange-100 dark:bg-orange-900",
+      text: "text-orange-700 dark:text-orange-200",
+    },
+    {
+      rating: 3,
+      label: "Attentive",
+      bg: "bg-yellow-100 dark:bg-yellow-900",
+      text: "text-yellow-700 dark:text-yellow-200",
+    },
+    {
+      rating: 4,
+      label: "Locked-in",
+      bg: "bg-green-100 dark:bg-green-900",
+      text: "text-green-700 dark:text-green-200",
+    },
+    {
+      rating: 5,
+      label: "Flow",
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
+    },
   ];
 
   const dayTasks = tasks.filter(
@@ -99,68 +124,77 @@ const SessionForm: React.FC<SessionFormProps> = ({ onSessionCreated }) => {
   );
 
   return (
-    <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-4 border border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 transition-all duration-200">
-      <form className="space-y-4">
-        <div className="flex gap-4">
-          <div className="flex-1 flex gap-4">
-            <select
-              name="task"
-              value={formData.task}
-              onChange={handleInputChange}
-              className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100"
-            >
-              <option value="">Select a task</option>
-              {dayTasks.map((task) => (
-                <option key={task._id} value={task.title}>
-                  {task.title}
-                </option>
-              ))}
-            </select>
-            <input
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              placeholder="Notes"
-              className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-            />
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              name="project"
-              value={formData.project}
-              onChange={handleInputChange}
-              placeholder="Project"
-              className="w-20 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-            />
-            <input
-              type="number"
-              name="time"
-              value={formData.time}
-              onChange={handleInputChange}
-              placeholder="Min"
-              className="w-16 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-2">
-          {focusLevels.map(({ rating, label, color }) => (
-            <button
-              key={rating}
-              type="button"
-              onClick={() => handleSubmit(rating)}
-              className="flex-1 flex text-xs text-white rounded-lg hover:scale-105 transition-transform overflow-hidden shadow-sm"
-            >
-              <div className={`${color} px-3 py-2 font-bold`}>{rating}</div>
-              <div
-                className={`${color} bg-opacity-80 font-medium px-2.5 py-2 flex-1`}
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+        <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+          Record Session
+        </h2>
+      </div>
+      <div className="p-5 bg-white dark:bg-gray-900">
+        <form className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 space-y-4 md:space-y-0 md:flex md:gap-4">
+              <select
+                name="task"
+                value={formData.task}
+                onChange={handleInputChange}
+                className="w-full md:w-1/2 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm"
               >
-                {label}
-              </div>
-            </button>
-          ))}
-        </div>
-      </form>
+                <option value="">Select a task</option>
+                {dayTasks.map((task) => (
+                  <option key={task._id} value={task.title}>
+                    {task.title}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Notes"
+                className="w-full md:w-1/2 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                name="project"
+                value={formData.project}
+                onChange={handleInputChange}
+                placeholder="Project"
+                className="w-full md:w-auto flex-grow p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
+              />
+              <input
+                type="number"
+                name="time"
+                value={formData.time}
+                onChange={handleInputChange}
+                placeholder="Min"
+                className="w-20 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+            {focusLevels.map(({ rating, label, bg, text }) => (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => handleSubmit(rating)}
+                className={`w-full flex text-sm ${text} rounded-md transition-all hover:opacity-90 overflow-hidden`}
+              >
+                <div
+                  className={`${bg} px-3 py-2 font-medium flex items-center justify-center`}
+                >
+                  {rating}
+                </div>
+                <div className={`${bg} px-3 py-2 flex-1 text-center`}>
+                  {label}
+                </div>
+              </button>
+            ))}
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

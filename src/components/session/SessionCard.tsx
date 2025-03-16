@@ -57,9 +57,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
   return (
     <div
       key={session.created_at}
-      className={`bg-white dark:bg-slate-800 w-full rounded-lg shadow-sm border border-gray-100 dark:border-slate-700 ${
+      className={`bg-white dark:bg-gray-900 w-full rounded-lg border border-gray-200 dark:border-gray-800 ${
         small ? "p-3" : "p-4"
-      } hover:shadow-md transition-shadow`}
+      } hover:shadow-sm transition-all hover:border-gray-300 dark:hover:border-gray-700`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -77,32 +77,34 @@ const SessionCard: React.FC<SessionCardProps> = ({
               : "Distracted"}
           </span>
           {small && (
-            <span className="text-gray-600 dark:text-gray-300 text-sm">
+            <span className="text-gray-700 dark:text-gray-300 text-sm">
               {session.project}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <span>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-gray-600 dark:text-gray-400">
             {timeString.charAt(0) === "0"
               ? timeString.substring(1)
               : timeString}
           </span>
-          <span>{session.minutes}</span>
+          <span className="px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium">
+            {session.minutes}
+          </span>
         </div>
       </div>
 
       {session.notes && (
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+        <p className="text-sm text-gray-700 dark:text-gray-300 mt-2 mb-1 line-clamp-2">
           {session.notes}
         </p>
       )}
 
       {!small && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          <div className="inline-flex items-center text-gray-600 dark:text-gray-300">
+        <div className="flex flex-wrap gap-3 text-sm mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <div className="inline-flex items-center px-2.5 py-1 bg-gray-50 dark:bg-gray-800/50 rounded-md text-gray-700 dark:text-gray-300">
             <svg
-              className="w-4 h-4 mr-1"
+              className="w-4 h-4 mr-1.5 text-gray-500 dark:text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -117,9 +119,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
             {session.project}
           </div>
 
-          <div className="inline-flex items-center text-gray-600 dark:text-gray-300">
+          <div className="inline-flex items-center px-2.5 py-1 bg-gray-50 dark:bg-gray-800/50 rounded-md text-gray-700 dark:text-gray-300">
             <svg
-              className="w-4 h-4 mr-1"
+              className="w-4 h-4 mr-1.5 text-gray-500 dark:text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

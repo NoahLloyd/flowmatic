@@ -85,7 +85,7 @@ const Compass: React.FC<CompassProps> = ({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="p-6 space-y-6">
       <TimerCompleteModal
         isOpen={isModalOpen}
         onClose={onCloseModal}
@@ -100,44 +100,44 @@ const Compass: React.FC<CompassProps> = ({
       />
 
       {/* Signals Section */}
-      <div className="mb-8">
-        <Signals />
-      </div>
+      <Signals />
 
       {/* Timer and Sessions Section */}
-      <div className="flex space-x-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Timer */}
-        <div className="flex-shrink-0">
-          <div className="">
-            <TimerDisplay
-              time={time}
-              isRunning={isRunning}
-              onStartPause={onStartPause}
-              onReset={onReset}
-              onAdjustTime={onAdjustTime}
-            />
-          </div>
+        <div className="h-full">
+          <TimerDisplay
+            time={time}
+            isRunning={isRunning}
+            onStartPause={onStartPause}
+            onReset={onReset}
+            onAdjustTime={onAdjustTime}
+          />
         </div>
 
         {/* Sessions Overview */}
-        <div className="flex-grow">
-          <div className="overflow-x-auto">
-            <SessionsOverview
-              sessions={sessions}
-              isLoading={isLoadingSessions}
-              onSessionsUpdate={onSessionsUpdate}
-            />
+        <div className="lg:col-span-2">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
+            <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+                Sessions Overview
+              </h2>
+            </div>
+            <div className="p-5 bg-white dark:bg-gray-900 h-[calc(100%-48px)]">
+              <SessionsOverview
+                sessions={sessions}
+                isLoading={isLoadingSessions}
+                onSessionsUpdate={onSessionsUpdate}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Bottom section: Form and Stats */}
-      <div className="text-gray-900 dark:text-gray-100">
-        <SessionForm onSessionCreated={onSessionCreated} />
-        <div className="mt-4">
-          <SessionStats sessions={sessions} />
-        </div>
-      </div>
+      <SessionForm onSessionCreated={onSessionCreated} />
+
+      <SessionStats sessions={sessions} />
     </div>
   );
 };

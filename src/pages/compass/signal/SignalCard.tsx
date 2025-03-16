@@ -29,13 +29,19 @@ const SignalCard: React.FC<SignalCardProps> = ({
   };
 
   const getTimeColor = (minutes: number) => {
-    if (minutes <= 15) return "bg-emerald-500 text-white";
-    if (minutes <= 30) return "bg-green-500 text-white";
-    if (minutes <= 45) return "bg-yellow-500 text-black";
-    if (minutes <= 60) return "bg-orange-500 text-white";
-    if (minutes <= 120) return "bg-red-500 text-white";
-    if (minutes <= 180) return "bg-red-600 text-white";
-    return "bg-red-700 text-white";
+    if (minutes <= 15)
+      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
+    if (minutes <= 30)
+      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
+    if (minutes <= 45)
+      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200";
+    if (minutes <= 60)
+      return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200";
+    if (minutes <= 120)
+      return "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200";
+    if (minutes <= 180)
+      return "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200";
+    return "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200";
   };
 
   const renderWaterOptions = () => {
@@ -50,14 +56,14 @@ const SignalCard: React.FC<SignalCardProps> = ({
           <button
             key={option.value}
             onClick={() => onChange((value as number) + option.value)}
-            className="py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+            className="py-1.5 px-3 rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
           >
             +{option.label}
           </button>
         ))}
         <div
           onClick={() => setIsEditing(true)}
-          className="flex-1 text-center py-1.5 px-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer"
+          className="flex-1 text-center py-1.5 px-2 text-sm font-mono bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md cursor-pointer text-gray-800 dark:text-gray-200"
         >
           {isEditing ? (
             <input
@@ -69,11 +75,11 @@ const SignalCard: React.FC<SignalCardProps> = ({
                 onChange(Number(tempValue));
                 setIsEditing(false);
               }}
-              className="w-full text-center h-full focus:outline-none bg-transparent dark:text-white"
+              className="w-full text-center h-full focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 bg-transparent text-gray-800 dark:text-gray-200"
               autoFocus
             />
           ) : (
-            `${value}ml`
+            <span className="text-gray-800 dark:text-gray-200">{value}ml</span>
           )}
         </div>
       </div>
@@ -83,15 +89,15 @@ const SignalCard: React.FC<SignalCardProps> = ({
   const renderScale = () => {
     const getScaleColor = (num: number) => {
       const colors = {
-        1: "bg-red-500 hover:bg-red-600",
-        2: "bg-orange-500 hover:bg-orange-600",
-        3: "bg-yellow-500 hover:bg-yellow-600",
-        4: "bg-lime-500 hover:bg-lime-600",
-        5: "bg-green-500 hover:bg-green-600",
+        1: "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200",
+        2: "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200",
+        3: "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200",
+        4: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200",
+        5: "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200",
       };
       return (
         colors[num as keyof typeof colors] ||
-        "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600"
+        "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
       );
     };
 
@@ -101,10 +107,10 @@ const SignalCard: React.FC<SignalCardProps> = ({
           <button
             key={num}
             onClick={() => onChange(num)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+            className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
               value === num
-                ? `${getScaleColor(num)} text-white shadow-sm`
-                : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                ? getScaleColor(num)
+                : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
             }`}
           >
             {num}
@@ -118,9 +124,9 @@ const SignalCard: React.FC<SignalCardProps> = ({
     return (
       <div
         onClick={() => setIsEditing(true)}
-        className={`w-full text-center py-1 px-2 text-sm font-mono rounded-lg cursor-pointer ${
+        className={`w-full text-center py-1.5 px-2 text-sm font-medium rounded-md cursor-pointer ${
           isEditing
-            ? "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+            ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-gray-200"
             : getTimeColor(value as number)
         }`}
       >
@@ -134,7 +140,7 @@ const SignalCard: React.FC<SignalCardProps> = ({
               onChange(Number(tempValue));
               setIsEditing(false);
             }}
-            className="w-full h-6 text-center focus:outline-none bg-transparent dark:text-white"
+            className="w-full h-6 text-center focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 bg-transparent"
             autoFocus
           />
         ) : (
@@ -147,9 +153,9 @@ const SignalCard: React.FC<SignalCardProps> = ({
   };
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200">
-      <div className="flex justify-between items-center mb-1.5">
-        <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 p-3 transition-colors hover:border-gray-300 dark:hover:border-gray-700">
+      <div className="flex justify-between items-center mb-2">
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
           {label}
         </label>
       </div>
@@ -157,10 +163,10 @@ const SignalCard: React.FC<SignalCardProps> = ({
       {type === "binary" ? (
         <button
           onClick={() => onChange(!value)}
-          className={`w-full py-1.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+          className={`w-full py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
             value
-              ? "bg-indigo-500 text-white shadow-sm hover:bg-indigo-600"
-              : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+              ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
+              : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
           }`}
         >
           {value ? "Yes" : "No"}

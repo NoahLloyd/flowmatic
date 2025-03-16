@@ -34,9 +34,27 @@ interface TimerCompleteModalProps {
 
 // Define the break options
 const breakOptions = [
-  { minutes: 5, shortcut: "1", label: "Short Break" },
-  { minutes: 15, shortcut: "2", label: "Medium Break" },
-  { minutes: 30, shortcut: "3", label: "Long Break" },
+  {
+    minutes: 5,
+    shortcut: "1",
+    label: "Short Break",
+    bg: "bg-indigo-100 dark:bg-indigo-900",
+    text: "text-indigo-700 dark:text-indigo-200",
+  },
+  {
+    minutes: 15,
+    shortcut: "2",
+    label: "Medium Break",
+    bg: "bg-green-100 dark:bg-green-900",
+    text: "text-green-700 dark:text-green-200",
+  },
+  {
+    minutes: 30,
+    shortcut: "3",
+    label: "Long Break",
+    bg: "bg-yellow-100 dark:bg-yellow-900",
+    text: "text-yellow-700 dark:text-yellow-200",
+  },
 ];
 
 const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
@@ -163,31 +181,36 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
     {
       rating: 1,
       label: "Distracted",
-      color: "bg-red-600 dark:bg-red-800",
+      bg: "bg-red-100 dark:bg-red-900",
+      text: "text-red-700 dark:text-red-200",
       shortcut: "1",
     },
     {
       rating: 2,
       label: "Browsing",
-      color: "bg-orange-600 dark:bg-orange-800",
+      bg: "bg-orange-100 dark:bg-orange-900",
+      text: "text-orange-700 dark:text-orange-200",
       shortcut: "2",
     },
     {
       rating: 3,
       label: "Attentive",
-      color: "bg-yellow-600 dark:bg-yellow-800",
+      bg: "bg-yellow-100 dark:bg-yellow-900",
+      text: "text-yellow-700 dark:text-yellow-200",
       shortcut: "3",
     },
     {
       rating: 4,
       label: "Locked-in",
-      color: "bg-green-600 dark:bg-green-800",
+      bg: "bg-green-100 dark:bg-green-900",
+      text: "text-green-700 dark:text-green-200",
       shortcut: "4",
     },
     {
       rating: 5,
       label: "Flow",
-      color: "bg-indigo-600 dark:bg-indigo-800",
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
       shortcut: "5",
     },
   ];
@@ -316,10 +339,10 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Overlay - allow clicking through */}
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm pointer-events-none" />
 
       {/* Modal container */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+      <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-lg w-full mx-4 overflow-hidden border border-gray-200 dark:border-gray-800">
         <AnimatePresence mode="wait">
           {currentStep === "focus" && (
             <motion.div
@@ -330,28 +353,28 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
               transition={{ duration: 0.2 }}
               className="p-6"
             >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Session Details
                 </h2>
                 <button
                   onClick={handleClose}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                 >
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Session form fields - similar to SessionForm.tsx */}
               <div className="space-y-4 mb-6">
-                <div className="flex gap-4">
-                  <div className="flex-1 flex gap-4">
+                <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:gap-4">
+                  <div className="flex-1 space-y-4 md:space-y-0 md:flex md:gap-4">
                     <select
                       ref={taskInputRef}
                       name="task"
                       value={formData.task}
                       onChange={handleInputChange}
-                      className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100"
+                      className="w-full md:w-1/2 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm"
                     >
                       <option value="">Select a task</option>
                       {dayTasks.map((task) => (
@@ -366,7 +389,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                       value={formData.notes}
                       onChange={handleInputChange}
                       placeholder="Notes"
-                      className="w-1/2 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      className="w-full md:w-1/2 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -377,7 +400,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                       value={formData.project}
                       onChange={handleInputChange}
                       placeholder="Project"
-                      className="w-20 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      className="flex-grow p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
                     />
                     <input
                       ref={minutesInputRef}
@@ -386,57 +409,57 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                       value={formData.minutes}
                       onChange={handleInputChange}
                       placeholder="Min"
-                      className="w-16 p-2 bg-white dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg focus:outline-none focus:border-slate-300 dark:focus:border-gray-500 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                      className="w-20 p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 text-gray-800 dark:text-gray-200 text-sm placeholder-gray-500 dark:placeholder-gray-400"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                <span className="inline-block mr-3">
-                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">
+              <div className="flex flex-wrap gap-2 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                <span className="inline-block">
+                  <kbd className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono text-xs">
                     T
                   </kbd>{" "}
                   task
                 </span>
-                <span className="inline-block mr-3">
-                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">
+                <span className="inline-block">
+                  <kbd className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono text-xs">
                     N
                   </kbd>{" "}
                   notes
                 </span>
-                <span className="inline-block mr-3">
-                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">
+                <span className="inline-block">
+                  <kbd className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono text-xs">
                     P
                   </kbd>{" "}
                   project
                 </span>
-                <span className="inline-block mr-3">
-                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">
+                <span className="inline-block">
+                  <kbd className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono text-xs">
                     M
                   </kbd>{" "}
                   minutes
                 </span>
                 <span className="inline-block">
-                  <kbd className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 font-mono">
+                  <kbd className="px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono text-xs">
                     Esc
                   </kbd>{" "}
-                  exit inputs
+                  exit
                 </span>
               </div>
 
-              <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                 Rate your session focus
               </h3>
 
-              <div className="space-y-3">
-                {focusLevels.map(({ rating, label, color, shortcut }) => (
+              <div className="space-y-2">
+                {focusLevels.map(({ rating, label, bg, text, shortcut }) => (
                   <button
                     key={rating}
                     onClick={() => handleFocusRating(rating)}
-                    className={`w-full flex items-center text-white rounded-lg p-3 hover:opacity-90 transition-opacity ${color}`}
+                    className={`w-full flex items-center ${text} rounded-md p-2.5 transition-colors ${bg}`}
                   >
-                    <div className="flex items-center justify-center bg-black/10 rounded-md w-8 h-8 mr-3 font-bold">
+                    <div className="flex items-center justify-center bg-black/10 rounded-md w-8 h-8 mr-3 font-medium">
                       {shortcut}
                     </div>
                     <span className="font-medium">{label}</span>
@@ -456,25 +479,25 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
               className="p-6"
             >
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Take a break?
                 </h2>
                 <button
                   onClick={handleClose}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                 >
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-3 mb-4">
+              <div className="space-y-2 mb-6">
                 {breakOptions.map((option, index) => (
                   <button
                     key={index}
                     onClick={() => handleBreakSelection(option.minutes)}
-                    className="w-full flex items-center bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg p-3 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                    className={`w-full flex items-center ${option.bg} ${option.text} rounded-md p-2.5 transition-colors`}
                   >
-                    <div className="flex items-center justify-center bg-blue-200 dark:bg-blue-800 rounded-md w-8 h-8 mr-3 font-bold text-blue-700 dark:text-blue-200">
+                    <div className="flex items-center justify-center bg-black/10 rounded-md w-8 h-8 mr-3 font-medium">
                       {option.shortcut}
                     </div>
                     <span className="font-medium">
@@ -483,21 +506,21 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                   </button>
                 ))}
 
-                <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  <Clock className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                <div className="flex items-center p-3 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                  <Clock className="w-5 h-5 text-gray-600 dark:text-gray-300 mr-2" />
                   <input
                     type="number"
                     value={customBreakTime}
                     onChange={handleCustomBreakChange}
-                    className="w-16 p-1 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-center"
+                    className="w-16 p-1.5 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-center text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500"
                     min="1"
                   />
-                  <span className="text-gray-600 dark:text-gray-300">
+                  <span className="text-gray-600 dark:text-gray-300 ml-2">
                     minutes
                   </span>
                   <button
                     onClick={() => handleBreakSelection(customBreakTime)}
-                    className="ml-auto bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 p-2 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
+                    className="ml-auto bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 p-1.5 rounded-md"
                   >
                     <Check className="w-4 h-4" />
                   </button>
@@ -508,9 +531,9 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                     onRestartTimer();
                     handleClose();
                   }}
-                  className="w-full flex items-center bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-lg p-3 hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                  className="w-full flex items-center bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-md p-2.5 transition-colors"
                 >
-                  <div className="flex items-center justify-center bg-green-200 dark:bg-green-800 rounded-md w-8 h-8 mr-3 font-bold text-green-700 dark:text-green-200">
+                  <div className="flex items-center justify-center bg-black/10 rounded-md w-8 h-8 mr-3 font-medium">
                     4
                   </div>
                   <span className="font-medium">Start new timer (60m)</span>
@@ -518,9 +541,9 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
 
                 <button
                   onClick={handleClose}
-                  className="w-full flex items-center bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg p-3 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="w-full flex items-center bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md p-2.5 transition-colors border border-gray-200 dark:border-gray-700"
                 >
-                  <div className="flex items-center justify-center bg-gray-200 dark:bg-gray-600 rounded-md w-8 h-8 mr-3 font-bold text-gray-700 dark:text-gray-200">
+                  <div className="flex items-center justify-center bg-gray-300 dark:bg-gray-700 rounded-md w-8 h-8 mr-3 font-medium">
                     5
                   </div>
                   <span className="font-medium">Done for now</span>
@@ -539,20 +562,20 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
               className="p-6"
             >
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Break Timer
                 </h2>
                 <button
                   onClick={handleClose}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                 >
-                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="flex flex-col items-center justify-center space-y-6">
                 <div className="text-center">
-                  <div className="text-teal-600 dark:text-teal-400 font-medium mb-2">
+                  <div className="text-blue-600 dark:text-blue-400 font-medium mb-2">
                     Time Remaining
                   </div>
                   <div className="text-5xl font-bold text-gray-900 dark:text-white">
@@ -560,16 +583,16 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex space-x-4">
+                <div className="flex space-x-2">
                   <button
                     onClick={() => onBreakTimerAdjust(-60)}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="px-3 py-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-md transition-colors text-sm text-gray-700 dark:text-gray-300"
                   >
                     -1m
                   </button>
                   <button
                     onClick={() => onBreakTimerAdjust(60)}
-                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="px-3 py-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-md transition-colors text-sm text-gray-700 dark:text-gray-300"
                   >
                     +1m
                   </button>
@@ -578,7 +601,11 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                 <div className="flex space-x-3">
                   <button
                     onClick={onBreakTimerStartPause}
-                    className="flex items-center justify-center p-3 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800"
+                    className={`p-3 rounded-full transition-colors ${
+                      isBreakTimerRunning
+                        ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
+                        : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"
+                    }`}
                   >
                     {isBreakTimerRunning ? (
                       <Pause className="w-5 h-5" />
@@ -591,13 +618,13 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                       onBreakTimerReset();
                       handleClose();
                     }}
-                    className="flex items-center justify-center p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg hover:bg-red-200 dark:hover:bg-red-800"
+                    className="p-3 bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded-full transition-colors"
                   >
                     <X className="w-5 h-5" />
                   </button>
                   <button
                     onClick={onBreakTimerReset}
-                    className="flex items-center justify-center p-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="p-3 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-full transition-colors"
                   >
                     <RefreshCw className="w-5 h-5" />
                   </button>

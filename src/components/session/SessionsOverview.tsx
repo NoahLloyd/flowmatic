@@ -64,7 +64,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
         bg: "bg-yellow-100 dark:bg-yellow-900",
         text: "text-yellow-700 dark:text-yellow-200",
       };
-    if (focus < 5)
+    if (focus < 4.5)
       return {
         bg: "bg-green-100 dark:bg-green-900",
         text: "text-green-700 dark:text-green-200",
@@ -250,46 +250,48 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full">
       {isLoading && page === 1 ? (
-        <p>Loading sessions...</p>
+        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          Loading sessions...
+        </div>
       ) : (
         <div
-          className="overflow-x-auto overflow-y-hidden whitespace-nowrap"
+          className="overflow-x-auto overflow-y-hidden whitespace-nowrap h-full"
           onScroll={handleScroll}
           ref={containerRef}
           style={{ scrollSnapType: "x mandatory" }}
         >
-          <div className="inline-flex gap-4">
+          <div className="inline-flex gap-4 pb-2">
             {groupedSessions.map((group, groupIndex) => (
               <div
                 key={`group-${group.date.toISOString()}-${groupIndex}`}
-                className="w-[250px] inline-block"
+                className="w-72 inline-block"
                 style={{ scrollSnapAlign: "start" }}
               >
-                <div className="sticky top-0 bg-slate-50 dark:bg-slate-800 backdrop-blur-sm p-3 rounded-lg border border-gray-200 dark:border-slate-700 mb-3 shadow-sm">
+                <div className="sticky top-0 bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 mb-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                      <span className="font-medium text-gray-900 dark:text-slate-200">
+                      <Calendar className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      <span className="font-medium text-gray-900 dark:text-gray-200">
                         {format(group.date, "MMM d")}
                       </span>
                     </div>
-                    <div className="flex gap-3 text-sm">
+                    <div className="flex gap-2 text-xs">
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full ${
                           getHoursColor(group.totalMinutes / 60).bg
-                        } dark:bg-opacity-80`}
+                        }`}
                       >
                         <Clock
-                          className={`w-4 h-4 ${
+                          className={`w-3.5 h-3.5 ${
                             getHoursColor(group.totalMinutes / 60).text
                           }`}
                         />
                         <span
-                          className={
+                          className={`font-medium ${
                             getHoursColor(group.totalMinutes / 60).text
-                          }
+                          }`}
                         >
                           {(group.totalMinutes / 60)
                             .toFixed(1)
@@ -300,15 +302,17 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full ${
                           getFocusColor(group.averageFocus).bg
-                        } dark:bg-opacity-80`}
+                        }`}
                       >
                         <Brain
-                          className={`w-4 h-4 ${
+                          className={`w-3.5 h-3.5 ${
                             getFocusColor(group.averageFocus).text
                           }`}
                         />
                         <span
-                          className={getFocusColor(group.averageFocus).text}
+                          className={`font-medium ${
+                            getFocusColor(group.averageFocus).text
+                          }`}
                         >
                           {group.averageFocus}
                         </span>
@@ -317,8 +321,8 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-y-auto max-h-[260px]">
-                  <div className="grid gap-3 grid-cols-1">
+                <div className="overflow-y-auto max-h-[280px]">
+                  <div className="grid gap-2 grid-cols-1">
                     {group.sessions.map((session, sessionIndex) => (
                       <div
                         key={`session-${
@@ -329,9 +333,9 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                             ? () => handleSessionClick(session)
                             : undefined
                         }
-                        className={
-                          deleteItems ? "cursor-pointer w-full" : "w-full"
-                        }
+                        className={`${
+                          deleteItems ? "cursor-pointer" : ""
+                        } w-full transition-all hover:scale-[1.01]`}
                       >
                         <SessionCard session={session} small={true} />
                       </div>
@@ -342,8 +346,9 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
             ))}
 
             {groupedSessions.length === 0 && (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400 w-full">
-                No sessions recorded.
+              <div className="text-center py-4 px-6 text-gray-500 dark:text-gray-400 w-full">
+                No sessions recorded yet. Complete your first focused session to
+                see it here.
               </div>
             )}
 

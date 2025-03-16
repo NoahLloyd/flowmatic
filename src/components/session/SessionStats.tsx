@@ -128,36 +128,40 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
     progress: number;
     expectedProgress: number;
   }) => (
-    <div className="flex-1 relative overflow-hidden rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+    <div className="flex-1 relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* Progress background - expected progress */}
       <div
-        className="absolute inset-0 bg-slate-100 dark:bg-slate-700 opacity-30"
+        className="absolute inset-0 bg-gray-100 dark:bg-gray-800 opacity-30"
         style={{ width: `${expectedProgress}%` }}
       />
 
       {/* Progress background - actual progress */}
       <div
-        className="absolute inset-0 bg-blue-100 dark:bg-blue-900 opacity-50"
+        className={`absolute inset-0 ${
+          offset >= 0
+            ? "bg-green-100 dark:bg-green-900/30"
+            : "bg-red-100 dark:bg-red-900/30"
+        }`}
         style={{ width: `${Math.min(100, progress)}%` }}
       />
 
       {/* Expected progress marker - vertical line */}
       <div
-        className="absolute top-0 bottom-0 w-px bg-slate-400 dark:bg-slate-500"
+        className="absolute top-0 bottom-0 w-px bg-gray-400 dark:bg-gray-500"
         style={{ left: `${expectedProgress}%` }}
       />
 
       {/* Card content */}
       <div className="relative p-4">
         <div className="flex items-baseline gap-2">
-          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {typeof hours === "number"
               ? hours.toFixed(1).replace(/\.0$/, "")
               : hours}
           </p>
 
           {target && (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               / {target}
             </p>
           )}
@@ -173,7 +177,7 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
             {Math.round(offset)}h)
           </p>
         </div>
-        <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">
+        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
           {title} ({progress}%)
         </h3>
       </div>
@@ -181,7 +185,7 @@ const SessionStats: React.FC<SessionStatsProps> = ({ sessions }) => {
   );
 
   return (
-    <div className="flex gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Hours Today Card */}
       <ProgressCard
         title="hours today"

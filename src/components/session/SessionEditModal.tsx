@@ -38,25 +38,25 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-slate-200">
+    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 w-full max-w-md border border-gray-200 dark:border-gray-800 shadow-lg">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
           Edit Session
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Notes
             </label>
             <textarea
               name="notes"
               value={formData.notes}
               onChange={handleInputChange}
-              className="mt-1 w-full p-2 border rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Task
             </label>
             <input
@@ -64,11 +64,11 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
               name="task"
               value={formData.task}
               onChange={handleInputChange}
-              className="mt-1 w-full p-2 border rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Project
             </label>
             <input
@@ -76,11 +76,11 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
               name="project"
               value={formData.project}
               onChange={handleInputChange}
-              className="mt-1 w-full p-2 border rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Minutes
             </label>
             <input
@@ -88,11 +88,11 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
               name="minutes"
               value={formData.minutes}
               onChange={handleInputChange}
-              className="mt-1 w-full p-2 border rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
               Focus Level (1-5)
             </label>
             <input
@@ -102,14 +102,14 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
               max="5"
               value={formData.focus}
               onChange={handleInputChange}
-              className="mt-1 w-full p-2 border rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-200 border-gray-300 dark:border-slate-600"
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
             />
           </div>
           <div className="flex justify-between pt-4">
             <button
               type="button"
               onClick={handleDelete}
-              className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-4 py-2 rounded hover:bg-red-200 dark:hover:bg-red-800"
+              className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
             >
               Delete
             </button>
@@ -117,13 +117,13 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200 px-4 py-2 rounded hover:bg-gray-300 dark:hover:bg-slate-600"
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-4 py-2 rounded hover:bg-blue-200 dark:hover:bg-blue-800"
+                className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-200 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
               >
                 Save
               </button>
