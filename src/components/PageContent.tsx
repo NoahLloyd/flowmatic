@@ -147,6 +147,7 @@ const PageContent = () => {
     // Sidebar timer props - we don't need to pass these to Compass
     // since they're accessed directly in Layout
     synchronizeTimerState,
+    forceRefreshTimerDisplay,
   } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
@@ -203,8 +204,38 @@ const PageContent = () => {
     if (selected === "Compass") {
       // Force reload timer state from localStorage to ensure everything is in sync
       synchronizeTimerState();
+
+      // Force refresh the timer display to ensure it's showing the correct time
+      forceRefreshTimerDisplay();
     }
   }, [selected]); // Only re-run when selected page changes
+
+  // Add a special handler for when the user returns to Compass from another page
+  // This ensures the timer continues running properly after navigation
+  useEffect(() => {
+    let refreshTimer: NodeJS.Timeout | null = null;
+
+    if (selected === "Compass" && isRunning) {
+      // Force an immediate refresh
+      forceRefreshTimerDisplay();
+
+      // Set up a short series of refreshes to ensure the timer reconnects properly
+      refreshTimer = setTimeout(() => {
+        forceRefreshTimerDisplay();
+
+        // Sometimes a second refresh is needed to ensure the timer kicks back in
+        setTimeout(() => {
+          forceRefreshTimerDisplay();
+        }, 500);
+      }, 100);
+    }
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+    };
+  }, [selected, isRunning, forceRefreshTimerDisplay]);
 
   // Handle adding a task from the quick add modal
   const handleQuickAddTask = async (

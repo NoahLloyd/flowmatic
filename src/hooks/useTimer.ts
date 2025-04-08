@@ -794,10 +794,76 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   };
 
+  // Function to force refresh the timer display without changing the time
+  const forceRefreshTimerDisplay = () => {
+    // If we're on the Compass page, ensure the timer is not showing in sidebar
+    if (isRunning) {
+      // When navigating to Compass, we should ensure the timer isn't in sidebar mode
+      setShowInSidebar(false);
+
+      // Update localStorage to reflect that the timer is no longer minimized
+      const timerState: TimerState = {
+        duration,
+        startTime,
+        isRunning,
+        isBreakMode,
+        breakDuration,
+        breakStartTime,
+        breakIsRunning,
+        minimized: false,
+      };
+      saveTimerState(timerState);
+    }
+
+    if (isRunning && startTime) {
+      // Calculate the correct time remaining based on the current startTime
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+      setTimeRemaining(remaining);
+
+      // Ensure the interval is running
+      if (!intervalId) {
+        const newIntervalId = setInterval(() => {
+          const nowElapsed = Math.floor((Date.now() - startTime) / 1000);
+          const nowRemaining = Math.max(0, duration - nowElapsed);
+          setTimeRemaining(nowRemaining);
+
+          // Check if timer has completed
+          if (nowRemaining <= 0) {
+            handleTimerComplete();
+          }
+        }, 1000);
+
+        setIntervalId(newIntervalId);
+      }
+    } else if (breakIsRunning && breakStartTime) {
+      // Do the same for break timer
+      const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
+      const remaining = Math.max(0, breakDuration - elapsed);
+      setBreakTimeRemaining(remaining);
+
+      // Ensure break interval is running
+      if (!breakIntervalId) {
+        const newBreakIntervalId = setInterval(() => {
+          const nowElapsed = Math.floor((Date.now() - breakStartTime) / 1000);
+          const nowRemaining = Math.max(0, breakDuration - nowElapsed);
+          setBreakTimeRemaining(nowRemaining);
+
+          // Check if break timer has completed
+          if (nowRemaining <= 0) {
+            handleBreakComplete();
+          }
+        }, 1000);
+
+        setBreakIntervalId(newBreakIntervalId);
+      }
+    }
+  };
+
   return {
     timeRemaining,
     isRunning,
-    handleStartPause: toggleTimer, // Use unified toggle but keep same prop name
+    handleStartPause: toggleTimer,
     handleAdjustTime,
     handleReset,
     handleStartBreak,
@@ -808,7 +874,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     breakTimeRemaining,
     breakIsRunning,
     isBreakMode,
-    handleBreakTimerStartPause: toggleTimer, // Use unified toggle but keep same prop name
+    handleBreakTimerStartPause: toggleTimer,
     handleBreakTimerReset,
     handleBreakTimerAdjust,
     // Sidebar timer props
@@ -817,7 +883,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     handleHideSidebarTimer,
     // Also expose the unified function
     toggleTimer,
-    // Sync function for components that need to force refresh
+    // Sync functions for components that need to force refresh
     synchronizeTimerState,
+    forceRefreshTimerDisplay,
   };
 };

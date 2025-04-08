@@ -459,6 +459,18 @@ const Compass: React.FC<CompassProps> = ({
     isModalOpen,
   ]);
 
+  // Force refresh the timer every 3 seconds when it's running to prevent UI freezes
+  useEffect(() => {
+    if (isRunning) {
+      const refreshInterval = setInterval(() => {
+        // This is just a dummy state update to force re-render
+        setStats((prevStats) => ({ ...prevStats }));
+      }, 3000);
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [isRunning]);
+
   return (
     <div className="p-6 space-y-6">
       <TimerCompleteModal
