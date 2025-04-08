@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pause, Play, RefreshCw } from "lucide-react";
+import { Pause, Play, RefreshCw, Save } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 
@@ -9,6 +9,7 @@ interface TimerDisplayProps {
   onStartPause: () => void;
   onReset: () => void;
   onAdjustTime: (amount: number) => void;
+  onOpenRecordModal?: () => void;
 }
 
 const WaveComponent = ({
@@ -73,6 +74,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onStartPause,
   onReset,
   onAdjustTime,
+  onOpenRecordModal = () => {},
 }) => {
   const { user } = useAuth();
   // Always assume the initial time is 60 minutes (3600 seconds) for wave positioning
@@ -189,11 +191,15 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className={`p-3 rounded-full transition-colors ${
-                isRunning
-                  ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800"
-                  : "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800"
-              }`}
+              className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+              onClick={onReset}
+            >
+              <RefreshCw size={24} />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
               onClick={onStartPause}
             >
               <AnimatePresence mode="wait">
@@ -204,9 +210,15 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
-              onClick={onReset}
+              onClick={() => {
+                if (isRunning) {
+                  onStartPause();
+                }
+                onOpenRecordModal();
+              }}
+              title="Record session"
             >
-              <RefreshCw size={24} />
+              <Save size={24} />
             </motion.button>
           </div>
         </div>

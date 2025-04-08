@@ -170,25 +170,16 @@ const Compass: React.FC<CompassProps> = ({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip all keyboard shortcuts if the session completion modal is open
-      if (isModalOpen) {
-        // We need to stop immediate propagation to prevent other event listeners from receiving this event
-        // This is stronger than just stopPropagation and will block all other listeners
-        e.stopImmediatePropagation();
-        return;
-      }
-
-      // Ignore key events when typing in input fields, but allow Escape to exit
-      if (
-        (e.target instanceof HTMLInputElement ||
-          e.target instanceof HTMLTextAreaElement) &&
-        e.key !== "Escape"
-      ) {
-        return;
-      }
-
-      // Escape key to deselect signal
+      // Special case for Escape key
       if (e.key === "Escape") {
+        if (isModalOpen) {
+          // Close the modal if it's open
+          onCloseModal();
+          e.stopImmediatePropagation();
+          return;
+        }
+
+        // Otherwise handle normal Escape functionality
         e.preventDefault();
         // Force reset of everything
         setSelectedSignalIndex(null);
@@ -215,10 +206,62 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
+      // Skip all other keyboard shortcuts if the session completion modal is open
+      if (isModalOpen) {
+        // We need to stop immediate propagation to prevent other event listeners from receiving this event
+        // This is stronger than just stopPropagation and will block all other listeners
+        e.stopImmediatePropagation();
+        return;
+      }
+
+      // Ignore key events when typing in input fields
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
       // Space key to start/pause timer
       if (e.code === "Space") {
         e.preventDefault();
         onStartPause();
+        return;
+      }
+
+      // 'r' key to open record session modal
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        if (isRunning) {
+          onStartPause(); // Pause the timer if it's running
+        }
+        // Directly set isModalOpen to true by calling onCloseModal
+        // We need to ensure we're not toggling an already open modal
+        if (!isModalOpen) {
+          onCloseModal();
+        }
+        return;
+      }
+
+      // Timer adjustment keys
+      if (e.key === "+") {
+        e.preventDefault();
+        onAdjustTime(60); // Add 1 minute
+        return;
+      }
+      if (e.key === "-") {
+        e.preventDefault();
+        onAdjustTime(-60); // Subtract 1 minute
+        return;
+      }
+      if (e.key === "_") {
+        e.preventDefault();
+        onAdjustTime(-60 * 10); // Subtract 10 minutes
+        return;
+      }
+      if (e.key === "?") {
+        e.preventDefault();
+        onAdjustTime(60 * 10); // Add 10 minutes
         return;
       }
 
@@ -237,33 +280,19 @@ const Compass: React.FC<CompassProps> = ({
         const signalCards = signalCardContainer?.children;
 
         if (!signalCards || signalCards.length === 0) {
-          console.log("No signal cards found in the grid");
           return;
         }
-
-        // Debug info
-        console.log(
-          `Key ${keyNum} pressed, targeting index ${index} of ${signalCards.length} signals`
-        );
-        console.log(`Current selected signal index: ${selectedSignalIndex}`);
 
         // Get the active signals
         const activeSignals = user?.preferences?.activeSignals || [];
 
         // First, check if we're already in an interaction mode with a selected signal
         if (selectedSignalIndex !== null) {
-          console.log(
-            `Already interacting with signal at index ${selectedSignalIndex}`
-          );
           const selectedSignalKey = activeSignals[selectedSignalIndex];
           const selectedSignalConfig =
             AVAILABLE_SIGNALS[
               selectedSignalKey as keyof typeof AVAILABLE_SIGNALS
             ];
-
-          console.log(
-            `Interacting with selected signal: ${selectedSignalKey}, type: ${selectedSignalConfig?.type}`
-          );
 
           // Handle water signal special case
           if (selectedSignalConfig?.type === "water") {
@@ -292,7 +321,6 @@ const Compass: React.FC<CompassProps> = ({
               // Find the actual div that triggers editing and click it
               const editContainer = waterCard.querySelector(".flex-1");
               if (editContainer) {
-                console.log("Found edit container, triggering click");
                 editContainer.dispatchEvent(
                   new MouseEvent("click", { bubbles: true })
                 );
@@ -302,7 +330,6 @@ const Compass: React.FC<CompassProps> = ({
                   const input = waterCard.querySelector("input");
                   if (input) {
                     input.focus();
-                    console.log("Focused water input");
                   }
                 }, 50);
                 return;
@@ -345,20 +372,14 @@ const Compass: React.FC<CompassProps> = ({
             AVAILABLE_SIGNALS[signalKey as keyof typeof AVAILABLE_SIGNALS];
           const targetSignalCard = signalCards[index] as HTMLElement;
 
-          console.log(
-            `Processing signal ${index}: ${signalKey} of type ${signalConfig?.type}`
-          );
-
           // Handle different signal types
           if (signalConfig?.type === "binary") {
             // For binary signals, toggle immediately without setting selection
-            console.log(`Immediately toggling binary signal: ${signalKey}`);
             const toggleButton = targetSignalCard.querySelector("button");
             if (toggleButton) {
               toggleButton.click();
               // No need to select or outline binary signals
             } else {
-              console.log(`No toggle button for binary signal ${signalKey}`);
               // Try clicking the card itself
               targetSignalCard.dispatchEvent(
                 new MouseEvent("click", { bubbles: true })
@@ -377,22 +398,18 @@ const Compass: React.FC<CompassProps> = ({
 
           if (signalConfig?.type === "scale") {
             // For scale, wait for next input (1-5)
-            console.log(`Waiting for scale value for ${signalKey}`);
             setAwaitingScaleValue(true);
           } else if (signalConfig?.type === "water") {
             // For water, show highlight to indicate options (1=350ml, 2=1.1L, 3=edit)
-            console.log(`Waiting for water option for ${signalKey}`);
             // Keep selected for subsequent input
           } else if (signalConfig?.type === "number") {
             // For number, activate edit mode immediately
-            console.log(`Activating edit mode for ${signalKey}`);
 
             // Find either the actual input or the clickable div
             const existingInput = targetSignalCard.querySelector("input");
             if (existingInput) {
               // Input is already visible, focus it
               existingInput.focus();
-              console.log("Found and focused existing input");
             } else {
               // Need to click to reveal the input field
               const clickableDiv = targetSignalCard.querySelector(
@@ -402,21 +419,16 @@ const Compass: React.FC<CompassProps> = ({
                 clickableDiv.dispatchEvent(
                   new MouseEvent("click", { bubbles: true })
                 );
-                console.log("Clicked to reveal input");
 
                 // Focus the input after a short delay to ensure it's rendered
                 setTimeout(() => {
                   const input = targetSignalCard.querySelector("input");
                   if (input) {
                     input.focus();
-                    console.log("Found and focused new input");
-                  } else {
-                    console.log("Failed to find input after clicking");
                   }
                 }, 50);
               } else {
                 // Last resort - try clicking the card itself
-                console.log("No clickable div found, trying card itself");
                 targetSignalCard.dispatchEvent(
                   new MouseEvent("click", { bubbles: true })
                 );
@@ -425,19 +437,11 @@ const Compass: React.FC<CompassProps> = ({
                   const input = targetSignalCard.querySelector("input");
                   if (input) {
                     input.focus();
-                    console.log("Found and focused input after clicking card");
                   }
                 }, 50);
               }
             }
           }
-        } else {
-          console.log(
-            `Invalid signal index: ${index}, only found ${Math.min(
-              activeSignals.length,
-              signalCards.length
-            )} valid signals`
-          );
         }
       }
     };
@@ -448,6 +452,7 @@ const Compass: React.FC<CompassProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     onStartPause,
+    onAdjustTime,
     selectedSignalIndex,
     awaitingScaleValue,
     user?.preferences?.activeSignals,
@@ -484,6 +489,7 @@ const Compass: React.FC<CompassProps> = ({
             onStartPause={onStartPause}
             onReset={onReset}
             onAdjustTime={onAdjustTime}
+            onOpenRecordModal={onCloseModal}
           />
         </div>
 
@@ -507,9 +513,7 @@ const Compass: React.FC<CompassProps> = ({
         </div>
       </div>
 
-      {/* Bottom section: Form and Stats */}
-      <SessionForm onSessionCreated={onSessionCreated} />
-
+      {/* Bottom section: Stats only */}
       <SessionStats sessions={sessions} />
     </div>
   );

@@ -568,24 +568,28 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
   // Close the modal but keep timer running in sidebar
   const handleCloseModal = () => {
-    setIsModalOpen(false);
+    // Toggle the modal state
+    setIsModalOpen((prev) => !prev);
 
-    // Only move main work timer to sidebar, never the break timer
-    if (isRunning && !isBreakMode) {
-      setShowInSidebar(true);
+    // If we're closing the modal (it was previously open), handle sidebar visibility
+    if (isModalOpen) {
+      // Only move main work timer to sidebar, never the break timer
+      if (isRunning && !isBreakMode) {
+        setShowInSidebar(true);
 
-      // Update localStorage with minimized state
-      const timerState: TimerState = {
-        duration,
-        startTime,
-        isRunning,
-        isBreakMode,
-        breakDuration,
-        breakStartTime,
-        breakIsRunning,
-        minimized: true,
-      };
-      saveTimerState(timerState);
+        // Update localStorage with minimized state
+        const timerState: TimerState = {
+          duration,
+          startTime,
+          isRunning,
+          isBreakMode,
+          breakDuration,
+          breakStartTime,
+          breakIsRunning,
+          minimized: true,
+        };
+        saveTimerState(timerState);
+      }
     }
   };
 
