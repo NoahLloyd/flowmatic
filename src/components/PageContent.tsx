@@ -14,10 +14,13 @@ import { api } from "../utils/api";
 import { Session } from "../types/Session";
 import Auth from "../pages/auth/Auth";
 import { useAuth } from "../context/AuthContext";
-import Articles from "../pages/articles/Articles";
+import Write from "../pages/write/Write";
+import QuickAddTaskModal from "./task/QuickAddTaskModal";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
+  // State for QuickAddTaskModal
+  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
 
   // Create a direct navigation function
   const directNavigate = useCallback(
@@ -38,6 +41,19 @@ const PageContent = () => {
         (document.activeElement &&
           document.activeElement.hasAttribute("contenteditable"))
       ) {
+        return;
+      }
+
+      // Global "a" key to open quick add task modal
+      if (e.key === "a" && !isQuickAddModalOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsQuickAddModalOpen(true);
+        return;
+      }
+
+      // Skip other keyboard shortcuts if the quick add modal is open
+      if (isQuickAddModalOpen) {
         return;
       }
 
@@ -104,12 +120,12 @@ const PageContent = () => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, []);
+  }, [isQuickAddModalOpen]);
 
   const {
     timeRemaining: time,
@@ -190,6 +206,15 @@ const PageContent = () => {
     }
   }, [selected]); // Only re-run when selected page changes
 
+  // Handle adding a task from the quick add modal
+  const handleQuickAddTask = async (
+    title: string,
+    type: "day" | "week" | "future"
+  ) => {
+    await handleAddTask(title, type);
+    return Promise.resolve();
+  };
+
   if (isAuthChecking) {
     return <div>Loading...</div>;
   }
@@ -252,8 +277,8 @@ const PageContent = () => {
     case "Settings":
       content = <Settings />;
       break;
-    case "Articles":
-      content = <Articles />;
+    case "Write":
+      content = <Write />;
       break;
     default:
       content = <Friends />;
@@ -271,6 +296,11 @@ const PageContent = () => {
   return (
     <Layout selected={selected} setSelected={setSelected}>
       {content}
+      <QuickAddTaskModal
+        isOpen={isQuickAddModalOpen}
+        onClose={() => setIsQuickAddModalOpen(false)}
+        onAddTask={handleQuickAddTask}
+      />
     </Layout>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import SidebarItem from "./SidebarItem";
+import SidebarScoreCard from "./SidebarScoreCard";
 import {
   Users,
   Settings,
@@ -26,6 +27,7 @@ import { api } from "../../utils/api";
 import { Session } from "../../types/Session";
 import { AVAILABLE_SIGNALS } from "../../pages/settings/components/SignalSettings";
 import { useSignals } from "../../context/SignalsContext";
+import { useTimezone } from "../../context/TimezoneContext";
 
 type SidebarProps = {
   selected: string;
@@ -57,6 +59,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { signals, signalScore, totalSignals, completedSignals, updateSignal } =
     useSignals();
 
+  // Get the timezone context
+  const { timezone } = useTimezone();
+
   const displayName = user?.email ? user.email.split("@")[0] : title;
 
   const icons = [
@@ -65,7 +70,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     { label: "Tasks", icon: Check },
     { label: "Morning", icon: Sunrise },
     { label: "Notes", icon: StickyNote },
-    { label: "Articles", icon: BookOpen },
+
+    { label: "Write", icon: BookOpen },
     { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];
@@ -77,15 +83,49 @@ const Sidebar: React.FC<SidebarProps> = ({
     Tasks: "t",
     Morning: "m",
     Notes: "n",
-    Articles: "a",
+    Write: "w",
     Insights: "i",
     Settings: "s",
   };
 
-  // Get today's focus goal from user preferences
+  // Get date in user's timezone
+  const getDateInUserTimezone = (date: Date) => {
+    try {
+      // Get the date string in the user's timezone
+      const dateInTZ = new Date(
+        date.toLocaleString("en-US", { timeZone: timezone })
+      );
+
+      // Create a fixed offset to compensate for the timezone difference
+      const utcDate = new Date(date.toISOString());
+      const tzOffset = utcDate.getTime() - dateInTZ.getTime();
+
+      // Apply the offset to get the correct date in user's timezone
+      return new Date(date.getTime() - tzOffset);
+    } catch (error) {
+      console.error("Error formatting date with timezone:", error);
+      return date; // Fallback to original date
+    }
+  };
+
+  // Get today's date string in user's timezone (YYYY-MM-DD)
+  const getTodayStringInUserTimezone = () => {
+    try {
+      const now = new Date();
+      const todayInUserTZ = getDateInUserTimezone(now);
+      return todayInUserTZ.toISOString().split("T")[0];
+    } catch (error) {
+      console.error("Error getting today's date string:", error);
+      return new Date().toISOString().split("T")[0]; // Fallback
+    }
+  };
+
+  // Modified to use timezone-aware date
   const getDailyGoal = (date: Date = new Date()) => {
-    // Get the day of week (0 = Sunday, 1 = Monday, etc.)
-    const day = date.getDay();
+    // Get the day of week in user's timezone
+    const dateInUserTZ = getDateInUserTimezone(date);
+    const day = dateInUserTZ.getDay();
+
     // Convert to our day format (monday, tuesday, etc.)
     const dayNames = [
       "sunday",
@@ -108,6 +148,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     return 4; // Default if not set
   };
 
+  // Use timezone-aware date string for today
+  const todayString = getTodayStringInUserTimezone();
+
   // Calculate the current streak
   const calculateStreak = (allSessions: Session[]) => {
     if (!allSessions.length) return 0;
@@ -122,11 +165,30 @@ const Sidebar: React.FC<SidebarProps> = ({
     // Group sessions by day
     const sessionsByDay: Record<string, Session[]> = {};
     sortedSessions.forEach((session) => {
-      const date = new Date(session.created_at).toISOString().split("T")[0];
-      if (!sessionsByDay[date]) {
-        sessionsByDay[date] = [];
+      try {
+        // Get date in user's timezone in a consistent format
+        const rawDate = new Date(session.created_at);
+        const dateStr = rawDate.toLocaleString("en-US", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
+
+        if (!sessionsByDay[dateStr]) {
+          sessionsByDay[dateStr] = [];
+        }
+        sessionsByDay[dateStr].push(session);
+      } catch (error) {
+        console.error("Error grouping session by day:", error);
+        // Fallback to previous method
+        const sessionDate = getDateInUserTimezone(new Date(session.created_at));
+        const date = sessionDate.toISOString().split("T")[0];
+        if (!sessionsByDay[date]) {
+          sessionsByDay[date] = [];
+        }
+        sessionsByDay[date].push(session);
       }
-      sessionsByDay[date].push(session);
     });
 
     // Get sorted unique dates
@@ -135,7 +197,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     // Check if each day met the goal
     let currentStreak = 0;
-    const today = new Date().toISOString().split("T")[0];
+
+    // Get today's date in user's timezone in the same format as session grouping
+    const now = new Date();
+    const today = now.toLocaleString("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
 
     // Start from today or the most recent date with sessions
     let currentDate = today;
@@ -143,9 +213,15 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     // If today has no sessions yet but yesterday did and met the goal, we still count the streak
     if (!sessionsByDay[today] && dates[0] !== today) {
-      const yesterday = new Date();
+      // Calculate yesterday's date in user's timezone
+      const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      const yesterdayStr = yesterday.toLocaleString("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
 
       if (mostRecentDate === yesterdayStr) {
         currentDate = yesterdayStr;
@@ -210,19 +286,83 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         // ----- Calculate today's hours exactly as SessionStats does -----
         // Set to start of today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = new Date().toISOString().split("T")[0];
+        const todayInTZ = getTodayStringInUserTimezone();
+
+        console.log("Timezone debugging:");
+        console.log("- Current timezone:", timezone);
+        console.log("- Raw today:", today);
+        console.log("- Today in user timezone:", todayInTZ);
+
+        // Log the last few sessions to debug
+        const recentSessions = [...allSessions]
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )
+          .slice(0, 3);
+
+        recentSessions.forEach((session, i) => {
+          const rawDate = new Date(session.created_at);
+          const tzDate = getDateInUserTimezone(rawDate);
+          console.log(`- Session ${i}:`);
+          console.log(`  * Raw date: ${rawDate.toISOString()}`);
+          console.log(`  * TZ date: ${tzDate.toISOString()}`);
+          console.log(
+            `  * TZ date string: ${tzDate.toISOString().split("T")[0]}`
+          );
+          console.log(
+            `  * Included in today: ${
+              tzDate.toISOString().split("T")[0] === todayInTZ
+            }`
+          );
+        });
 
         // Filter sessions for today (using same filter logic as SessionStats)
-        const todaySessions = allSessions.filter(
-          (session) => new Date(session.created_at) >= today
-        );
+        const todaySessions = allSessions.filter((session) => {
+          try {
+            // Convert the session date to the user's timezone
+            const rawDate = new Date(session.created_at);
+
+            // Create a date string in the user's timezone format
+            const sessionDateStr = rawDate.toLocaleString("en-US", {
+              timeZone: timezone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            });
+
+            // Create today's date string in the same format
+            const now = new Date();
+            const todayDateStr = now.toLocaleString("en-US", {
+              timeZone: timezone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            });
+
+            // Compare the date strings directly
+            return sessionDateStr === todayDateStr;
+          } catch (error) {
+            console.error("Error filtering session date:", error);
+            // Fallback to the previous approach
+            const sessionDate = getDateInUserTimezone(
+              new Date(session.created_at)
+            );
+            return sessionDate.toISOString().split("T")[0] === todayInTZ;
+          }
+        });
+
+        console.log("- Today's sessions count:", todaySessions.length);
 
         // Calculate hours using same reducer logic as SessionStats
         const hours = todaySessions.reduce(
           (acc, session) => acc + session.minutes / 60,
           0
         );
+
+        console.log("- Hours today:", hours);
 
         setHoursToday(hours);
 
@@ -239,7 +379,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const interval = setInterval(fetchSessions, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, timezone]);
 
   // Add keyboard shortcut handlers
   useEffect(() => {
@@ -325,133 +465,45 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Signal Score Visualization */}
-      <div
+      <SidebarScoreCard
+        title="Signals"
+        value={signalScore}
+        suffix="%"
+        percentage={signalScore}
+        total={totalSignals > 0 ? totalSignals : undefined}
+        completed={completedSignals}
+        exceededGoal={signalScore >= 80}
+        showTrophy={signalScore >= 80}
         onClick={() => onSelect("Compass")}
-        className={`mb-0 px-4 py-3 cursor-pointer rounded-xl border ${
-          signalScore >= 80
-            ? "bg-green-50/30 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-            : "bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700"
-        } hover:bg-white/15 dark:hover:bg-slate-700/80`}
-      >
-        <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Signals
-            </span>
-            {signalScore >= 80 && (
-              <div className="ml-2">
-                <Trophy
-                  className="w-3 h-3 text-yellow-500 dark:text-yellow-400"
-                  style={{ display: "inline" }}
-                />
-              </div>
-            )}
-          </div>
+      />
 
-          <span
-            className={`text-xs font-semibold ${
-              signalScore >= 80
-                ? "text-green-600 dark:text-green-400"
-                : "text-slate-700 dark:text-slate-300"
-            }`}
-          >
-            {signalScore}%
-            {totalSignals > 0 && (
-              <span className="text-slate-500 dark:text-slate-400">
-                {" "}
-                ({completedSignals}/{totalSignals})
-              </span>
-            )}
-          </span>
-        </div>
-        <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full ${
-              signalScore >= 80
-                ? "bg-green-500 dark:bg-green-600"
-                : signalScore >= 60
-                ? "bg-green-500 dark:bg-green-600"
-                : signalScore >= 40
-                ? "bg-yellow-500 dark:bg-yellow-600"
-                : "bg-red-500 dark:bg-red-600"
-            }`}
-            style={{ width: `${signalScore}%` }}
-          >
-            {/* No shimmer effect */}
-          </div>
-        </div>
-      </div>
-
-      {/* Hours Today Visualization - All animations removed */}
-      <div
+      {/* Hours Today Visualization */}
+      <SidebarScoreCard
+        title="Hours"
+        value={displayHours.toFixed(1)}
+        suffix="h"
+        goal={dailyGoal}
+        percentage={rawProgressPercentage}
+        exceededGoal={exceededGoal}
+        showTrophy={exceededGoal}
         onClick={() => onSelect("Compass")}
-        className={`mb-0 px-4 py-3 cursor-pointer rounded-xl border ${
+        extraDisplay={
+          exceededGoal ? ` (+${(displayHours - dailyGoal).toFixed(1)}h)` : ""
+        }
+        progressColor={
           exceededGoal
-            ? "bg-green-50/30 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-            : "bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700"
-        } hover:bg-white/15 dark:hover:bg-slate-700/80`}
-      >
-        <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center">
-            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-              Hours
-            </span>
-            {exceededGoal && (
-              <div className="ml-2">
-                <Trophy
-                  className="w-3 h-3 text-yellow-500 dark:text-yellow-400"
-                  style={{ display: "inline" }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Current Streak Display */}
-          {/* {streak > 0 && (
-            <div className="flex items-center absolute right-4 top-1">
-              <Flame className="w-3 h-3 text-orange-500 dark:text-orange-400 mr-1" />
-              <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
-                {streak}d
-              </span>
-            </div>
-          )} */}
-
-          <span
-            className={`text-xs font-semibold ${
-              exceededGoal
-                ? "text-green-600 dark:text-green-400"
-                : "text-slate-700 dark:text-slate-300"
-            }`}
-          >
-            {displayHours.toFixed(1)}h
-            <span className="text-slate-500 dark:text-slate-400">
-              {" / "}
-              {dailyGoal}h
-            </span>
-            {exceededGoal && ` (+${(displayHours - dailyGoal).toFixed(1)}h)`}
-          </span>
-        </div>
-        <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full ${
-              exceededGoal
-                ? "bg-green-500 dark:bg-green-600"
-                : progressPercentage >= 75
-                ? "bg-blue-500 dark:bg-blue-600"
-                : progressPercentage >= 50
-                ? "bg-yellow-500 dark:bg-yellow-600"
-                : "bg-red-500 dark:bg-red-600"
-            }`}
-            style={{ width: `${progressPercentage}%` }}
-          >
-            {/* Removed shimmer effect */}
-          </div>
-        </div>
-      </div>
+            ? "green"
+            : progressPercentage >= 75
+            ? "blue"
+            : progressPercentage >= 50
+            ? "yellow"
+            : "red"
+        }
+      />
 
       <div
         onClick={() => onSelect("Settings")}
-        className="p-4 shadow cursor-pointer bg-white dark:bg-slate-800 rounded-xl flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        className="p-4 cursor-pointer rounded-xl border bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700 flex items-center justify-between hover:bg-white/15 dark:hover:bg-slate-700/80 transition-colors"
       >
         <div className="flex items-center">
           <User className="w-6 h-6 mr-2 text-slate-700 dark:text-slate-200" />

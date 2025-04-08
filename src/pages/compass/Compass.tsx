@@ -170,6 +170,14 @@ const Compass: React.FC<CompassProps> = ({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip all keyboard shortcuts if the session completion modal is open
+      if (isModalOpen) {
+        // We need to stop immediate propagation to prevent other event listeners from receiving this event
+        // This is stronger than just stopPropagation and will block all other listeners
+        e.stopImmediatePropagation();
+        return;
+      }
+
       // Ignore key events when typing in input fields, but allow Escape to exit
       if (
         (e.target instanceof HTMLInputElement ||
@@ -434,13 +442,16 @@ const Compass: React.FC<CompassProps> = ({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Use the capture phase to ensure our handler runs before other handlers
+    // The third parameter `true` enables capture phase handling
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     onStartPause,
     selectedSignalIndex,
     awaitingScaleValue,
     user?.preferences?.activeSignals,
+    isModalOpen,
   ]);
 
   return (

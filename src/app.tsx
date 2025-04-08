@@ -4,6 +4,7 @@ import PageContent from "./components/PageContent";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { SignalsProvider } from "./context/SignalsContext";
+import { TimezoneProvider } from "./context/TimezoneContext";
 import { AVAILABLE_SIGNALS } from "./pages/settings/components/SignalSettings";
 
 // Add global declaration for TypeScript
@@ -26,11 +27,13 @@ const AppWrapper = () => {
     <StrictMode>
       <AuthProvider>
         <ThemeProvider>
-          <SignalsProvider>
-            <div className="min-h-screen bg-gray-50">
-              <PageContent />
-            </div>
-          </SignalsProvider>
+          <TimezoneProvider>
+            <SignalsProvider>
+              <div className="min-h-screen bg-gray-50">
+                <PageContent />
+              </div>
+            </SignalsProvider>
+          </TimezoneProvider>
         </ThemeProvider>
       </AuthProvider>
     </StrictMode>

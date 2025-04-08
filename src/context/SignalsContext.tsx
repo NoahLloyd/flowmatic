@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { api } from "../utils/api";
 import { useAuth } from "./AuthContext";
+import { useTimezone } from "./TimezoneContext";
 import { AVAILABLE_SIGNALS as ImportedAvailableSignals } from "../pages/settings/components/SignalSettings";
 
 // Declare global interface for TypeScript
@@ -47,29 +48,60 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const { user } = useAuth();
+  const { timezone, formatDate } = useTimezone();
   const [signals, setSignals] = useState<Record<string, number | boolean>>({});
   const [signalScore, setSignalScore] = useState(0);
   const [totalSignals, setTotalSignals] = useState(0);
   const [completedSignals, setCompletedSignals] = useState(0);
+
+  // Function to get today's date in YYYY-MM-DD format in user's timezone
+  const getTodayInUserTimezone = () => {
+    const now = new Date();
+    try {
+      // Create a date for "today" in the user's timezone
+      const todayInUserTZ = new Date(
+        now.toLocaleString("en-US", { timeZone: timezone })
+      );
+      return todayInUserTZ.toISOString().split("T")[0];
+    } catch (error) {
+      console.error("Error formatting date with timezone:", error);
+      // Fallback to UTC
+      return now.toISOString().split("T")[0];
+    }
+  };
+
+  // Function to get date n days ago in YYYY-MM-DD format in user's timezone
+  const getDateDaysAgo = (daysAgo: number) => {
+    const now = new Date();
+    try {
+      // Create a date in the user's timezone
+      const dateInUserTZ = new Date(
+        now.toLocaleString("en-US", { timeZone: timezone })
+      );
+      // Go back n days
+      dateInUserTZ.setDate(dateInUserTZ.getDate() - daysAgo);
+      return dateInUserTZ.toISOString().split("T")[0];
+    } catch (error) {
+      console.error(
+        `Error formatting date ${daysAgo} days ago with timezone:`,
+        error
+      );
+      // Fallback to UTC
+      const date = new Date();
+      date.setDate(date.getDate() - daysAgo);
+      return date.toISOString().split("T")[0];
+    }
+  };
 
   // Function to refresh signals and recalculate scores
   const refreshSignals = async () => {
     if (!user) return;
 
     try {
-      // Get today's date in YYYY-MM-DD format
-      const today = new Date().toISOString().split("T")[0];
-
-      // Get yesterday and day before yesterday dates
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-      const dayBeforeYesterday = new Date();
-      dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
-      const dayBeforeYesterdayStr = dayBeforeYesterday
-        .toISOString()
-        .split("T")[0];
+      // Get dates in user's timezone
+      const today = getTodayInUserTimezone();
+      const yesterdayStr = getDateDaysAgo(1);
+      const dayBeforeYesterdayStr = getDateDaysAgo(2);
 
       // Fetch today's signals
       const todaySignals = await api.getDailySignals(today);
@@ -89,13 +121,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             (item) => item.metric === "shower"
           );
         }
-        console.log("Shower history for past 3 days:", showerHistory);
       } catch (error) {
         console.error("Failed to fetch shower history:", error);
       }
-
-      // Log signals for debugging
-      console.log("Today's signals:", todaySignals);
 
       // Get active signals from user preferences
       const activeSignals = user?.preferences?.activeSignals || [];
@@ -112,20 +140,40 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       let hasShoweredIn3Days = false;
 
       // Check if user has showered in the past 3 days
-      if (todaySignals.shower === true) {
+      // First check today's shower status
+      const todayShowerValue = todaySignals.shower;
+
+      // Check all possible truthy values for shower
+      if (
+        todayShowerValue === true ||
+        todayShowerValue === "true" ||
+        todayShowerValue === 1 ||
+        todayShowerValue === "1"
+      ) {
         hasShoweredIn3Days = true;
       } else {
         // Check shower history for yesterday and day before
+        // Look for any truthy value in the history
         hasShoweredIn3Days = showerHistory.some((item) => {
           const itemDate = item.date;
-          return (
-            (itemDate === yesterdayStr || itemDate === dayBeforeYesterdayStr) &&
-            item.value === true
-          );
+          const itemValue = item.value;
+
+          // Check if date is in the last 3 days
+          const isRecentDate =
+            itemDate === today ||
+            itemDate === yesterdayStr ||
+            itemDate === dayBeforeYesterdayStr;
+
+          // Check if value is truthy in any format
+          const isTruthyValue =
+            itemValue === true ||
+            itemValue === "true" ||
+            itemValue === 1 ||
+            itemValue === "1";
+
+          return isRecentDate && isTruthyValue;
         });
       }
-
-      console.log("Has showered in past 3 days:", hasShoweredIn3Days);
 
       // For debugging
       const signalScores: Record<string, number> = {};
@@ -277,37 +325,36 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      // Log individual signal scores for debugging
-      console.log("Signal scores:", signalScores);
-      console.log("Completion tracker:", completionTracker);
-      console.log(`Total active signals: ${totalActiveSignals}`);
-      console.log(`Raw completed signals: ${totalCompletedSignals}`);
-
       // Double-check our totals by summing the completion tracker
       const sumOfCompletions = Object.values(completionTracker).reduce(
         (sum, value) => sum + (value >= 1 ? 1 : 0),
         0
       );
-      console.log(`Sum of fully completed signals: ${sumOfCompletions}`);
-
-      // Calculate average score (0-100)
-      let averageScore =
-        totalActiveSignals > 0
-          ? Math.round(totalScore / totalActiveSignals)
-          : 0;
-
-      // Ensure the score is between 0 and 100
-      averageScore = Math.max(0, Math.min(100, averageScore));
 
       // Count signals that are at or above 80% as completed
       const displayCompletedSignals = Object.values(signalScores).filter(
         (score) => score >= 80
       ).length;
 
-      console.log(
-        `Final display completed: ${displayCompletedSignals}/${totalActiveSignals}`
-      );
-      console.log(`Average score: ${averageScore}%`);
+      // Calculate average score (0-100)
+      let averageScore;
+
+      // Force 100% when all signals are completed
+      if (
+        displayCompletedSignals === totalActiveSignals &&
+        totalActiveSignals > 0
+      ) {
+        averageScore = 100;
+      } else {
+        // Otherwise calculate average normally
+        averageScore =
+          totalActiveSignals > 0
+            ? Math.round(totalScore / totalActiveSignals)
+            : 0;
+      }
+
+      // Ensure the score is between 0 and 100
+      averageScore = Math.max(0, Math.min(100, averageScore));
 
       setSignalScore(averageScore);
       setTotalSignals(totalActiveSignals);
@@ -320,7 +367,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   // Function to update a signal
   const updateSignal = async (metric: string, value: number | boolean) => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayInUserTimezone();
 
       // Update the signal immediately in the local state first
       setSignals((prev) => ({
@@ -369,6 +416,13 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       window.removeEventListener("signalUpdated", handleSignalUpdate);
     };
   }, [user]);
+
+  // Re-fetch signals when timezone changes
+  useEffect(() => {
+    if (user) {
+      refreshSignals();
+    }
+  }, [timezone, user]);
 
   // Provide the context to children
   return (

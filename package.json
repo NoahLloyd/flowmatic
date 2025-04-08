@@ -1,12 +1,12 @@
 {
   "name": "flowmatic",
   "productName": "Flowmatic",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "The productivity system",
   "author": {
     "name": "Noah Lloyd",
     "email": "noahlloydrobson@gmail.com",
-    "url": "https://noahandnoah.com"
+    "url": "https://noahlr.com"
   },
   "main": ".webpack/main",
   "scripts": {

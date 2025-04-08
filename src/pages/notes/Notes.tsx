@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useTimezone } from "../../context/TimezoneContext";
 import {
   StickyNote,
   Save,
@@ -22,6 +23,7 @@ interface Note {
 
 const Notes: React.FC = () => {
   const { user, updateUserPreferences } = useAuth();
+  const { formatDate: formatDateWithTimezone } = useTimezone();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -193,11 +195,7 @@ const Notes: React.FC = () => {
 
   // Format date for display - simplified to remove minutes/hours
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return formatDateWithTimezone(dateString);
   };
 
   // Filter notes based on current filters

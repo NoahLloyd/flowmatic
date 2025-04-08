@@ -58,7 +58,7 @@ const MenuButton = ({
   </button>
 );
 
-const Articles: React.FC = () => {
+const Write: React.FC = () => {
   const { user, updateUserPreferences } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [activeArticle, setActiveArticle] = useState<Article | null>(null);
@@ -245,21 +245,17 @@ const Articles: React.FC = () => {
     });
   };
 
-  // For displaying content in view mode
+  // Component to display article content
   const ContentDisplay = ({ content }: { content: string }) => {
-    if (!content) {
-      return <p className="text-gray-500 dark:text-gray-400">No content</p>;
-    }
-
     return (
       <div
-        className="prose prose-gray dark:prose-invert max-w-none"
+        className="prose dark:prose-invert max-w-none"
         dangerouslySetInnerHTML={{ __html: content }}
       />
     );
   };
 
-  // Handle editor content changes
+  // Update content when editor changes
   const handleContentChange = () => {
     if (editor && activeArticle) {
       handleUpdateArticle("content", editor.getHTML());
@@ -268,62 +264,41 @@ const Articles: React.FC = () => {
 
   // Save the current article
   const handleSaveArticle = async () => {
-    if (activeArticle) {
-      // Make sure we have the latest content from the editor
-      if (editor) {
-        handleUpdateArticle("content", editor.getHTML());
-      }
-      await saveArticles();
-    }
+    if (!activeArticle) return;
+    await saveArticles();
+    setIsEditing(false);
   };
 
-  if (!editor) {
-    return (
-      <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-        Loading editor...
-      </div>
-    );
-  }
+  // Calculate sidebar height
+  const sidebarHeight = isEditing
+    ? "calc(100vh - 220px)"
+    : "calc(100vh - 180px)";
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Header with action buttons */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-medium text-gray-900 dark:text-white flex items-center">
             <BookOpen className="w-6 h-6 mr-2" />
-            Articles
+            Write
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Write and manage your longform content
+            Write and organize your documents
           </p>
         </div>
-        <div className="flex space-x-2">
+
+        <div className="flex items-center gap-3">
           <button
             onClick={handleCreateArticle}
-            className="flex items-center px-3 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 text-sm rounded-md transition-colors"
+            className="px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 text-sm rounded-md flex items-center gap-2 transition-colors"
           >
-            <PlusCircle className="w-4 h-4 mr-1" />
-            New Article
+            <PlusCircle className="w-4 h-4" />
+            New Document
           </button>
-          {activeArticle && (
-            <button
-              onClick={handleSaveArticle}
-              disabled={isSaving}
-              className="flex items-center px-3 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 text-sm rounded-md transition-colors disabled:opacity-50"
-            >
-              {isSaving ? (
-                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-1" />
-              )}
-              {isSaving ? "Saving..." : "Save"}
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Save message notification */}
+      {/* Notification message */}
       {saveMessage.text && (
         <div
           className={`p-3 rounded-md text-sm flex items-center mb-6 ${
@@ -333,194 +308,216 @@ const Articles: React.FC = () => {
           }`}
         >
           {saveMessage.type === "success" ? (
-            <Check className="w-4 h-4 mr-2 text-green-500 dark:text-green-400" />
+            <Save className="w-4 h-4 mr-2 text-green-500 dark:text-green-400" />
           ) : (
             <X className="w-4 h-4 mr-2 text-red-500 dark:text-red-400" />
           )}
-          {saveMessage.text}
+          {saveMessage.text.replace("Articles", "Documents")}
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Articles List Sidebar */}
-        <div className="col-span-12 md:col-span-4 lg:col-span-3">
-          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-            <div className="border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Sidebar with article list */}
+        <div className="lg:col-span-1 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-900">
+            <h2 className="text-sm font-medium text-gray-900 dark:text-white flex items-center">
               <FileText className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
-              <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-                Your Articles
-              </h2>
-            </div>
-            <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
-              {articles.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500 dark:text-gray-400">
-                  You don't have any articles yet.
-                </div>
-              ) : (
-                <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-                  {articles.map((article) => (
-                    <li
-                      key={article.id}
-                      className={`relative transition-colors cursor-pointer ${
-                        activeArticle?.id === article.id
-                          ? "bg-blue-50 dark:bg-blue-900/30"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-800"
-                      }`}
-                      onClick={() => handleSelectArticle(article)}
-                    >
-                      <div className="px-4 py-3">
-                        <div className="flex justify-between items-start">
-                          <div className="truncate pr-8">
-                            <h3 className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                              {article.title}
-                            </h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {formatDate(article.updated_at)}
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteArticle(article.id);
-                            }}
-                            className="absolute right-3 top-3 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              Your Documents
+            </h2>
+          </div>
+          <div
+            className="overflow-y-auto bg-white dark:bg-gray-900"
+            style={{ maxHeight: sidebarHeight }}
+          >
+            {articles.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                No documents yet. Create one to get started.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200 dark:divide-gray-800">
+                {articles.map((article) => (
+                  <li
+                    key={article.id}
+                    className={`cursor-pointer transition-colors ${
+                      activeArticle?.id === article.id
+                        ? "bg-gray-100 dark:bg-gray-800"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    }`}
+                    onClick={() => handleSelectArticle(article)}
+                  >
+                    <div className="px-4 py-3">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {article.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {formatDate(article.updated_at)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
-        {/* Editor Section */}
-        <div className="col-span-12 md:col-span-8 lg:col-span-9">
+        {/* Main content area */}
+        <div className="lg:col-span-3">
           {activeArticle ? (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-              {/* Title section */}
-              <div className="border-b border-gray-200 dark:border-gray-800 px-4 py-3">
-                <label
-                  htmlFor="article-title"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                >
-                  Title
-                </label>
-                <input
-                  ref={titleInputRef}
-                  type="text"
-                  id="article-title"
-                  value={activeArticle.title}
-                  onChange={(e) => handleUpdateArticle("title", e.target.value)}
-                  className="w-full px-2 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-base focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600"
-                />
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+              {/* Article header */}
+              <div className="border-b border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-900 flex justify-between items-center">
+                <div className="flex-1">
+                  {isEditing ? (
+                    <input
+                      ref={titleInputRef}
+                      type="text"
+                      value={activeArticle.title}
+                      onChange={(e) =>
+                        handleUpdateArticle("title", e.target.value)
+                      }
+                      className="w-full p-0 border-0 text-sm font-medium text-gray-900 dark:text-white bg-transparent focus:outline-none focus:ring-0"
+                      placeholder="Document Title"
+                    />
+                  ) : (
+                    <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+                      {activeArticle.title}
+                    </h2>
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {formatDate(activeArticle.updated_at)}
+                  </p>
+                </div>
+
+                {/* Article actions */}
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={handleSaveArticle}
+                        className="p-2 text-green-600 dark:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                        title="Save"
+                      >
+                        <Save className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setIsEditing(false)}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                        title="Cancel"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="p-2 text-blue-600 dark:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteArticle(activeArticle.id)}
+                        className="p-2 text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* TipTap Editor with toolbar */}
-              <div className="editor-container max-h-[calc(100vh-300px)] flex flex-col">
-                {/* Toolbar */}
-                <div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 dark:border-gray-700">
-                  {/* Heading */}
+              {/* Editor toolbar (only visible when editing) */}
+              {isEditing && editor && (
+                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex flex-wrap gap-1">
+                  <MenuButton
+                    onClick={() => editor.chain().focus().toggleBold().run()}
+                    isActive={editor.isActive("bold")}
+                  >
+                    <Bold className="w-4 h-4" />
+                  </MenuButton>
+                  <MenuButton
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
+                    isActive={editor.isActive("italic")}
+                  >
+                    <Italic className="w-4 h-4" />
+                  </MenuButton>
                   <MenuButton
                     onClick={() =>
                       editor.chain().focus().toggleHeading({ level: 2 }).run()
                     }
                     isActive={editor.isActive("heading", { level: 2 })}
                   >
-                    <Heading className="w-5 h-5" />
+                    <Heading className="w-4 h-4" />
                   </MenuButton>
-
-                  {/* Bold */}
-                  <MenuButton
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    isActive={editor.isActive("bold")}
-                  >
-                    <Bold className="w-5 h-5" />
-                  </MenuButton>
-
-                  {/* Italic */}
-                  <MenuButton
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    isActive={editor.isActive("italic")}
-                  >
-                    <Italic className="w-5 h-5" />
-                  </MenuButton>
-
-                  <div className="h-6 mx-1 border-r border-gray-300 dark:border-gray-600" />
-
-                  {/* Bullet List */}
                   <MenuButton
                     onClick={() =>
                       editor.chain().focus().toggleBulletList().run()
                     }
                     isActive={editor.isActive("bulletList")}
                   >
-                    <List className="w-5 h-5" />
+                    <List className="w-4 h-4" />
                   </MenuButton>
-
-                  {/* Ordered List */}
                   <MenuButton
                     onClick={() =>
                       editor.chain().focus().toggleOrderedList().run()
                     }
                     isActive={editor.isActive("orderedList")}
                   >
-                    <ListOrdered className="w-5 h-5" />
+                    <ListOrdered className="w-4 h-4" />
                   </MenuButton>
-
-                  <div className="h-6 mx-1 border-r border-gray-300 dark:border-gray-600" />
-
-                  {/* Blockquote */}
                   <MenuButton
                     onClick={() =>
                       editor.chain().focus().toggleBlockquote().run()
                     }
                     isActive={editor.isActive("blockquote")}
                   >
-                    <Quote className="w-5 h-5" />
+                    <Quote className="w-4 h-4" />
                   </MenuButton>
-
-                  {/* Code Block */}
                   <MenuButton
                     onClick={() =>
                       editor.chain().focus().toggleCodeBlock().run()
                     }
                     isActive={editor.isActive("codeBlock")}
                   >
-                    <Code className="w-5 h-5" />
+                    <Code className="w-4 h-4" />
                   </MenuButton>
                 </div>
+              )}
 
-                {/* Editor content */}
-                <div
-                  ref={editorContainerRef}
-                  className="flex-1 overflow-y-auto"
-                  onBlur={handleContentChange}
-                >
+              {/* Article content */}
+              <div
+                className="p-5 bg-white dark:bg-gray-900"
+                ref={editorContainerRef}
+              >
+                {isEditing && editor ? (
                   <EditorContent
                     editor={editor}
-                    className="tiptap-editor prose prose-gray dark:prose-invert max-w-none p-4"
+                    className="tiptap-editor"
+                    onBlur={handleContentChange}
                   />
-                </div>
+                ) : (
+                  <ContentDisplay content={activeArticle.content} />
+                )}
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center">
-              <BookOpen className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" />
-              <h2 className="mt-4 text-xl font-medium text-gray-900 dark:text-white">
-                No Article Selected
-              </h2>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Select an article from the sidebar or create a new one.
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-8 flex flex-col items-center justify-center text-center bg-white dark:bg-gray-900">
+              <BookOpen className="w-12 h-12 text-gray-400 dark:text-gray-600 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No Document Selected
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">
+                Select a document from the sidebar or create a new one to get
+                started
               </p>
               <button
                 onClick={handleCreateArticle}
-                className="mt-4 px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 text-sm rounded-md transition-colors"
+                className="px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 text-sm rounded-md flex items-center gap-2 transition-colors"
               >
-                Create Article
+                <PlusCircle className="w-4 h-4" />
+                New Document
               </button>
             </div>
           )}
@@ -530,4 +527,4 @@ const Articles: React.FC = () => {
   );
 };
 
-export default Articles;
+export default Write;

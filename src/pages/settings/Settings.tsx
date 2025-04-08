@@ -12,15 +12,74 @@ import {
   Sunrise,
   Calendar,
   BarChart,
+  Globe,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
+import { useTimezone } from "../../context/TimezoneContext";
 import MorningSettings from "../morning/MorningSettings";
 import WorkingHoursSettings from "./components/WorkingHoursSettings";
 import SignalSettings from "./components/SignalSettings";
 
+// List of common timezones
+const COMMON_TIMEZONES = [
+  "Pacific/Honolulu", // HST
+  "America/Anchorage", // AKST
+  "America/Los_Angeles", // PST/PDT
+  "America/Denver", // MST/MDT
+  "America/Chicago", // CST/CDT
+  "America/New_York", // EST/EDT
+  "America/Halifax", // AST/ADT
+  "America/Sao_Paulo", // BRT
+  "Europe/London", // GMT/BST
+  "Europe/Paris", // CET/CEST
+  "Europe/Helsinki", // EET/EEST
+  "Asia/Istanbul", // TRT
+  "Asia/Dubai", // GST
+  "Asia/Kolkata", // IST
+  "Asia/Singapore", // SGT
+  "Asia/Tokyo", // JST
+  "Australia/Sydney", // AEST/AEDT
+  "Pacific/Auckland", // NZST/NZDT
+];
+
+// Format timezone for display
+const formatTimezone = (tz: string) => {
+  try {
+    const now = new Date();
+    const offset =
+      new Intl.DateTimeFormat("en", {
+        timeZoneName: "short",
+        timeZone: tz,
+      })
+        .formatToParts(now)
+        .find((part) => part.type === "timeZoneName")?.value || "";
+
+    // Replace region path with more readable format
+    const region = tz.replace("_", " ").split("/").pop();
+
+    return `${region} (${offset})`;
+  } catch (error) {
+    return tz;
+  }
+};
+
+// Get user's current timezone
+const getUserTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    return "UTC";
+  }
+};
+
 const Settings = () => {
   const { user, updateUserPreferences, logout } = useAuth();
   const { isDarkMode } = useTheme();
+  const {
+    timezone: currentTimezone,
+    setTimezone: updateAppTimezone,
+    getUserTimezone,
+  } = useTimezone();
   const initialMountRef = useRef(true);
 
   // Default color values based on theme
@@ -44,6 +103,11 @@ const Settings = () => {
     user?.preferences?.toColor ||
       (isDarkMode ? defaultDarkToColor : defaultLightToColor)
   );
+  const [timezone, setTimezone] = useState<string>(currentTimezone);
+  const [customTimezone, setCustomTimezone] = useState<string>("");
+  const [showCustomTimezone, setShowCustomTimezone] = useState<boolean>(
+    !COMMON_TIMEZONES.includes(currentTimezone)
+  );
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState({ type: "", text: "" });
@@ -61,6 +125,16 @@ const Settings = () => {
         user.preferences.toColor ||
           (isDarkMode ? defaultDarkToColor : defaultLightToColor)
       );
+      setTimezone(user.preferences.timezone || getUserTimezone());
+
+      // Check if the user's timezone is in the common list or is custom
+      if (
+        user.preferences.timezone &&
+        !COMMON_TIMEZONES.includes(user.preferences.timezone)
+      ) {
+        setShowCustomTimezone(true);
+        setCustomTimezone(user.preferences.timezone);
+      }
     }
 
     // Mark as initialized after first mount
@@ -68,6 +142,44 @@ const Settings = () => {
       initialMountRef.current = false;
     }
   }, [user, isDarkMode]);
+
+  // Update local state when currentTimezone changes
+  useEffect(() => {
+    setTimezone(currentTimezone);
+    if (!COMMON_TIMEZONES.includes(currentTimezone)) {
+      setShowCustomTimezone(true);
+      setCustomTimezone(currentTimezone);
+    }
+  }, [currentTimezone]);
+
+  // Handle timezone change
+  const handleTimezoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedTimezone = e.target.value;
+
+    if (selectedTimezone === "custom") {
+      setShowCustomTimezone(true);
+    } else {
+      setShowCustomTimezone(false);
+      setTimezone(selectedTimezone);
+    }
+  };
+
+  // Handle custom timezone input
+  const handleCustomTimezoneChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setCustomTimezone(e.target.value);
+    // Only update main timezone if valid
+    try {
+      // Simple validation - try to format a date with this timezone
+      new Intl.DateTimeFormat("en", { timeZone: e.target.value }).format(
+        new Date()
+      );
+      setTimezone(e.target.value);
+    } catch (error) {
+      // Invalid timezone - don't update main timezone yet
+    }
+  };
 
   const handleSavePreferences = async () => {
     try {
@@ -79,6 +191,12 @@ const Settings = () => {
       const signalSettings = (window as any).__signalSettings || {};
       const morningSettings = (window as any).__morningSettings || {};
 
+      // Use the custom timezone if showing custom input
+      const finalTimezone = showCustomTimezone ? customTimezone : timezone;
+
+      // Update the app-wide timezone immediately
+      updateAppTimezone(finalTimezone);
+
       // Combine all preferences into one object
       const updatedPreferences = {
         ...user?.preferences,
@@ -87,6 +205,7 @@ const Settings = () => {
         defaultMinutes,
         fromColor,
         toColor,
+        timezone: finalTimezone,
 
         // Working hours settings
         ...(workingHoursSettings.dailyHoursGoals
@@ -343,6 +462,85 @@ const Settings = () => {
                 <ArrowLeftRight className="w-3 h-3" />
                 Swap Colors
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Timezone Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <Globe className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Timezone Settings
+          </h2>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Your Timezone
+            </label>
+            <select
+              value={showCustomTimezone ? "custom" : timezone}
+              onChange={handleTimezoneChange}
+              className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+            >
+              {/* Display auto-detected timezone first */}
+              <option value={getUserTimezone()}>
+                {formatTimezone(getUserTimezone())} (Auto-detected)
+              </option>
+
+              {/* Common timezones */}
+              <optgroup label="Common Timezones">
+                {COMMON_TIMEZONES.filter((tz) => tz !== getUserTimezone()).map(
+                  (tz) => (
+                    <option key={tz} value={tz}>
+                      {formatTimezone(tz)}
+                    </option>
+                  )
+                )}
+              </optgroup>
+
+              {/* Custom option */}
+              <option value="custom">Custom Timezone...</option>
+            </select>
+
+            {/* Custom timezone input */}
+            {showCustomTimezone && (
+              <div className="mt-2">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  Enter Custom Timezone (IANA format, e.g. "America/New_York")
+                </label>
+                <input
+                  type="text"
+                  value={customTimezone}
+                  onChange={handleCustomTimezoneChange}
+                  placeholder="Continent/City"
+                  className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                />
+              </div>
+            )}
+
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              All times in the app will be displayed in this timezone
+            </p>
+          </div>
+          <div className="p-3 bg-gray-50 dark:bg-gray-900/40 rounded-md text-xs text-gray-600 dark:text-gray-400">
+            <div className="font-medium mb-1">
+              Current time in selected timezone:
+            </div>
+            <div className="text-sm text-gray-900 dark:text-white">
+              {(() => {
+                try {
+                  return new Date().toLocaleString("en-US", {
+                    timeZone: showCustomTimezone ? customTimezone : timezone,
+                    dateStyle: "full",
+                    timeStyle: "long",
+                  });
+                } catch (e) {
+                  return "Invalid timezone";
+                }
+              })()}
             </div>
           </div>
         </div>

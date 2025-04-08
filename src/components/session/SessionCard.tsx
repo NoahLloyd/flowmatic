@@ -1,6 +1,7 @@
 import React from "react";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
+import { useTimezone } from "../../context/TimezoneContext";
 
 interface SessionCardProps {
   session: Session;
@@ -16,6 +17,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
   todaysGoal,
 }) => {
   const { user } = useAuth();
+  const { formatTime } = useTimezone();
 
   const getDailyGoal = () => {
     const day = new Date().getDay();
@@ -74,12 +76,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
   const focusColors = getFocusColor(session.focus);
 
   const formatTimeString = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    return formatTime(new Date(timestamp));
   };
 
   const timeString = formatTimeString(session.created_at);

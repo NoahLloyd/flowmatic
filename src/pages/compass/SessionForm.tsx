@@ -3,6 +3,7 @@ import { api } from "../../utils/api";
 import { useTasks } from "../../hooks/useTasks";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
+import { useTimezone } from "../../context/TimezoneContext";
 
 interface SessionFormProps {
   onSessionCreated: () => Promise<void>;
@@ -28,6 +29,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
 }) => {
   const { tasks } = useTasks();
   const { user } = useAuth();
+  const { timezone } = useTimezone();
 
   // Get user's preferred settings from preferences
   const defaultProject = user?.preferences?.defaultProject || "";
@@ -95,11 +97,36 @@ const SessionForm: React.FC<SessionFormProps> = ({
     }));
   };
 
+  // Create an ISO string that's in the user's timezone
+  const createTimezoneAwareDate = () => {
+    try {
+      // Get the current date/time
+      const now = new Date();
+
+      // This is a trick to create a Date object that has the same
+      // wall-clock time in the user's timezone as 'now' has in the local timezone.
+      // We'll still return the ISO string which is always in UTC,
+      // but the datetime value itself will be appropriate for the user's timezone.
+      const nowStr = now.toLocaleString("en-US", { timeZone: timezone });
+      const nowInUserTZ = new Date(nowStr);
+
+      // Adjust the UTC time to match the timezone offset
+      const offset = now.getTime() - nowInUserTZ.getTime();
+      const adjustedDate = new Date(now.getTime() + offset);
+
+      return adjustedDate.toISOString();
+    } catch (error) {
+      console.error("Error creating timezone-aware date:", error);
+      return new Date().toISOString(); // Fallback
+    }
+  };
+
   const handleSubmit = async (focusRating: number) => {
     const submitData = {
       ...formData,
       focus: focusRating,
       minutes: formData.time,
+      created_at: createTimezoneAwareDate(),
     };
 
     try {
