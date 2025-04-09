@@ -63,6 +63,17 @@
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
     "@types/react-beautiful-dnd": "^13.1.8",
+    "@yoopta/action-menu-list": "4.9.4",
+    "@yoopta/blockquote": "4.9.4",
+    "@yoopta/code": "4.9.4",
+    "@yoopta/editor": "4.9.4",
+    "@yoopta/headings": "4.9.4",
+    "@yoopta/link": "4.9.4",
+    "@yoopta/link-tool": "4.9.4",
+    "@yoopta/lists": "4.9.4",
+    "@yoopta/marks": "4.9.4",
+    "@yoopta/paragraph": "4.9.4",
+    "@yoopta/toolbar": "4.9.4",
     "axios": "^1.7.7",
     "electron-squirrel-startup": "^1.0.1",
     "framer-motion": "^11.11.11",
@@ -73,6 +84,9 @@
     "react-datepicker": "^7.5.0",
     "react-dom": "^18.3.1",
     "react-icons": "^5.3.0",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "slate": "0.102.0",
+    "slate-history": "0.100.0",
+    "slate-react": "0.102.0"
   }
 }
