@@ -151,8 +151,6 @@ const PageContent = () => {
   } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
-    tasks,
-    isLoading: isLoadingTasks,
     handleAddTask,
     handleToggleComplete,
     handleDeleteTask,
@@ -284,8 +282,6 @@ const PageContent = () => {
     case "Tasks":
       content = (
         <Tasks
-          tasks={tasks}
-          isLoading={isLoadingTasks}
           onAddTask={handleAddTask}
           onToggleComplete={handleToggleComplete}
           onDelete={handleDeleteTask}
