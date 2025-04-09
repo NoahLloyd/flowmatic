@@ -230,7 +230,7 @@ const Compass: React.FC<CompassProps> = ({
       }
 
       // 'r' key to open record session modal
-      if (e.key === "r" || e.key === "R") {
+      if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         if (isRunning) {
           onStartPause(); // Pause the timer if it's running

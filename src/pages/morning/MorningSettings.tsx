@@ -19,6 +19,7 @@ import {
   Plus,
   Copy,
   CalendarDays,
+  CheckSquare,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import {
@@ -146,9 +147,7 @@ const MorningSettings = () => {
 
   // Remove an activity
   const removeActivity = (id: string) => {
-    // Don't allow removing the writing activity (it's required)
-    if (id === "writing") return;
-
+    // Remove the restriction on deleting the writing activity
     setWeeklySchedule((prev) => ({
       ...prev,
       [selectedDay]: prev[selectedDay].filter((activity) => activity.id !== id),
@@ -221,6 +220,8 @@ const MorningSettings = () => {
         return <Star className="w-4 h-4 text-yellow-500" />;
       case "breathwork":
         return <Wind className="w-4 h-4 text-cyan-500" />;
+      case "tasks":
+        return <CheckSquare className="w-4 h-4 text-emerald-500" />;
     }
   };
 
@@ -292,7 +293,7 @@ const MorningSettings = () => {
         </p>
 
         <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="morning-activities">
+          <Droppable droppableId="morning-activities-droppable">
             {(provided: DroppableProvided) => (
               <div
                 {...provided.droppableProps}
@@ -337,14 +338,12 @@ const MorningSettings = () => {
                                 {activity.enabled ? "Enabled" : "Disabled"}
                               </span>
                             </label>
-                            {activity.id !== "writing" && (
-                              <button
-                                onClick={() => removeActivity(activity.id)}
-                                className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800"
-                              >
-                                <Trash2 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => removeActivity(activity.id)}
+                              className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800"
+                            >
+                              <Trash2 className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                            </button>
                           </div>
                         </div>
 
@@ -438,6 +437,11 @@ const MorningSettings = () => {
           <div className="flex flex-wrap gap-2">
             {[
               {
+                type: "writing",
+                label: "Writing",
+                icon: <PenLine className="w-4 h-4 mr-1" />,
+              },
+              {
                 type: "visualization",
                 label: "Visualization",
                 icon: <Eye className="w-4 h-4 mr-1" />,
@@ -456,6 +460,11 @@ const MorningSettings = () => {
                 type: "breathwork",
                 label: "Breathwork",
                 icon: <Wind className="w-4 h-4 mr-1" />,
+              },
+              {
+                type: "tasks",
+                label: "Tasks",
+                icon: <CheckSquare className="w-4 h-4 mr-1" />,
               },
             ].map((activity) => {
               const alreadyExists = activities.some(

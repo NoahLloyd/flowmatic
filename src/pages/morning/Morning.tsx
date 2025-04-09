@@ -15,6 +15,7 @@ import {
   Heart,
   Wind,
   CalendarDays,
+  CheckSquare,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import {
@@ -24,12 +25,52 @@ import {
   MorningActivityContent,
 } from "../../types/Morning";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigation } from "../../hooks/useNavigation";
 import { debounce } from "lodash";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
+// Force navigation to Tasks page
+const forceNavigateToTasks = () => {
+  console.log("Force navigating to Tasks");
+  // Try multiple navigation methods
+  try {
+    // 1. Try direct DOM method - click the Tasks tab in sidebar
+    const tasksTab = document.querySelector(
+      'button[data-page="Tasks"], a[data-page="Tasks"]'
+    );
+    if (tasksTab) {
+      console.log("Found Tasks tab, clicking it");
+      (tasksTab as HTMLElement).click();
+      return true;
+    }
+  } catch (e) {
+    console.error("Error clicking Tasks tab:", e);
+  }
+
+  // 2. Try location change as fallback
+  try {
+    window.location.href = "/tasks";
+    return true;
+  } catch (e) {
+    console.error("Error changing location:", e);
+  }
+
+  return false;
+};
+
 const Morning = () => {
   const { user } = useAuth();
+  const { setSelected } = useNavigation();
+
+  // Create a direct navigation function
+  const directNavigate = useCallback(
+    (page: string) => {
+      setSelected(page);
+    },
+    [setSelected]
+  );
+
   const [entries, setEntries] = useState<MorningEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState("");
   const [streak, setStreak] = useState(0);
@@ -190,13 +231,16 @@ const Morning = () => {
   // Switch to next activity
   const nextActivity = useCallback(() => {
     if (currentActivityIndex < activities.length - 1) {
-      setCurrentActivityIndex((prev) => prev + 1);
+      const nextActivityIndex = currentActivityIndex + 1;
+      const nextActivityItem = activities[nextActivityIndex];
+
+      // Just move to the next activity
+      setCurrentActivityIndex(nextActivityIndex);
       setTimerComplete(false);
 
       // Reset timer for new activity
-      const nextActivity = activities[currentActivityIndex + 1];
-      if (nextActivity && nextActivity.timerMinutes) {
-        setTimeRemaining(nextActivity.timerMinutes * 60);
+      if (nextActivityItem && nextActivityItem.timerMinutes) {
+        setTimeRemaining(nextActivityItem.timerMinutes * 60);
       } else {
         setTimeRemaining(15 * 60); // Default
       }
@@ -265,13 +309,7 @@ const Morning = () => {
     const loadCurrentEntry = async () => {
       try {
         const response = await api.getEntry(selectedDate);
-        console.log("API Response:", response); // Debug: Log full response
-
         const { content, activityContent } = response;
-
-        // Debug logs to help diagnose the issue
-        console.log("Content from API:", content);
-        console.log("Activity content from API:", activityContent);
 
         // Only reset content if we have actual data to set
         // This prevents wiping out the UI when empty data is returned
@@ -285,7 +323,6 @@ const Morning = () => {
         const hasContent = content && content.trim().length > 0;
 
         if (!hasActivityContent && !hasContent) {
-          console.log("No content received from API, keeping current state");
           return; // Don't reset if no content found
         }
 
@@ -296,28 +333,19 @@ const Morning = () => {
 
         // Load saved activity data if available
         if (activityContent && Object.keys(activityContent).length > 0) {
-          console.log("Loading from activityContent");
-
           // Set content for different activities
           if (activityContent.writing) {
-            console.log("Found writing content:", activityContent.writing);
             setCurrentEntry(activityContent.writing);
           } else if (content && content.trim()) {
             // Backward compatibility: if writing not in activityContent but in content
-            console.log("Using legacy content field:", content);
             setCurrentEntry(content);
           }
 
           if (activityContent.gratitude) {
-            console.log("Found gratitude content:", activityContent.gratitude);
             setGratitudeEntry(activityContent.gratitude);
           }
 
           if (activityContent.affirmations) {
-            console.log(
-              "Found affirmations content:",
-              activityContent.affirmations
-            );
             setAffirmationsEntry(activityContent.affirmations);
           }
 
@@ -327,18 +355,11 @@ const Morning = () => {
             activityContent.lastActivityIndex >= 0 &&
             activityContent.lastActivityIndex < activities.length
           ) {
-            console.log(
-              "Restoring activity index:",
-              activityContent.lastActivityIndex
-            );
             setCurrentActivityIndex(activityContent.lastActivityIndex);
           }
         } else if (content && content.trim()) {
           // Backward compatibility if no activityContent but has content
-          console.log("No activityContent, using legacy content:", content);
           setCurrentEntry(content);
-        } else {
-          console.log("No content or activityContent found");
         }
 
         // If either writing content or legacy content exists, consider writing already started
@@ -379,17 +400,8 @@ const Morning = () => {
             lastActivityIndex: activityIndex,
           };
 
-          console.log("Saving to API:", {
-            date,
-            contentLength: content?.length || 0,
-            gratitudeLength: gratitudeText?.length || 0,
-            affirmationsLength: affirmationsText?.length || 0,
-            activityContent,
-          });
-
           // Pass empty string for content (we'll use writing from activityContent)
           const saveResponse = await api.updateEntry(date, "", activityContent);
-          console.log("Save response:", saveResponse);
 
           setLastSaved(new Date());
           setHasPendingChanges(false);
@@ -560,11 +572,20 @@ const Morning = () => {
         );
       case "breathwork":
         return <Wind className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />;
+      case "tasks":
+        return (
+          <CheckSquare className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+        );
     }
   };
 
   // Current activity
   const currentActivity = activities[currentActivityIndex];
+
+  // Handle click event on next button
+  const handleNextButtonClick = () => {
+    nextActivity();
+  };
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -577,6 +598,15 @@ const Morning = () => {
         return;
       }
 
+      console.log("Key pressed:", e.key);
+      console.log("Current activity:", currentActivity?.type);
+      console.log(
+        "Current index:",
+        currentActivityIndex,
+        "of",
+        activities.length
+      );
+
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         if (currentActivityIndex < activities.length - 1) {
           nextActivity();
@@ -587,12 +617,16 @@ const Morning = () => {
         }
       } else if (e.key === "Enter") {
         // Focus the appropriate textarea based on current activity
-        if (currentActivity.type === "writing") {
+        if (currentActivity?.type === "writing") {
           writingTextareaRef.current?.focus();
-        } else if (currentActivity.type === "gratitude") {
+        } else if (currentActivity?.type === "gratitude") {
           gratitudeTextareaRef.current?.focus();
-        } else if (currentActivity.type === "affirmations") {
+        } else if (currentActivity?.type === "affirmations") {
           affirmationsTextareaRef.current?.focus();
+        } else if (currentActivity?.type === "tasks") {
+          // Navigate to tasks page using directNavigate
+          console.log("Enter on tasks, navigating");
+          directNavigate("Tasks");
         }
       }
     };
@@ -607,12 +641,14 @@ const Morning = () => {
     nextActivity,
     prevActivity,
     currentActivity,
+    directNavigate,
   ]);
 
   // Start timer when changing to visualization or breathwork
   useEffect(() => {
     // Start timer automatically if the current activity is visualization or breathwork
     if (
+      currentActivity &&
       (currentActivity.type === "visualization" ||
         currentActivity.type === "breathwork") &&
       !timerActive &&
@@ -620,12 +656,19 @@ const Morning = () => {
     ) {
       startTimer();
     }
+
+    // Navigate automatically to Tasks page if current activity is tasks
+    if (currentActivity && currentActivity.type === "tasks") {
+      console.log("Current activity is tasks, navigating via useEffect");
+      directNavigate("Tasks");
+    }
   }, [
     currentActivityIndex,
     currentActivity,
     timerActive,
     timerComplete,
     startTimer,
+    directNavigate,
   ]);
 
   return (
@@ -638,16 +681,6 @@ const Morning = () => {
               {streak} day streak
             </span>
           </div>
-
-          {/* Day of week indicator */}
-          {currentDayOfWeek && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <CalendarDays className="w-5 h-5 text-purple-500 dark:text-purple-400" />
-              <span className="text-slate-700 dark:text-slate-200">
-                {currentDayOfWeek}
-              </span>
-            </div>
-          )}
 
           {/* Timer display */}
           <div
@@ -706,17 +739,56 @@ const Morning = () => {
               </button>
             </div>
           </div>
+
+          {/* Condensed activity navigation */}
+          {activities.length > 1 && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <button
+                onClick={prevActivity}
+                disabled={currentActivityIndex === 0}
+                className={`p-1 rounded-full ${
+                  currentActivityIndex === 0
+                    ? "text-slate-400 dark:text-slate-600"
+                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                }`}
+                title="Previous (← or ↑ key)"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center space-x-2 px-1">
+                {getActivityIcon(currentActivity?.type || "writing")}
+                <span className="text-sm text-slate-700 dark:text-slate-300">
+                  {currentActivityIndex + 1}/{activities.length}
+                </span>
+              </div>
+
+              <button
+                onClick={handleNextButtonClick}
+                disabled={currentActivityIndex === activities.length - 1}
+                className={`p-1 rounded-full ${
+                  currentActivityIndex === activities.length - 1
+                    ? "text-slate-400 dark:text-slate-600"
+                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                }`}
+                title="Next (→ or ↓ key)"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
+
         <div className="relative flex items-center space-x-2">
           <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
             className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
           >
-            <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <Calendar className="w-5 h-5 text-slate-500 dark:text-slate-400" />
             {isSaving || hasPendingChanges ? (
-              <Loader className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+              <Loader className="w-5 h-5 text-slate-500 dark:text-slate-400" />
             ) : lastSaved ? (
-              <Check className="w-4 h-4 text-green-500" />
+              <Check className="w-5 h-5 text-green-500" />
             ) : null}
           </button>
           {isCalendarOpen && (
@@ -741,49 +813,6 @@ const Morning = () => {
           )}
         </div>
       </div>
-
-      {/* Activity navigation controls */}
-      {activities.length > 1 && (
-        <div className="mb-4 flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-          <button
-            onClick={prevActivity}
-            disabled={currentActivityIndex === 0}
-            className={`flex items-center px-3 py-1.5 rounded ${
-              currentActivityIndex === 0
-                ? "text-slate-400 dark:text-slate-600"
-                : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-            }`}
-            title="Previous (← or ↑ key)"
-          >
-            <ChevronUp className="w-4 h-4 mr-1" />
-            Previous
-          </button>
-
-          <div className="flex items-center space-x-2">
-            {getActivityIcon(currentActivity.type)}
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {currentActivity.title}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 m-0">
-              {currentActivityIndex + 1} of {activities.length}
-            </span>
-          </div>
-
-          <button
-            onClick={nextActivity}
-            disabled={currentActivityIndex === activities.length - 1}
-            className={`flex items-center px-3 py-1.5 rounded ${
-              currentActivityIndex === activities.length - 1
-                ? "text-slate-400 dark:text-slate-600"
-                : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-            }`}
-            title="Next (→ or ↓ key)"
-          >
-            Next
-            <ChevronDown className="w-4 h-4 ml-1" />
-          </button>
-        </div>
-      )}
 
       {/* Timer completion notification */}
       {timerComplete && (
@@ -892,6 +921,28 @@ const Morning = () => {
 3. Hold your breath for 4 counts
 4. Exhale through your mouth for 6 counts
 5. Repeat for 5-10 cycles`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tasks */}
+        {currentActivity?.type === "tasks" && (
+          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+            <div className="flex-grow flex flex-col justify-center items-center">
+              <div className="max-w-2xl text-center space-y-6">
+                <CheckSquare className="w-20 h-20 text-emerald-500 dark:text-emerald-400 mx-auto" />
+                <h2 className="text-2xl font-medium text-slate-700 dark:text-slate-200">
+                  Daily Tasks
+                </h2>
+                <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Take a moment to plan your day. What are the most important
+                  tasks you want to accomplish today?
+                </p>
+                <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Prioritize your tasks and focus on what brings you closer to
+                  your goals.
                 </p>
               </div>
             </div>

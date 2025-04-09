@@ -24,7 +24,8 @@ export interface MorningActivity {
     | "visualization"
     | "gratitude"
     | "affirmations"
-    | "breathwork";
+    | "breathwork"
+    | "tasks";
   enabled: boolean;
   timerMinutes: number;
   text?: string;
