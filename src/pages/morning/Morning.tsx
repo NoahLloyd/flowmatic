@@ -598,15 +598,6 @@ const Morning = () => {
         return;
       }
 
-      console.log("Key pressed:", e.key);
-      console.log("Current activity:", currentActivity?.type);
-      console.log(
-        "Current index:",
-        currentActivityIndex,
-        "of",
-        activities.length
-      );
-
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         if (currentActivityIndex < activities.length - 1) {
           nextActivity();
@@ -625,7 +616,6 @@ const Morning = () => {
           affirmationsTextareaRef.current?.focus();
         } else if (currentActivity?.type === "tasks") {
           // Navigate to tasks page using directNavigate
-          console.log("Enter on tasks, navigating");
           directNavigate("Tasks");
         }
       }
@@ -659,7 +649,6 @@ const Morning = () => {
 
     // Navigate automatically to Tasks page if current activity is tasks
     if (currentActivity && currentActivity.type === "tasks") {
-      console.log("Current activity is tasks, navigating via useEffect");
       directNavigate("Tasks");
     }
   }, [

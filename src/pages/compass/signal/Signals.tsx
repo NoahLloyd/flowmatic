@@ -138,7 +138,7 @@ const Signals: React.FC = () => {
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mb-6">
       <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-          Daily Signals
+          Signals
         </h2>
       </div>
       <div className="p-5">

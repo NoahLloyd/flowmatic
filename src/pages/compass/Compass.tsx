@@ -10,6 +10,8 @@ import TimerCompleteModal from "../../components/session/TimerCompleteModal";
 import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { AVAILABLE_SIGNALS } from "../settings/components/SignalSettings";
+import { Task } from "../../types/Task";
+import DailyTasks from "./DailyTasks";
 
 // Define the session form data interface
 interface SessionFormData {
@@ -510,7 +512,7 @@ const Compass: React.FC<CompassProps> = ({
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
             <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
               <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-                Sessions Overview
+                Sessions
               </h2>
             </div>
             <div className="p-5 bg-white dark:bg-gray-900 h-[calc(100%-48px)]">
@@ -525,8 +527,15 @@ const Compass: React.FC<CompassProps> = ({
         </div>
       </div>
 
-      {/* Bottom section: Stats only */}
-      <SessionStats sessions={sessions} />
+      {/* Bottom section: Stats and Daily Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-3">
+          <SessionStats sessions={sessions} />
+        </div>
+        <div className="lg:col-span-2">
+          <DailyTasks />
+        </div>
+      </div>
     </div>
   );
 };

@@ -143,16 +143,20 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
   };
 
   // Handle focus rating selection
-  const handleFocusRating = async (rating: number) => {
+  const handleFocusRating = (rating: number) => {
     // Update the form data with the focus rating
     const updatedFormData = {
       ...formData,
       focus: rating,
     };
 
-    // Submit the session with all the form data
-    await onSubmitSession(updatedFormData);
+    // Immediately transition to the break step
     setCurrentStep("break");
+
+    // Submit the session in the background (no await)
+    onSubmitSession(updatedFormData).catch((error) => {
+      console.error("Error submitting session:", error);
+    });
   };
 
   // Handle break selection and start break timer
