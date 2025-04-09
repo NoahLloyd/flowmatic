@@ -49,6 +49,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
     averageFocus: 0,
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const statsCalculatedRef = useRef(false);
   const { user } = useAuth(); // Move hook to component level
 
   const sessions = propSessions || localSessions;
@@ -188,11 +189,19 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
       setGroupedSessions(groupSessionsByDay(sessions));
       const calculatedStats = calculateStats(sessions);
       setStats(calculatedStats);
-      if (onStatsCalculated) {
+
+      // Only call onStatsCalculated if it hasn't been called yet or if sessions changed
+      if (onStatsCalculated && !statsCalculatedRef.current) {
         onStatsCalculated(calculatedStats);
+        statsCalculatedRef.current = true;
       }
     }
-  }, [sessions, onStatsCalculated]);
+  }, [sessions]);
+
+  // Reset the ref when onStatsCalculated changes
+  useEffect(() => {
+    statsCalculatedRef.current = false;
+  }, [onStatsCalculated]);
 
   const calculateStats = (sessions: Session[]): SessionStats => {
     const today = new Date();
