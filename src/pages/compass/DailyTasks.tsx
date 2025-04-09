@@ -231,7 +231,7 @@ const DailyTasks: React.FC = () => {
         </span>
       </div>
       <div className="p-4 bg-white dark:bg-gray-900">
-        <div className="space-y-2 max-h-40 overflow-y-auto">
+        <div className="space-y-2 max-h-[179px] overflow-y-auto">
           {/* Active tasks */}
           {activeTasks.map((task) => (
             <div key={task._id} className="flex items-center gap-3 py-1">

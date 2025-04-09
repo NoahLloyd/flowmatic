@@ -382,6 +382,11 @@ const Tasks: React.FC<TasksProps> = ({
               onChange={(e) => {
                 setActiveSearchQuery(e.target.value);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.currentTarget.blur();
+                }
+              }}
               className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
             />
             <svg
@@ -478,6 +483,11 @@ const Tasks: React.FC<TasksProps> = ({
                   value={completedSearchQuery}
                   onChange={(e) => {
                     setCompletedSearchQuery(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.currentTarget.blur();
+                    }
                   }}
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
                 />

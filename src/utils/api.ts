@@ -169,4 +169,29 @@ export const api = {
       body: preferences,
       ...withAuth(),
     }),
+
+  // Notes endpoints
+  getNotes: async () => window.electron.apiRequest("GET", "/notes", withAuth()),
+
+  createNote: async (noteData: { content: string; tags: string[] }) =>
+    window.electron.apiRequest("POST", "/notes", {
+      body: noteData,
+      ...withAuth(),
+    }),
+
+  updateNote: async (
+    noteId: string,
+    updates: {
+      content?: string;
+      is_processed?: boolean;
+      tags?: string[];
+    }
+  ) =>
+    window.electron.apiRequest("PUT", `/notes/${noteId}`, {
+      body: updates,
+      ...withAuth(),
+    }),
+
+  deleteNote: async (noteId: string) =>
+    window.electron.apiRequest("DELETE", `/notes/${noteId}`, withAuth()),
 };

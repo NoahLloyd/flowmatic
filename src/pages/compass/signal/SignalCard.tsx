@@ -170,8 +170,6 @@ const SignalCard = ({
       return date.toISOString().split("T")[0];
     });
 
-    console.log(`[${label}] Generated last7Days:`, last7Days);
-
     // Map history data to these days, filling gaps with null
     const formattedHistory = last7Days.map((date) => {
       const dayData = history.find((day) => day.date === date);
@@ -184,14 +182,8 @@ const SignalCard = ({
       };
     });
 
-    console.log(`[${label}] Formatted history data:`, formattedHistory);
-
     // Check if we have any non-null values
     const hasData = formattedHistory.some((day) => day.value !== null);
-
-    if (!hasData) {
-      console.log(`[${label}] No history data available, showing grey squares`);
-    }
 
     // Render in a more compact form for the header
     return (

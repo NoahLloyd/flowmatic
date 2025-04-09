@@ -16,6 +16,7 @@ import {
   Wind,
   CalendarDays,
   CheckSquare,
+  EyeOff,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import {
@@ -29,35 +30,6 @@ import { useNavigation } from "../../hooks/useNavigation";
 import { debounce } from "lodash";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-
-// Force navigation to Tasks page
-const forceNavigateToTasks = () => {
-  console.log("Force navigating to Tasks");
-  // Try multiple navigation methods
-  try {
-    // 1. Try direct DOM method - click the Tasks tab in sidebar
-    const tasksTab = document.querySelector(
-      'button[data-page="Tasks"], a[data-page="Tasks"]'
-    );
-    if (tasksTab) {
-      console.log("Found Tasks tab, clicking it");
-      (tasksTab as HTMLElement).click();
-      return true;
-    }
-  } catch (e) {
-    console.error("Error clicking Tasks tab:", e);
-  }
-
-  // 2. Try location change as fallback
-  try {
-    window.location.href = "/tasks";
-    return true;
-  } catch (e) {
-    console.error("Error changing location:", e);
-  }
-
-  return false;
-};
 
 const Morning = () => {
   const { user } = useAuth();
@@ -660,6 +632,29 @@ const Morning = () => {
     directNavigate,
   ]);
 
+  const [isTextBlurred, setIsTextBlurred] = useState(false);
+
+  // Add global keyboard shortcut for blur toggle
+  useEffect(() => {
+    const handleBlurShortcut = (e: KeyboardEvent) => {
+      // Alt+B to toggle blur
+      if (e.key === "$") {
+        e.preventDefault();
+        setIsTextBlurred((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleBlurShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleBlurShortcut);
+    };
+  }, []);
+
+  // Toggle blur state
+  const toggleBlur = () => {
+    setIsTextBlurred((prev) => !prev);
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-8 dark:bg-slate-900">
       <div className="mb-6 flex items-center justify-between">
@@ -766,6 +761,24 @@ const Morning = () => {
               </button>
             </div>
           )}
+
+          {/* Blur toggle button */}
+          <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              onClick={toggleBlur}
+              title={isTextBlurred ? "Show text (Alt+B)" : "Blur text (Alt+B)"}
+              className="flex items-center space-x-1"
+            >
+              {isTextBlurred ? (
+                <Eye className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+              ) : (
+                <EyeOff className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+              )}
+              <span className="text-slate-700 dark:text-slate-200">
+                {isTextBlurred ? "Show" : "Blur"}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="relative flex items-center space-x-2">
@@ -839,7 +852,9 @@ const Morning = () => {
             onChange={handleTextChange}
             onKeyDown={handleTextareaKeyDown}
             placeholder="Write your morning entry here..."
-            className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500"
+            className={`w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 ${
+              isTextBlurred ? "blur-sm" : ""
+            }`}
             spellCheck="true"
           />
         )}
@@ -872,7 +887,9 @@ const Morning = () => {
               onChange={handleGratitudeChange}
               onKeyDown={handleTextareaKeyDown}
               placeholder="Write down things you're grateful for..."
-              className="w-full h-full p-0 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 border-0"
+              className={`w-full h-full p-0 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 border-0 ${
+                isTextBlurred ? "blur-sm" : ""
+              }`}
               spellCheck="true"
             />
           </div>
@@ -887,7 +904,9 @@ const Morning = () => {
               onChange={handleAffirmationsChange}
               onKeyDown={handleTextareaKeyDown}
               placeholder="Write your positive affirmations here..."
-              className="w-full h-full p-0 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 border-0"
+              className={`w-full h-full p-0 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 border-0 ${
+                isTextBlurred ? "blur-sm" : ""
+              }`}
               spellCheck="true"
             />
           </div>

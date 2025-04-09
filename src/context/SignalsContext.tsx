@@ -56,31 +56,52 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   const getTodayInUserTimezone = () => {
-    const now = new Date();
     try {
-      // Create a date for "today" in the user's timezone
-      const todayInUserTZ = new Date(
-        now.toLocaleString("en-US", { timeZone: timezone })
-      );
-      return todayInUserTZ.toISOString().split("T")[0];
+      // Use Intl.DateTimeFormat to get the date parts in the user's timezone
+      const date = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+
+      // Extract and format as YYYY-MM-DD
+      const month = date.find((part) => part.type === "month")?.value || "01";
+      const day = date.find((part) => part.type === "day")?.value || "01";
+      const year = date.find((part) => part.type === "year")?.value || "2023";
+
+      return `${year}-${month}-${day}`;
     } catch (error) {
       console.error("Error formatting date with timezone:", error);
       // Fallback to UTC
-      return now.toISOString().split("T")[0];
+      return new Date().toISOString().split("T")[0];
     }
   };
 
   // Function to get date n days ago in YYYY-MM-DD format in user's timezone
   const getDateDaysAgo = (daysAgo: number) => {
-    const now = new Date();
     try {
-      // Create a date in the user's timezone
-      const dateInUserTZ = new Date(
-        now.toLocaleString("en-US", { timeZone: timezone })
-      );
-      // Go back n days
-      dateInUserTZ.setDate(dateInUserTZ.getDate() - daysAgo);
-      return dateInUserTZ.toISOString().split("T")[0];
+      // Get current date in user's timezone
+      const now = new Date();
+
+      // Create a date object for n days ago in UTC
+      const pastDate = new Date(now);
+      pastDate.setDate(pastDate.getDate() - daysAgo);
+
+      // Format the date in user's timezone
+      const date = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(pastDate);
+
+      // Extract and format as YYYY-MM-DD
+      const month = date.find((part) => part.type === "month")?.value || "01";
+      const day = date.find((part) => part.type === "day")?.value || "01";
+      const year = date.find((part) => part.type === "year")?.value || "2023";
+
+      return `${year}-${month}-${day}`;
     } catch (error) {
       console.error(
         `Error formatting date ${daysAgo} days ago with timezone:`,

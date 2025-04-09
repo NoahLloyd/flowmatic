@@ -62,13 +62,16 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
       setStep("input");
     } else if (e.key.toLowerCase() === "d") {
       // Add as daily task
-      onAddTask(taskTitle, "day").then(onClose);
+      onClose(); // Close immediately
+      onAddTask(taskTitle, "day"); // Let it run in background
     } else if (e.key.toLowerCase() === "w") {
       // Add as weekly task
-      onAddTask(taskTitle, "week").then(onClose);
+      onClose(); // Close immediately
+      onAddTask(taskTitle, "week"); // Let it run in background
     } else if (e.key.toLowerCase() === "f") {
       // Add as future task
-      onAddTask(taskTitle, "future").then(onClose);
+      onClose(); // Close immediately
+      onAddTask(taskTitle, "future"); // Let it run in background
     }
   };
 
@@ -152,7 +155,10 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
                 <div className="space-y-2">
                   {/* Daily Task */}
                   <button
-                    onClick={() => onAddTask(taskTitle, "day").then(onClose)}
+                    onClick={() => {
+                      onClose(); // Close immediately
+                      onAddTask(taskTitle, "day"); // Let it run in background
+                    }}
                     className="w-full flex items-center p-3 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors"
                   >
                     <div className="flex-shrink-0 mr-3">
@@ -165,7 +171,10 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
 
                   {/* Weekly Task */}
                   <button
-                    onClick={() => onAddTask(taskTitle, "week").then(onClose)}
+                    onClick={() => {
+                      onClose(); // Close immediately
+                      onAddTask(taskTitle, "week"); // Let it run in background
+                    }}
                     className="w-full flex items-center p-3 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors"
                   >
                     <div className="flex-shrink-0 mr-3">
@@ -178,7 +187,10 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
 
                   {/* Future Task */}
                   <button
-                    onClick={() => onAddTask(taskTitle, "future").then(onClose)}
+                    onClick={() => {
+                      onClose(); // Close immediately
+                      onAddTask(taskTitle, "future"); // Let it run in background
+                    }}
                     className="w-full flex items-center p-3 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors"
                   >
                     <div className="flex-shrink-0 mr-3">

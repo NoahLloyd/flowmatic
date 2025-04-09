@@ -262,6 +262,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
       if (currentStep === "focus") {
         // Handle the navigation shortcut keys with strong prevention
         if (["t", "n", "p", "m"].includes(e.key.toLowerCase())) {
+          console.log(`Key detected: ${e.key.toLowerCase()}`);
           // Prevent global navigation and default behavior
           e.preventDefault();
           e.stopPropagation();
@@ -277,9 +278,11 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
               return;
             case "p":
               projectInputRef.current?.focus();
+              projectInputRef.current?.select();
               return;
             case "m":
               minutesInputRef.current?.focus();
+              minutesInputRef.current?.select();
               return;
           }
           return;

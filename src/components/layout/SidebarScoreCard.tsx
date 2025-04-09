@@ -101,7 +101,9 @@ const SidebarScoreCard: React.FC<SidebarScoreCardProps> = ({
                 : ""}
             </span>
           )}
-          {extraDisplay && <span>{extraDisplay}</span>}
+          {extraDisplay && !extraDisplay.includes("0.0") && (
+            <span>{extraDisplay}</span>
+          )}
         </span>
       </div>
       <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">

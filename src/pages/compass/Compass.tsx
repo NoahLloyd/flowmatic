@@ -5,6 +5,7 @@ import SessionCard from "../../components/session/SessionCard";
 import { Session } from "../../types/Session";
 import SessionsOverview from "../../components/session/SessionsOverview";
 import SessionStats from "../../components/session/SessionStats";
+import FriendsProgressStats from "../../components/session/FriendsProgressStats";
 import Signals from "./signal/Signals";
 import TimerCompleteModal from "../../components/session/TimerCompleteModal";
 import { api } from "../../utils/api";
@@ -172,50 +173,6 @@ const Compass: React.FC<CompassProps> = ({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Special case for Escape key
-      if (e.key === "Escape") {
-        if (isModalOpen) {
-          // Close the modal if it's open
-          onCloseModal();
-          e.stopImmediatePropagation();
-          return;
-        }
-
-        // Otherwise handle normal Escape functionality
-        e.preventDefault();
-        // Force reset of everything
-        setSelectedSignalIndex(null);
-        setAwaitingScaleValue(false);
-
-        // Reset any outlines and focused elements
-        const signalCardContainer = signalsRef.current?.querySelector(".grid");
-        const signalCards = signalCardContainer?.children;
-        if (signalCards && signalCards.length > 0) {
-          Array.from(signalCards).forEach((card) => {
-            (card as HTMLElement).style.boxShadow = "none";
-
-            // Force blur any inputs to exit edit mode
-            const inputs = card.querySelectorAll("input");
-            inputs.forEach((input) => input.blur());
-          });
-        }
-
-        // If there's any active editing element, try to blur it
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-
-        return;
-      }
-
-      // Skip all other keyboard shortcuts if the session completion modal is open
-      if (isModalOpen) {
-        // We need to stop immediate propagation to prevent other event listeners from receiving this event
-        // This is stronger than just stopPropagation and will block all other listeners
-        e.stopImmediatePropagation();
-        return;
-      }
-
       // Ignore key events when typing in input fields
       if (
         e.target instanceof HTMLInputElement ||
@@ -246,22 +203,22 @@ const Compass: React.FC<CompassProps> = ({
       }
 
       // Timer adjustment keys
-      if (e.key === "+") {
+      if (e.key === "+" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAdjustTime(60); // Add 1 minute
         return;
       }
-      if (e.key === "-") {
+      if (e.key === "-" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAdjustTime(-60); // Subtract 1 minute
         return;
       }
-      if (e.key === "_") {
+      if (e.key === "_" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAdjustTime(-60 * 10); // Subtract 10 minutes
         return;
       }
-      if (e.key === "?") {
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAdjustTime(60 * 10); // Add 10 minutes
         return;
@@ -474,7 +431,7 @@ const Compass: React.FC<CompassProps> = ({
   }, [isRunning]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-0 space-y-6">
       <TimerCompleteModal
         isOpen={isModalOpen}
         onClose={onCloseModal}
@@ -528,12 +485,14 @@ const Compass: React.FC<CompassProps> = ({
       </div>
 
       {/* Bottom section: Stats and Daily Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3">
-          <SessionStats sessions={sessions} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-2">
+          <FriendsProgressStats sessions={sessions} />
         </div>
         <div className="lg:col-span-2">
-          <DailyTasks />
+          <div className="">
+            <DailyTasks />
+          </div>
         </div>
       </div>
     </div>

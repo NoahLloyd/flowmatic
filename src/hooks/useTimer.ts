@@ -728,7 +728,6 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState) as TimerState;
-        console.log("Synchronizing with stored state:", parsedState);
 
         // Clear any existing intervals first to prevent conflicts
         if (intervalId) {
@@ -786,8 +785,6 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
             setBreakStartTime(parsedState.breakStartTime);
           }
         }
-
-        console.log("Timer state synchronized with localStorage");
       } catch (error) {
         console.error("Failed to parse timer state from localStorage:", error);
       }

@@ -417,8 +417,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   // For display, cap at 100%
   const progressPercentage = Math.min(rawProgressPercentage, 100);
 
-  // Determine if we exceeded the goal
-  const exceededGoal = displayHours > dailyGoal;
+  // Determine if we exceeded the goal - now requires exactly meeting or exceeding the goal
+  const exceededGoal = displayHours >= dailyGoal;
 
   return (
     <div className="w-64 flex flex-col pr-4 space-y-4">
