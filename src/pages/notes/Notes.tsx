@@ -21,10 +21,18 @@ import {
   LayoutGrid,
   Eye,
   EyeOff,
+  ChevronRight,
+  Edit,
+  LayoutPanelTop,
 } from "lucide-react";
 import { api } from "../../utils/api";
 
-interface Note {
+import NoteForm from "./components/NoteForm";
+import NoteFilters from "./components/NoteFilters";
+import TagBuckets from "./components/TagBuckets";
+import NoteCard from "./components/NoteCard";
+
+export interface Note {
   id: string;
   content: string;
   created_at: string;
@@ -32,7 +40,7 @@ interface Note {
   tags: string[];
 }
 
-interface Bucket {
+export interface Bucket {
   id: string;
   name: string;
   icon: React.ReactNode;
@@ -60,9 +68,12 @@ const Notes: React.FC = () => {
   >("newest");
   const [draggedNote, setDraggedNote] = useState<string | null>(null);
   const [showProcessed, setShowProcessed] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const newNoteRef = useRef<HTMLTextAreaElement>(null);
+  const newNoteRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const columnRefs = useRef<HTMLDivElement[]>([]);
 
@@ -160,20 +171,36 @@ const Notes: React.FC = () => {
 
   // Create buckets based on available tags and status
   const getBuckets = useCallback((): Bucket[] => {
-    const popularTags = getPopularTags().slice(0, 3);
+    const popularTags = getPopularTags().slice(0, 5);
+
+    // Check if active bucket is a tag that isn't in popularTags
+    const isActiveTagBucket =
+      activeBucket.startsWith("tag-") &&
+      !popularTags.includes(activeBucket.replace("tag-", ""));
+
+    // If active bucket is a tag that's not in popularTags, add it
+    let tagsToInclude = [...popularTags];
+    if (isActiveTagBucket) {
+      const activeTag = activeBucket.replace("tag-", "");
+      tagsToInclude = [
+        activeTag,
+        ...popularTags.filter((tag) => tag !== activeTag),
+      ];
+    }
 
     const defaultBuckets: Bucket[] = [
       {
         id: "all",
         name: "All Notes",
-        icon: <StickyNote className="w-4 h-4" />,
+        icon: <LayoutPanelTop className="w-4 h-4" />,
         filter: () => true,
-        color: "bg-gray-100 dark:bg-gray-800",
+        color:
+          "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
       },
     ];
 
-    // Add buckets for popular tags
-    const tagBuckets = popularTags.map((tag) => ({
+    // Add buckets for popular tags and active tag if it's not already included
+    const tagBuckets = tagsToInclude.map((tag) => ({
       id: `tag-${tag}`,
       name: `#${tag}`,
       icon: <Tag className="w-4 h-4" />,
@@ -182,7 +209,7 @@ const Notes: React.FC = () => {
     }));
 
     return [...defaultBuckets, ...tagBuckets];
-  }, [notes, availableTags]);
+  }, [notes, availableTags, activeBucket]);
 
   // Create a new note
   const handleCreateNote = async () => {
@@ -422,9 +449,16 @@ const Notes: React.FC = () => {
     let filtered = notes;
 
     if (activeBucket !== "all") {
-      const bucket = getBuckets().find((b) => b.id === activeBucket);
-      if (bucket) {
-        filtered = notes.filter(bucket.filter);
+      if (activeBucket.startsWith("tag-")) {
+        // Handle tag filtering directly
+        const tagName = activeBucket.replace("tag-", "");
+        filtered = notes.filter((note) => note.tags?.includes(tagName));
+      } else {
+        // Use bucket filter for other buckets
+        const bucket = getBuckets().find((b) => b.id === activeBucket);
+        if (bucket) {
+          filtered = notes.filter(bucket.filter);
+        }
       }
     }
 
@@ -501,19 +535,81 @@ const Notes: React.FC = () => {
     columnCount: number
   ): Note[][] => {
     // Initialize columns
-    const columns: Note[][] = Array.from({ length: columnCount }, () => []);
+    const columns: Note[][] = Array.from(
+      { length: columnCount },
+      () => [] as Note[]
+    );
 
-    // Distribute notes to the column with the fewest notes
+    // Initialize column heights
+    const columnHeights: number[] = Array(columnCount).fill(0);
+
+    // Estimate height based on content
+    const estimateNoteHeight = (note: Note): number => {
+      const contentLength = note.content.length;
+      const tagCount = note.tags?.length || 0;
+
+      // Base height + content height + tag height
+      return 100 + Math.ceil(contentLength / 2) + tagCount * 10;
+    };
+
+    // Distribute notes to the column with the shortest height
     notes.forEach((note) => {
-      // Find column with fewest notes
-      const columnIndex = columns
-        .map((column, index) => ({ index, length: column.length }))
-        .sort((a, b) => a.length - b.length)[0].index;
+      // Find column with shortest height
+      const shortestColumnIndex = columnHeights
+        .map((height, index) => ({ index, height }))
+        .sort((a, b) => a.height - b.height)[0].index;
 
-      columns[columnIndex].push(note);
+      // Add note to the shortest column
+      columns[shortestColumnIndex].push(note);
+
+      // Update the column height
+      columnHeights[shortestColumnIndex] += estimateNoteHeight(note);
     });
 
     return columns;
+  };
+
+  // Start editing a note
+  const handleStartEditing = (noteId: string) => {
+    const note = notes.find((n) => n.id === noteId);
+    if (note) {
+      setEditingNoteId(noteId);
+      setEditedContent(note.content);
+    }
+  };
+
+  // Save edited note
+  const handleSaveEditedNote = async (noteId: string) => {
+    if (!editedContent.trim()) {
+      return;
+    }
+
+    const noteToUpdate = notes.find((n) => n.id === noteId);
+    if (!noteToUpdate) return;
+
+    try {
+      setIsSaving(true);
+      const updatedNote = { ...noteToUpdate, content: editedContent.trim() };
+      await api.updateNote(noteId, updatedNote);
+
+      // Update local state
+      const updatedNotes = notes.map((n) =>
+        n.id === noteId ? { ...n, content: editedContent.trim() } : n
+      );
+      setNotes(updatedNotes);
+      setEditingNoteId(null);
+      setEditedContent("");
+    } catch (error) {
+      console.error("Failed to update note:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEditing = () => {
+    setEditingNoteId(null);
+    setEditedContent("");
   };
 
   const filteredNotes = getFilteredAndSortedNotes();
@@ -527,24 +623,15 @@ const Notes: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Compact Note Creation */}
-      <div className="mb-6 flex gap-3 items-start">
-        <textarea
-          ref={newNoteRef}
-          placeholder="Capture a new note... (Ctrl+Enter to save)"
-          value={newNoteContent}
-          onChange={(e) => setNewNoteContent(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="flex-1 p-3 h-[45px] max-h-[45px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 text-gray-800 dark:text-gray-200"
-        />
-        <button
-          onClick={handleCreateNote}
-          disabled={!newNoteContent.trim() || isSaving}
-          className="px-4 py-2 bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 h-[45px]"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Replace the old form with the NoteForm component */}
+      <NoteForm
+        newNoteContent={newNoteContent}
+        setNewNoteContent={setNewNoteContent}
+        handleCreateNote={handleCreateNote}
+        isSaving={isSaving}
+        handleKeyDown={handleKeyDown}
+        newNoteRef={newNoteRef}
+      />
 
       {/* Notification message */}
       {saveMessage.text && (
@@ -564,138 +651,33 @@ const Notes: React.FC = () => {
         </div>
       )}
 
-      {/* Filter and Sorting Bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-3 flex-grow">
-          <div className="relative flex-grow max-w-xs">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 text-gray-800 dark:text-gray-200"
-            />
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" />
-          </div>
+      {/* Replace the old filter and sorting bar with the NoteFilters component */}
+      <NoteFilters
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchInputRef={searchInputRef}
+        filteredNoteCount={filteredNotes.length}
+        showProcessed={showProcessed}
+        setShowProcessed={setShowProcessed}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        saveMessage={saveMessage}
+      />
 
-          <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            {filteredNotes.length}{" "}
-            {filteredNotes.length === 1 ? "note" : "notes"}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Toggle for processed notes */}
-          <button
-            onClick={() => setShowProcessed(!showProcessed)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm
-              ${
-                showProcessed
-                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-              }`}
-          >
-            {showProcessed ? (
-              <>
-                <Eye className="w-3.5 h-3.5" />
-                <span>Showing processed</span>
-              </>
-            ) : (
-              <>
-                <EyeOff className="w-3.5 h-3.5" />
-                <span>Hiding processed</span>
-              </>
-            )}
-          </button>
-
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as any)}
-            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm py-1.5 px-3 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 text-gray-800 dark:text-gray-200"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="alphabetical">Alphabetical</option>
-          </select>
-
-          <div className="flex bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 ${
-                viewMode === "grid"
-                  ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  : "text-gray-500 dark:text-gray-400"
-              }`}
-              title="Grid view"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 ${
-                viewMode === "list"
-                  ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  : "text-gray-500 dark:text-gray-400"
-              }`}
-              title="List view"
-            >
-              <AlignLeft className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Category Buckets */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
-        {getBuckets().map((bucket) => (
-          <div
-            key={bucket.id}
-            className={`relative p-3 rounded-lg cursor-pointer transition-all ${
-              activeBucket === bucket.id
-                ? `${bucket.color} ring-2 ring-gray-400 dark:ring-gray-600`
-                : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/70"
-            }`}
-            onClick={() => setActiveBucket(bucket.id)}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.add(
-                "bg-blue-50",
-                "dark:bg-blue-900/20"
-              );
-            }}
-            onDragLeave={(e) => {
-              e.currentTarget.classList.remove(
-                "bg-blue-50",
-                "dark:bg-blue-900/20"
-              );
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.remove(
-                "bg-blue-50",
-                "dark:bg-blue-900/20"
-              );
-              if (draggedNote) {
-                handleDropOnBucket(bucket.id, draggedNote);
-                setDraggedNote(null);
-              }
-            }}
-          >
-            <div className="flex items-center mb-1">
-              <span className="mr-2 text-gray-700 dark:text-gray-300">
-                {bucket.icon}
-              </span>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {bucket.name}
-              </span>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {notes.filter(bucket.filter).length} notes
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Replace Category Buckets with TagBuckets component */}
+      <TagBuckets
+        buckets={getBuckets()}
+        activeBucket={activeBucket}
+        setActiveBucket={setActiveBucket}
+        availableTags={availableTags}
+        notes={notes}
+        handleDropOnBucket={handleDropOnBucket}
+        draggedNote={draggedNote}
+        showAllTags={showAllTags}
+        setShowAllTags={setShowAllTags}
+      />
 
       {/* Notes Grid - True Masonry Layout */}
       {isLoading ? (
@@ -736,6 +718,12 @@ const Notes: React.FC = () => {
                   inputRef={inputRef}
                   availableTags={availableTags}
                   setDraggedNote={setDraggedNote}
+                  editingNoteId={editingNoteId}
+                  editedContent={editedContent}
+                  setEditedContent={setEditedContent}
+                  handleStartEditing={handleStartEditing}
+                  handleSaveEditedNote={handleSaveEditedNote}
+                  handleCancelEditing={handleCancelEditing}
                 />
               ))}
             </div>
@@ -762,197 +750,14 @@ const Notes: React.FC = () => {
               availableTags={availableTags}
               setDraggedNote={setDraggedNote}
               isList={true}
+              editingNoteId={editingNoteId}
+              editedContent={editedContent}
+              setEditedContent={setEditedContent}
+              handleStartEditing={handleStartEditing}
+              handleSaveEditedNote={handleSaveEditedNote}
+              handleCancelEditing={handleCancelEditing}
             />
           ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Extracted note card component for reuse between grid and list views
-const NoteCard: React.FC<{
-  note: Note;
-  formatDate: (date: string) => string;
-  handleToggleProcessed: (id: string) => void;
-  handleShowTagInput: (id: string, e?: React.MouseEvent) => void;
-  handleDeleteNote: (id: string) => void;
-  handleRemoveTag: (
-    noteId: string,
-    tagToRemove: string,
-    e?: React.MouseEvent
-  ) => void;
-  showTagInput: string | null;
-  newTag: string;
-  setNewTag: React.Dispatch<React.SetStateAction<string>>;
-  handleTagKeyDown: (e: React.KeyboardEvent, noteId: string) => void;
-  handleAddTag: (noteId: string) => void;
-  inputRef: React.RefObject<HTMLInputElement>;
-  availableTags: string[];
-  setDraggedNote: React.Dispatch<React.SetStateAction<string | null>>;
-  isList?: boolean;
-}> = ({
-  note,
-  formatDate,
-  handleToggleProcessed,
-  handleShowTagInput,
-  handleDeleteNote,
-  handleRemoveTag,
-  showTagInput,
-  newTag,
-  setNewTag,
-  handleTagKeyDown,
-  handleAddTag,
-  inputRef,
-  availableTags,
-  setDraggedNote,
-  isList = false,
-}) => {
-  return (
-    <div
-      className={`group relative p-4 rounded-lg border transition-all ${
-        note.is_processed
-          ? "bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-800/50 text-gray-600 dark:text-gray-400"
-          : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100"
-      } hover:shadow-md dark:hover:shadow-gray-900/30 ${
-        isList ? "w-full" : ""
-      }`}
-      draggable
-      onDragStart={() => setDraggedNote(note.id)}
-      onDragEnd={() => setDraggedNote(null)}
-    >
-      {/* Note content */}
-      <div className="flex flex-col h-full">
-        <p className="flex-grow whitespace-pre-wrap break-words mb-3 text-base">
-          {note.content}
-        </p>
-
-        <div className="mt-auto">
-          {/* Date and tags on same line */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-              {formatDate(note.created_at)}
-            </span>
-
-            {/* Tags */}
-            {note.tags && note.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {note.tags.map((tag) => (
-                  <div
-                    key={tag}
-                    className="flex items-center text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full"
-                  >
-                    #{tag}
-                    <button
-                      onClick={(e) => handleRemoveTag(note.id, tag, e)}
-                      className="ml-1 text-gray-400 hover:text-red-500"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Actions - only visible on hover */}
-      <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => handleToggleProcessed(note.id)}
-          className={`p-1.5 rounded-md ${
-            note.is_processed
-              ? "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
-              : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800/50"
-          }`}
-          title={
-            note.is_processed ? "Mark as unprocessed" : "Mark as processed"
-          }
-        >
-          {note.is_processed ? (
-            <ArrowUpRight className="w-4 h-4" />
-          ) : (
-            <Check className="w-4 h-4" />
-          )}
-        </button>
-
-        <button
-          onClick={(e) => handleShowTagInput(note.id, e)}
-          className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-md"
-          title="Add tag"
-        >
-          <Tag className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={() => handleDeleteNote(note.id)}
-          className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 dark:hover:text-red-400 rounded-md"
-          title="Delete note"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Tag input overlay */}
-      {showTagInput === note.id && (
-        <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 z-10 rounded-lg p-4 flex flex-col">
-          <div className="mb-3 font-medium text-sm text-gray-800 dark:text-gray-200">
-            Add a tag
-          </div>
-          <div className="flex-grow relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              onKeyDown={(e) => handleTagKeyDown(e, note.id)}
-              placeholder="Enter a tag name..."
-              className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800"
-              autoFocus
-            />
-          </div>
-
-          {/* Quick tag selection */}
-          {availableTags.length > 0 && (
-            <div className="mt-3">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                Popular tags:
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {availableTags
-                  .filter((tag) => !note.tags?.includes(tag))
-                  .slice(0, 10)
-                  .map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => {
-                        setNewTag(tag);
-                        handleAddTag(note.id);
-                      }}
-                      className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              onClick={() => handleShowTagInput("", undefined)}
-              className="p-1.5 px-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleAddTag(note.id)}
-              className="p-1.5 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm rounded-md"
-            >
-              Add Tag
-            </button>
-          </div>
         </div>
       )}
     </div>
