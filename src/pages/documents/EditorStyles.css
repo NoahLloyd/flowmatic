@@ -1,0 +1,225 @@
+/* Editor container styles */
+.editor-wrapper {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Light mode variables */
+  --background: #ffffff;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --card: #ffffff;
+  --primary: #3b82f6;
+  --accent: #3b82f6;
+  --accent-subtle: #eff6ff;
+  --code-bg: #f3f4f6;
+  --code-text: #1f2937;
+  --bullet-color: #4b5563;
+}
+
+/* Dark mode styles */
+.editor-wrapper.dark {
+  --background: #1f2937;
+  --text: #f3f4f6;
+  --text-muted: #9ca3af;
+  --border: #374151;
+  --card: #374151;
+  --primary: #60a5fa;
+  --accent: #60a5fa;
+  --accent-subtle: #1e3a8a;
+  --code-bg: #111827;
+  --code-text: #e5e7eb;
+  --bullet-color: #d1d5db;
+}
+
+.editor-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--background);
+  color: var(--text);
+  border-radius: 0.5rem;
+}
+
+/* Bubble menu styles */
+.bubble-menu {
+  display: flex;
+  gap: 0.5rem;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.bubble-menu button {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.bubble-menu button:hover {
+  background-color: var(--accent-subtle);
+}
+
+.bubble-menu button.is-active {
+  background-color: var(--accent);
+  color: white;
+}
+
+/* Floating menu styles */
+.floating-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.floating-menu button {
+  border: none;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.floating-menu button:hover {
+  background-color: var(--accent-subtle);
+}
+
+.floating-menu button.is-active {
+  background-color: var(--accent);
+  color: white;
+}
+
+/* TipTap editor content styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100px;
+  padding: 1rem;
+}
+
+.ProseMirror p {
+  margin: 1em 0;
+  line-height: 1.5;
+}
+
+.ProseMirror h1 {
+  font-size: 2em;
+  margin: 1em 0 0.5em;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ProseMirror h3 {
+  font-size: 1.25em;
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* List styling */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 2rem;
+  margin: 1em 0;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  color: var(--bullet-color);
+}
+
+.ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror ol ol {
+  list-style-type: lower-alpha;
+}
+
+.ProseMirror ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.ProseMirror li {
+  position: relative;
+  margin-bottom: 0.5em;
+}
+
+/* Make sure the text content is the right color */
+.ProseMirror li p {
+  color: var(--text);
+  margin: 0.25em 0;
+}
+
+.ProseMirror a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.ProseMirror pre {
+  background-color: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+.ProseMirror code {
+  background-color: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+.ProseMirror mark {
+  background-color: #fef3c7;
+  color: #92400e;
+  padding: 0 0.125rem;
+  border-radius: 0.125rem;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-muted);
+  pointer-events: none;
+  height: 0;
+}

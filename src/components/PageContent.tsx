@@ -14,13 +14,16 @@ import { api } from "../utils/api";
 import { Session } from "../types/Session";
 import Auth from "../pages/auth/Auth";
 import { useAuth } from "../context/AuthContext";
-import Write from "../pages/write/Write";
+import Documents from "../pages/documents/Documents";
 import QuickAddTaskModal from "./task/QuickAddTaskModal";
+import QuickAddNoteModal from "./note/QuickAddNoteModal";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
   // State for QuickAddTaskModal
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  // State for QuickAddNoteModal
+  const [isQuickAddNoteModalOpen, setIsQuickAddNoteModalOpen] = useState(false);
 
   // Create a direct navigation function
   const directNavigate = useCallback(
@@ -45,15 +48,23 @@ const PageContent = () => {
       }
 
       // Global "a" key to open quick add task modal
-      if (e.key === "a" && !isQuickAddModalOpen) {
+      if (e.key === "a" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen) {
         e.preventDefault();
         e.stopPropagation();
         setIsQuickAddModalOpen(true);
         return;
       }
 
-      // Skip other keyboard shortcuts if the quick add modal is open
-      if (isQuickAddModalOpen) {
+      // Global "o" key to open quick add note modal
+      if (e.key === "o" && !isQuickAddNoteModalOpen && !isQuickAddModalOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsQuickAddNoteModalOpen(true);
+        return;
+      }
+
+      // Skip other keyboard shortcuts if any quick add modal is open
+      if (isQuickAddModalOpen || isQuickAddNoteModalOpen) {
         return;
       }
 
@@ -125,7 +136,7 @@ const PageContent = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [isQuickAddModalOpen]);
+  }, [isQuickAddModalOpen, isQuickAddNoteModalOpen]);
 
   const {
     timeRemaining: time,
@@ -244,80 +255,94 @@ const PageContent = () => {
     return Promise.resolve();
   };
 
+  // Handle adding a note from the quick add modal
+  const handleQuickAddNote = async (content: string) => {
+    try {
+      await api.createNote({ content, tags: [] });
+      // If we're on the Notes page, we might want to refresh the notes list
+      if (selected === "Notes") {
+        // This assumes your Notes component has a prop to trigger a refresh
+        // You might need to add this functionality
+      }
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Failed to create note:", error);
+      return Promise.reject(error);
+    }
+  };
+
   if (isAuthChecking) {
     return <div>Loading...</div>;
   }
 
   let content;
-  switch (selected) {
-    case "Friends":
-      content = <Friends />;
-      break;
-    case "Compass":
-      content = (
-        <Compass
-          time={time}
-          isRunning={isRunning}
-          onStartPause={handleStartPause}
-          onReset={handleReset}
-          onAdjustTime={handleAdjustTime}
-          onStartBreak={handleStartBreak}
-          onRestartTimer={handleRestartTimer}
-          isModalOpen={isModalOpen}
-          onCloseModal={handleCloseModal}
-          // Break timer props
-          breakTimeRemaining={breakTimeRemaining}
-          breakIsRunning={breakIsRunning}
-          isBreakMode={isBreakMode}
-          onBreakTimerStartPause={handleBreakTimerStartPause}
-          onBreakTimerReset={handleBreakTimerReset}
-          onBreakTimerAdjust={handleBreakTimerAdjust}
-          sessions={sessions}
-          isLoadingSessions={isLoadingSessions}
-          onSessionCreated={fetchSessions}
-          onSessionsUpdate={fetchSessions}
-        />
-      );
-      break;
-    case "Tasks":
-      content = (
-        <Tasks
-          onAddTask={handleAddTask}
-          onToggleComplete={handleToggleComplete}
-          onDelete={handleDeleteTask}
-          onChangeTaskType={handleChangeTaskType}
-          onUpdateTitle={handleUpdateTitle}
-        />
-      );
-      break;
-    case "Morning":
-      content = <Morning />;
-      break;
-    case "Notes":
-      content = <Notes />;
-      break;
-    case "Insights":
-      content = (
-        <Insights sessions={sessions} isLoadingSessions={isLoadingSessions} />
-      );
-      break;
-    case "Settings":
-      content = <Settings />;
-      break;
-    case "Write":
-      content = <Write />;
-      break;
-    default:
-      content = <Friends />;
-      break;
+  if (!isAuthenticated) {
+    content = <Auth />;
+  } else {
+    switch (selected) {
+      case "Compass":
+        content = (
+          <Compass
+            time={time}
+            isRunning={isRunning}
+            onStartPause={handleStartPause}
+            onAdjustTime={handleAdjustTime}
+            onReset={handleReset}
+            isModalOpen={isModalOpen}
+            onCloseModal={handleCloseModal}
+            onStartBreak={handleStartBreak}
+            onRestartTimer={handleRestartTimer}
+            breakTimeRemaining={breakTimeRemaining}
+            breakIsRunning={breakIsRunning}
+            isBreakMode={isBreakMode}
+            onBreakTimerStartPause={handleBreakTimerStartPause}
+            onBreakTimerReset={handleBreakTimerReset}
+            onBreakTimerAdjust={handleBreakTimerAdjust}
+            sessions={sessions}
+            isLoadingSessions={isLoadingSessions}
+            onSessionCreated={fetchSessions}
+            onSessionsUpdate={fetchSessions}
+          />
+        );
+        break;
+      case "Documents":
+        content = <Documents />;
+        break;
+      case "Tasks":
+        content = (
+          <Tasks
+            onAddTask={handleAddTask}
+            onToggleComplete={handleToggleComplete}
+            onDelete={handleDeleteTask}
+            onChangeTaskType={handleChangeTaskType}
+            onUpdateTitle={handleUpdateTitle}
+          />
+        );
+        break;
+      case "Notes":
+        content = <Notes />;
+        break;
+      case "Morning":
+        content = <Morning />;
+        break;
+      case "Insights":
+        content = (
+          <Insights sessions={sessions} isLoadingSessions={isLoadingSessions} />
+        );
+        break;
+      case "Friends":
+        content = <Friends />;
+        break;
+      case "Settings":
+        content = <Settings />;
+        break;
+      default:
+        content = <div>Select a page from the sidebar</div>;
+    }
   }
 
   if (isLoading) {
     return <div>Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Auth />;
   }
 
   return (
@@ -327,6 +352,11 @@ const PageContent = () => {
         isOpen={isQuickAddModalOpen}
         onClose={() => setIsQuickAddModalOpen(false)}
         onAddTask={handleQuickAddTask}
+      />
+      <QuickAddNoteModal
+        isOpen={isQuickAddNoteModalOpen}
+        onClose={() => setIsQuickAddNoteModalOpen(false)}
+        onAddNote={handleQuickAddNote}
       />
     </Layout>
   );

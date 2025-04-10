@@ -70,8 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { label: "Tasks", icon: Check },
     { label: "Morning", icon: Sunrise },
     { label: "Notes", icon: StickyNote },
-
-    { label: "Write", icon: BookOpen },
+    { label: "Documents", icon: BookOpen },
     { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];
@@ -83,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     Tasks: "t",
     Morning: "m",
     Notes: "n",
-    Write: "w",
+    Documents: "d",
     Insights: "i",
     Settings: "s",
   };

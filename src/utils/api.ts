@@ -2,6 +2,7 @@ import { Session } from "src/types/Session";
 import { MorningEntries } from "src/types/Morning";
 import { Task } from "src/types/Task";
 import { User } from "src/types/User";
+import { Document } from "src/types/Document";
 
 const withAuth = () => ({
   headers: {
@@ -194,4 +195,39 @@ export const api = {
 
   deleteNote: async (noteId: string) =>
     window.electron.apiRequest("DELETE", `/notes/${noteId}`, withAuth()),
+
+  // Document endpoints
+  getUserDocuments: async (): Promise<Document[]> =>
+    window.electron.apiRequest("GET", "/documents", withAuth()),
+
+  getDocumentById: async (documentId: string): Promise<Document> =>
+    window.electron.apiRequest("GET", `/documents/${documentId}`, withAuth()),
+
+  createDocument: async (documentData: {
+    title: string;
+    content: string;
+  }): Promise<Document> =>
+    window.electron.apiRequest("POST", "/documents", {
+      body: documentData,
+      ...withAuth(),
+    }),
+
+  updateDocument: async (
+    documentId: string,
+    updates: {
+      title?: string;
+      content?: string;
+    }
+  ): Promise<Document> =>
+    window.electron.apiRequest("PUT", `/documents/${documentId}`, {
+      body: updates,
+      ...withAuth(),
+    }),
+
+  deleteDocument: async (documentId: string): Promise<void> =>
+    window.electron.apiRequest(
+      "DELETE",
+      `/documents/${documentId}`,
+      withAuth()
+    ),
 };
