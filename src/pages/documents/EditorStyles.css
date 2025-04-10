@@ -228,3 +228,10 @@
   pointer-events: none;
   height: 0;
 }
+
+/* last child of ProseMirror */
+.ProseMirror > *:last-child::after {
+  content: "";
+  display: block;
+  height: 100px;
+}

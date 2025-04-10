@@ -24,10 +24,7 @@ const Editor: React.FC<EditorComponentProps> = ({
   const saveTimeoutRef = useRef<number | null>(null);
   const { isDarkMode } = useTheme();
   const [prevDocumentId, setPrevDocumentId] = useState<string>(documentId);
-  const [internalContent, setInternalContent] = useState<string>(
-    initialContent || ""
-  );
-  const isUpdatingRef = useRef(false);
+  const lastSavedContentRef = useRef<string>(initialContent || "");
 
   // Setup editor
   const editor = useEditor({
@@ -67,7 +64,8 @@ const Editor: React.FC<EditorComponentProps> = ({
     },
     onUpdate: ({ editor }) => {
       const content = editor.getHTML();
-      setInternalContent(content);
+
+      // UI updates immediately because TipTap handles its own rendering
 
       // Debounce the save operation
       if (saveTimeoutRef.current) {
@@ -75,12 +73,11 @@ const Editor: React.FC<EditorComponentProps> = ({
       }
 
       saveTimeoutRef.current = window.setTimeout(() => {
-        isUpdatingRef.current = true;
-        onUpdate(content);
-        // Reset the flag after a short delay to allow for state updates
-        setTimeout(() => {
-          isUpdatingRef.current = false;
-        }, 50);
+        // Only save if content has changed since last save
+        if (content !== lastSavedContentRef.current) {
+          lastSavedContentRef.current = content;
+          onUpdate(content);
+        }
       }, 750);
     },
   });
@@ -88,38 +85,35 @@ const Editor: React.FC<EditorComponentProps> = ({
   // Only reset editor content when switching to a different document
   useEffect(() => {
     if (editor && documentId !== prevDocumentId) {
-      // Save current cursor position
+      // Switching documents - update content
+      editor.commands.setContent(initialContent || "");
+      lastSavedContentRef.current = initialContent || "";
+      setPrevDocumentId(documentId);
+
+      // Focus the editor for better UX when switching documents, but don't force cursor to end
+      editor.commands.focus();
+    } else if (
+      editor &&
+      initialContent !== lastSavedContentRef.current &&
+      initialContent !== editor.getHTML()
+    ) {
+      // External content update (like from API)
+
+      // Store the current selection
       const { from, to } = editor.view.state.selection;
 
       // Update content
       editor.commands.setContent(initialContent || "");
-      setInternalContent(initialContent || "");
-      setPrevDocumentId(documentId);
-
-      // Focus the editor for better UX when switching documents
-      editor.commands.focus();
-    } else if (
-      editor &&
-      initialContent !== internalContent &&
-      !isUpdatingRef.current
-    ) {
-      // If initial content changed but not due to our own updates and not from document switching,
-      // this means external content update (like from API)
-      setInternalContent(initialContent);
-
-      // Preserve selection if possible
-      const { from, to } = editor.view.state.selection;
-      editor.commands.setContent(initialContent || "");
+      lastSavedContentRef.current = initialContent || "";
 
       // Try to restore cursor position
       try {
         editor.commands.setTextSelection({ from, to });
       } catch (e) {
-        // If position is invalid, just focus at end
-        editor.commands.focus("end");
+        // If position restoration fails, just don't move the cursor
       }
     }
-  }, [editor, documentId, prevDocumentId, initialContent, internalContent]);
+  }, [editor, documentId, prevDocumentId, initialContent]);
 
   // Update editor when dark mode changes
   useEffect(() => {
