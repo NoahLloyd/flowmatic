@@ -197,15 +197,28 @@ export const api = {
     window.electron.apiRequest("DELETE", `/notes/${noteId}`, withAuth()),
 
   // Document endpoints
-  getUserDocuments: async (): Promise<Document[]> =>
-    window.electron.apiRequest("GET", "/documents", withAuth()),
+  getUserDocuments: async (): Promise<Document[]> => {
+    const response = await window.electron.apiRequest(
+      "GET",
+      "/documents",
+      withAuth()
+    );
+    return response;
+  },
 
-  getDocumentById: async (documentId: string): Promise<Document> =>
-    window.electron.apiRequest("GET", `/documents/${documentId}`, withAuth()),
+  getDocumentById: async (documentId: string): Promise<Document> => {
+    const response = await window.electron.apiRequest(
+      "GET",
+      `/documents/${documentId}`,
+      withAuth()
+    );
+    return response;
+  },
 
   createDocument: async (documentData: {
     title: string;
     content: string;
+    publication_status?: "unpublished" | "hidden" | "live";
   }): Promise<Document> =>
     window.electron.apiRequest("POST", "/documents", {
       body: documentData,
@@ -217,10 +230,20 @@ export const api = {
     updates: {
       title?: string;
       content?: string;
+      publication_status?: "unpublished" | "hidden" | "live";
     }
   ): Promise<Document> =>
     window.electron.apiRequest("PUT", `/documents/${documentId}`, {
       body: updates,
+      ...withAuth(),
+    }),
+
+  updateDocumentPublicationStatus: async (
+    documentId: string,
+    publication_status: "unpublished" | "hidden" | "live"
+  ): Promise<Document> =>
+    window.electron.apiRequest("PUT", `/documents/${documentId}/publication`, {
+      body: { publication_status },
       ...withAuth(),
     }),
 

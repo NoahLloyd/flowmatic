@@ -885,7 +885,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                     : statsData[user?._id || "you"].todayHours}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  /{statsData[user?._id || "you"].todayTarget}
+                  / {statsData[user?._id || "you"].todayTarget}
                 </span>
                 <span
                   className={`text-xs font-medium ${

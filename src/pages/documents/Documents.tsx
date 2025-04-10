@@ -5,10 +5,8 @@ import { api } from "../../utils/api";
 import { Document } from "../../types/Document";
 import { useTimezone } from "../../context/TimezoneContext";
 
-// Type to represent backend document response which might have snake_case
-interface ApiDocument extends Omit<Document, "createdAt" | "updatedAt"> {
-  createdAt?: Date | string;
-  updatedAt?: Date | string;
+// Type to represent backend document response
+interface ApiDocument extends Omit<Document, "created_at" | "updated_at"> {
   created_at?: string;
   updated_at?: string;
 }
@@ -27,6 +25,9 @@ const Documents = () => {
   // Editing state for document titles
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState<string>("");
+
+  // Publication status handling
+  const [isPublicationMenuOpen, setIsPublicationMenuOpen] = useState(false);
 
   // Get timezone utilities
   const { formatDateTime } = useTimezone();
@@ -53,6 +54,76 @@ const Documents = () => {
     }
   };
 
+  // Get publication status display text
+  const getPublicationStatusText = (
+    status?: "unpublished" | "hidden" | "live"
+  ) => {
+    switch (status) {
+      case "live":
+        return "Published - Live";
+      case "hidden":
+        return "Published - Hidden";
+      case "unpublished":
+      default:
+        return "Not Published";
+    }
+  };
+
+  // Get publication status icon
+  const getPublicationStatusIcon = (
+    status?: "unpublished" | "hidden" | "live"
+  ) => {
+    switch (status) {
+      case "live":
+        return (
+          <svg
+            className="h-4 w-4 text-green-500"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+      case "hidden":
+        return (
+          <svg
+            className="h-4 w-4 text-yellow-500"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+              clipRule="evenodd"
+            />
+            <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+          </svg>
+        );
+      case "unpublished":
+      default:
+        return (
+          <svg
+            className="h-4 w-4 text-gray-500"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+    }
+  };
+
   // Load documents from API on initial render
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -67,16 +138,12 @@ const Documents = () => {
           console.log("First doc:", apiDocs[0]);
         }
 
-        // Convert API docs to our Document format, handling snake_case if needed
+        // Convert API docs to our Document format
         const processedDocs = apiDocs.map((doc) => {
           return {
             ...doc,
-            createdAt:
-              doc.createdAt ||
-              (doc.created_at ? new Date(doc.created_at) : new Date()),
-            updatedAt:
-              doc.updatedAt ||
-              (doc.updated_at ? new Date(doc.updated_at) : new Date()),
+            created_at: doc.created_at || new Date(),
+            updated_at: doc.updated_at || new Date(),
           } as Document;
         });
 
@@ -85,8 +152,8 @@ const Documents = () => {
         // Set the most recently updated document as current if it exists
         if (processedDocs.length > 0) {
           const sortedDocs = [...processedDocs].sort((a, b) => {
-            const aDate = new Date(a.updatedAt);
-            const bDate = new Date(b.updatedAt);
+            const aDate = new Date(a.updated_at);
+            const bDate = new Date(b.updated_at);
             return bDate.getTime() - aDate.getTime();
           });
           setCurrentDocId(sortedDocs[0]._id);
@@ -113,6 +180,7 @@ const Documents = () => {
       const newDoc = await api.createDocument({
         title,
         content: "",
+        publication_status: "unpublished",
       });
 
       setDocuments((prev) => [...prev, newDoc]);
@@ -138,7 +206,7 @@ const Documents = () => {
         setDocuments((prev) =>
           prev.map((doc) =>
             doc._id === currentDocId
-              ? { ...doc, content, updatedAt: new Date() }
+              ? { ...doc, content, updated_at: new Date() }
               : doc
           )
         );
@@ -200,7 +268,7 @@ const Documents = () => {
         setDocuments((prev) =>
           prev.map((doc) =>
             doc._id === editingTitleId
-              ? { ...doc, title: editedTitle.trim(), updatedAt: new Date() }
+              ? { ...doc, title: editedTitle.trim(), updated_at: new Date() }
               : doc
           )
         );
@@ -241,6 +309,36 @@ const Documents = () => {
 
   // Get the current document
   const currentDocument = documents.find((doc) => doc._id === currentDocId);
+
+  // Update document publication status
+  const updatePublicationStatus = useCallback(
+    async (status: "unpublished" | "hidden" | "live") => {
+      if (!currentDocId) return;
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Call the API to update publication status
+        await api.updateDocumentPublicationStatus(currentDocId, status);
+
+        // Update local state
+        setDocuments((prev) =>
+          prev.map((doc) =>
+            doc._id === currentDocId
+              ? { ...doc, publication_status: status, updated_at: new Date() }
+              : doc
+          )
+        );
+      } catch (err) {
+        console.error("Error updating publication status:", err);
+        setError("Failed to update publication status. Please try again.");
+      } finally {
+        setIsLoading(false);
+        setIsPublicationMenuOpen(false);
+      }
+    },
+    [currentDocId]
+  );
 
   return (
     <div className="h-full w-full p-1.5">
@@ -348,9 +446,25 @@ const Documents = () => {
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
                           {doc.title}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {formatDocumentDate(doc.updatedAt)}
-                        </p>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {formatDocumentDate(doc.updated_at)}
+                          </span>
+                          {doc.publication_status &&
+                            doc.publication_status !== "unpublished" && (
+                              <span
+                                className={`ml-1 flex-shrink-0 inline-block px-1.5 py-0.5 text-xs rounded-full ${
+                                  doc.publication_status === "live"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                }`}
+                              >
+                                {doc.publication_status === "live"
+                                  ? "Live"
+                                  : "Hidden"}
+                              </span>
+                            )}
+                        </div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -419,38 +533,128 @@ const Documents = () => {
             </div>
           ) : currentDocument ? (
             <div className="flex flex-col h-full">
-              <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 bg-white dark:bg-gray-900 flex items-center">
-                {editingTitleId === currentDocument._id ? (
-                  <input
-                    type="text"
-                    value={editedTitle}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setEditedTitle(e.target.value);
-                    }}
-                    onBlur={(e) => {
-                      e.stopPropagation();
-                      saveDocumentTitle();
-                    }}
-                    onKeyDown={handleTitleKeyPress}
-                    className="flex-1 text-xl font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-none focus:outline-none focus:ring-0 p-0 m-0 w-full"
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <h2
-                    className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
+              <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 bg-white dark:bg-gray-900 flex items-center justify-between">
+                {/* Left side - document title */}
+                <div className="flex items-center">
+                  {editingTitleId === currentDocument._id ? (
+                    <input
+                      type="text"
+                      value={editedTitle}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setEditedTitle(e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        e.stopPropagation();
+                        saveDocumentTitle();
+                      }}
+                      onKeyDown={handleTitleKeyPress}
+                      className="flex-1 text-xl font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-none focus:outline-none focus:ring-0 p-0 m-0 w-full"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <h2
+                      className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditingTitle(
+                          currentDocument._id,
+                          currentDocument.title
+                        );
+                      }}
+                    >
+                      {currentDocument.title}
+                    </h2>
+                  )}
+                </div>
+
+                {/* Right side - publication status dropdown */}
+                <div className="relative">
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      startEditingTitle(
-                        currentDocument._id,
-                        currentDocument.title
-                      );
+                      setIsPublicationMenuOpen(!isPublicationMenuOpen);
                     }}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
                   >
-                    {currentDocument.title}
-                  </h2>
-                )}
+                    <span>
+                      {getPublicationStatusIcon(
+                        currentDocument.publication_status
+                      )}
+                    </span>
+                    <span>
+                      {getPublicationStatusText(
+                        currentDocument.publication_status
+                      )}
+                    </span>
+                    <svg
+                      className="h-4 w-4 text-gray-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+
+                  {isPublicationMenuOpen && (
+                    <div
+                      className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 z-10"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div
+                        className="py-1"
+                        role="menu"
+                        aria-orientation="vertical"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updatePublicationStatus("unpublished");
+                          }}
+                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          role="menuitem"
+                        >
+                          <div className="flex items-center space-x-2">
+                            {getPublicationStatusIcon("unpublished")}
+                            <span>Not Published</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updatePublicationStatus("hidden");
+                          }}
+                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          role="menuitem"
+                        >
+                          <div className="flex items-center space-x-2">
+                            {getPublicationStatusIcon("hidden")}
+                            <span>Published - Hidden</span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updatePublicationStatus("live");
+                          }}
+                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          role="menuitem"
+                        >
+                          <div className="flex items-center space-x-2">
+                            {getPublicationStatusIcon("live")}
+                            <span>Published - Live</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex-1 overflow-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg m-4 shadow-sm">
                 <Editor
