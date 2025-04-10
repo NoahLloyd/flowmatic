@@ -21,9 +21,13 @@ const Editor: React.FC<EditorComponentProps> = ({
   onUpdate,
   documentId,
 }) => {
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
   const { isDarkMode } = useTheme();
+  const [prevDocumentId, setPrevDocumentId] = useState<string>(documentId);
+  const [internalContent, setInternalContent] = useState<string>(
+    initialContent || ""
+  );
+  const isUpdatingRef = useRef(false);
 
   // Setup editor
   const editor = useEditor({
@@ -47,7 +51,7 @@ const Editor: React.FC<EditorComponentProps> = ({
     editorProps: {
       attributes: {
         class:
-          "prose dark:prose-invert prose-sm sm:prose-base mx-auto focus:outline-none p-6",
+          "prose dark:prose-invert prose-sm sm:prose-base focus:outline-none p-6",
       },
       // Add event handlers to prevent global shortcuts from triggering
       handleKeyDown: (view, event) => {
@@ -63,6 +67,7 @@ const Editor: React.FC<EditorComponentProps> = ({
     },
     onUpdate: ({ editor }) => {
       const content = editor.getHTML();
+      setInternalContent(content);
 
       // Debounce the save operation
       if (saveTimeoutRef.current) {
@@ -70,24 +75,61 @@ const Editor: React.FC<EditorComponentProps> = ({
       }
 
       saveTimeoutRef.current = window.setTimeout(() => {
+        isUpdatingRef.current = true;
         onUpdate(content);
-        setLastSavedAt(new Date());
+        // Reset the flag after a short delay to allow for state updates
+        setTimeout(() => {
+          isUpdatingRef.current = false;
+        }, 50);
       }, 750);
     },
   });
 
-  // Reset the editor content when documentId changes
+  // Only reset editor content when switching to a different document
   useEffect(() => {
-    if (editor && documentId) {
+    if (editor && documentId !== prevDocumentId) {
+      // Save current cursor position
+      const { from, to } = editor.view.state.selection;
+
+      // Update content
       editor.commands.setContent(initialContent || "");
+      setInternalContent(initialContent || "");
+      setPrevDocumentId(documentId);
+
+      // Focus the editor for better UX when switching documents
+      editor.commands.focus();
+    } else if (
+      editor &&
+      initialContent !== internalContent &&
+      !isUpdatingRef.current
+    ) {
+      // If initial content changed but not due to our own updates and not from document switching,
+      // this means external content update (like from API)
+      setInternalContent(initialContent);
+
+      // Preserve selection if possible
+      const { from, to } = editor.view.state.selection;
+      editor.commands.setContent(initialContent || "");
+
+      // Try to restore cursor position
+      try {
+        editor.commands.setTextSelection({ from, to });
+      } catch (e) {
+        // If position is invalid, just focus at end
+        editor.commands.focus("end");
+      }
     }
-  }, [editor, documentId, initialContent]);
+  }, [editor, documentId, prevDocumentId, initialContent, internalContent]);
 
   // Update editor when dark mode changes
   useEffect(() => {
     if (editor) {
-      // Force a refresh when theme changes
-      editor.commands.focus("end");
+      // Don't force refocus on theme change
+      // Just refresh the editor
+      const view = editor.view;
+      requestAnimationFrame(() => {
+        view.updateState(view.state);
+      });
     }
   }, [editor, isDarkMode]);
 
@@ -115,12 +157,6 @@ const Editor: React.FC<EditorComponentProps> = ({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       />
-
-      {lastSavedAt && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 p-2 text-right border-t border-gray-200 dark:border-gray-700">
-          Last saved: {lastSavedAt.toLocaleTimeString()}
-        </div>
-      )}
     </div>
   );
 };

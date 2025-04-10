@@ -30,10 +30,12 @@ import { useNavigation } from "../../hooks/useNavigation";
 import { debounce } from "lodash";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useTimezone } from "../../context/TimezoneContext";
 
 const Morning = () => {
   const { user } = useAuth();
   const { setSelected } = useNavigation();
+  const { timezone, getUserTimezone } = useTimezone();
 
   // Create a direct navigation function
   const directNavigate = useCallback(
@@ -77,12 +79,34 @@ const Morning = () => {
   const [gratitudeEntry, setGratitudeEntry] = useState("");
   const [affirmationsEntry, setAffirmationsEntry] = useState("");
 
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState(getTodayInUserTimezone());
 
   // Keep track of today's day of week
   const [currentDayOfWeek, setCurrentDayOfWeek] = useState<string>("");
+
+  // Function to get today's date in YYYY-MM-DD format in user's timezone
+  function getTodayInUserTimezone() {
+    try {
+      // Use Intl.DateTimeFormat to get the date parts in the user's timezone
+      const date = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+
+      // Extract and format as YYYY-MM-DD
+      const month = date.find((part) => part.type === "month")?.value || "01";
+      const day = date.find((part) => part.type === "day")?.value || "01";
+      const year = date.find((part) => part.type === "year")?.value || "2023";
+
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error("Error formatting date with timezone:", error);
+      // Fallback to UTC
+      return new Date().toISOString().split("T")[0];
+    }
+  }
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -93,7 +117,7 @@ const Morning = () => {
   // Load activities from user preferences
   useEffect(() => {
     if (user?.preferences?.weeklyMorningSchedule) {
-      // Get current day of the week
+      // Get current day of the week based on user's timezone
       const today = new Date();
       const daysOfWeek = [
         "sunday",
@@ -104,7 +128,16 @@ const Morning = () => {
         "friday",
         "saturday",
       ];
-      const currentDay = daysOfWeek[today.getDay()]; // getDay() returns 0-6 starting with Sunday
+
+      // Get the day of the week in the user's timezone
+      const currentDay =
+        daysOfWeek[
+          new Date(
+            new Intl.DateTimeFormat("en-US", {
+              timeZone: timezone,
+            }).format(today)
+          ).getDay()
+        ];
 
       // Store current day name for display
       setCurrentDayOfWeek(
@@ -151,7 +184,7 @@ const Morning = () => {
         }
       }
     }
-  }, [user]);
+  }, [user, timezone]);
 
   // Timer control functions
   const startTimer = useCallback(() => {
@@ -524,9 +557,33 @@ const Morning = () => {
     }
   };
 
+  // Handle date change in user's timezone
   const handleDateChange = (date: Date) => {
-    setSelectedDate(date.toISOString().split("T")[0]);
-    setIsCalendarOpen(false);
+    try {
+      // Format the selected date in the user's timezone
+      const dateParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(date);
+
+      // Extract date parts and format as YYYY-MM-DD
+      const month =
+        dateParts.find((part) => part.type === "month")?.value || "01";
+      const day = dateParts.find((part) => part.type === "day")?.value || "01";
+      const year =
+        dateParts.find((part) => part.type === "year")?.value || "2023";
+
+      const formattedDate = `${year}-${month}-${day}`;
+      setSelectedDate(formattedDate);
+      setIsCalendarOpen(false);
+    } catch (error) {
+      console.error("Error formatting selected date with timezone:", error);
+      // Fallback to UTC if there's an error
+      setSelectedDate(date.toISOString().split("T")[0]);
+      setIsCalendarOpen(false);
+    }
   };
 
   // Get icon for activity type
@@ -654,6 +711,13 @@ const Morning = () => {
   const toggleBlur = () => {
     setIsTextBlurred((prev) => !prev);
   };
+
+  // Update when timezone changes
+  useEffect(() => {
+    // Update selected date when timezone changes
+    const newToday = getTodayInUserTimezone();
+    setSelectedDate(newToday);
+  }, [timezone]);
 
   return (
     <div className="max-w-4xl mx-auto p-8 dark:bg-slate-900">
@@ -802,11 +866,32 @@ const Morning = () => {
                 maxDate={new Date()}
                 highlightDates={highlightedDates}
                 dayClassName={(date) =>
-                  highlightedDates.some(
-                    (d) =>
-                      d.toISOString().split("T")[0] ===
-                      date.toISOString().split("T")[0]
-                  )
+                  highlightedDates.some((d) => {
+                    // Convert both dates to YYYY-MM-DD in user's timezone
+                    const dateParts = new Intl.DateTimeFormat("en-US", {
+                      timeZone: timezone,
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                    }).formatToParts(date);
+
+                    const month =
+                      dateParts.find((part) => part.type === "month")?.value ||
+                      "01";
+                    const day =
+                      dateParts.find((part) => part.type === "day")?.value ||
+                      "01";
+                    const year =
+                      dateParts.find((part) => part.type === "year")?.value ||
+                      "2023";
+
+                    const formattedDate = `${year}-${month}-${day}`;
+
+                    // Get the entry date in YYYY-MM-DD format
+                    const entryDateString = d.toISOString().split("T")[0];
+
+                    return entryDateString === formattedDate;
+                  })
                     ? "highlighted-date"
                     : undefined
                 }

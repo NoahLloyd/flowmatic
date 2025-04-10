@@ -115,7 +115,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
       <div
         className={`flex-1 ${
           isDarkMode ? "bg-slate-900" : "bg-white"
-        } rounded-xl overflow-scroll p-6 shadow-lg`}
+        } rounded-xl overflow-auto p-6 shadow-lg`}
       >
         {children}
       </div>
