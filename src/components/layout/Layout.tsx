@@ -16,12 +16,27 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
   const { user } = useAuth();
 
   // Theme-based default colors for dark/light mode
-  const defaultFromColor = isDarkMode ? "#1E293B" : "#E8CBC0";
-  const defaultToColor = isDarkMode ? "#0F172A" : "#636FA4";
+  const defaultLightFromColor = "#E8CBC0";
+  const defaultLightToColor = "#636FA4";
+  const defaultDarkFromColor = "#1E293B";
+  const defaultDarkToColor = "#0F172A";
 
   // Use user preferences if available, otherwise use theme defaults
-  const fromColor = user?.preferences?.fromColor || defaultFromColor;
-  const toColor = user?.preferences?.toColor || defaultToColor;
+  const fromColor = isDarkMode
+    ? user?.preferences?.darkModeFromColor ||
+      user?.preferences?.fromColor ||
+      defaultDarkFromColor
+    : user?.preferences?.lightModeFromColor ||
+      user?.preferences?.fromColor ||
+      defaultLightFromColor;
+
+  const toColor = isDarkMode
+    ? user?.preferences?.darkModeToColor ||
+      user?.preferences?.toColor ||
+      defaultDarkToColor
+    : user?.preferences?.lightModeToColor ||
+      user?.preferences?.toColor ||
+      defaultLightToColor;
 
   // Get timer state - minimal version
   const {

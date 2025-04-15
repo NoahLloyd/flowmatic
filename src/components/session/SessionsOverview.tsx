@@ -303,7 +303,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   return (
     <div className="w-full h-full">
       {isLoading && page === 1 ? (
-        <div className="flex items-center justify-center h-[352px] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900">
+        <div className="flex items-center justify-center h-[300px] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900">
           Loading sessions...
         </div>
       ) : (
@@ -374,7 +374,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-y-auto h-[280px]">
+                <div className="overflow-y-auto h-[270px]">
                   <div className="grid gap-2 grid-cols-1">
                     {group.sessions.map((session, sessionIndex) => {
                       // Check if this session is from today to pass today's data

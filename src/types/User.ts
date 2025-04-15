@@ -20,6 +20,10 @@ interface UserPreferences {
   defaultMinutes?: number;
   fromColor?: string;
   toColor?: string;
+  lightModeFromColor?: string;
+  lightModeToColor?: string;
+  darkModeFromColor?: string;
+  darkModeToColor?: string;
   morningActivities?: MorningActivity[];
   weeklyMorningSchedule?: WeeklyMorningSchedule;
   dailyHoursGoals?: DailyHoursGoal;

@@ -17,8 +17,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
     <button
       className={`flex items-center space-x-2 px-4 my-0 py-3 rounded-xl transition duration-200 ease-in-out text-md ${
         isSelected
-          ? "bg-white dark:bg-slate-800 bg-opacity-30 dark:bg-opacity-100 shadow"
-          : "hover:bg-white hover:bg-opacity-20 dark:hover:bg-slate-700"
+          ? "bg-white/30 dark:bg-slate-800/40 shadow"
+          : "hover:bg-white/20 dark:hover:bg-slate-700/30"
       }`}
       onClick={() => onSelect(label)}
       style={{ border: "none", outline: "none" }}

@@ -64,8 +64,8 @@ const SidebarScoreCard: React.FC<SidebarScoreCardProps> = ({
       className={`mb-0 px-4 py-3 cursor-pointer rounded-xl border ${
         exceededGoal
           ? "bg-green-50/30 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-          : "bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700"
-      } hover:bg-white/15 dark:hover:bg-slate-700/80`}
+          : "bg-white/10 dark:bg-slate-800/30 border-white/20 dark:border-slate-700/60"
+      } hover:bg-white/15 dark:hover:bg-slate-700/40`}
     >
       <div className="flex justify-between items-center mb-1">
         <div className="flex items-center">
@@ -106,7 +106,7 @@ const SidebarScoreCard: React.FC<SidebarScoreCardProps> = ({
           )}
         </span>
       </div>
-      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+      <div className="w-full h-2.5 bg-slate-200/40 dark:bg-slate-700/40 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${progressColorClasses[color]}`}
           style={{ width: `${displayPercentage}%` }}

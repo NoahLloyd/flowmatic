@@ -82,7 +82,7 @@ const Settings = () => {
   } = useTimezone();
   const initialMountRef = useRef(true);
 
-  // Default color values based on theme
+  // Default color values
   const defaultLightFromColor = "#E8CBC0";
   const defaultLightToColor = "#636FA4";
   const defaultDarkFromColor = "#1E293B";
@@ -95,13 +95,17 @@ const Settings = () => {
   const [defaultMinutes, setDefaultMinutes] = useState<number>(
     user?.preferences?.defaultMinutes || 60
   );
-  const [fromColor, setFromColor] = useState<string>(
-    user?.preferences?.fromColor ||
-      (isDarkMode ? defaultDarkFromColor : defaultLightFromColor)
+  const [lightModeFromColor, setLightModeFromColor] = useState<string>(
+    user?.preferences?.lightModeFromColor || defaultLightFromColor
   );
-  const [toColor, setToColor] = useState<string>(
-    user?.preferences?.toColor ||
-      (isDarkMode ? defaultDarkToColor : defaultLightToColor)
+  const [lightModeToColor, setLightModeToColor] = useState<string>(
+    user?.preferences?.lightModeToColor || defaultLightToColor
+  );
+  const [darkModeFromColor, setDarkModeFromColor] = useState<string>(
+    user?.preferences?.darkModeFromColor || defaultDarkFromColor
+  );
+  const [darkModeToColor, setDarkModeToColor] = useState<string>(
+    user?.preferences?.darkModeToColor || defaultDarkToColor
   );
   const [timezone, setTimezone] = useState<string>(currentTimezone);
   const [customTimezone, setCustomTimezone] = useState<string>("");
@@ -117,13 +121,17 @@ const Settings = () => {
     if (user?.preferences) {
       setDefaultProject(user.preferences.defaultProject || "");
       setDefaultMinutes(user.preferences.defaultMinutes || 60);
-      setFromColor(
-        user.preferences.fromColor ||
-          (isDarkMode ? defaultDarkFromColor : defaultLightFromColor)
+      setLightModeFromColor(
+        user.preferences.lightModeFromColor || defaultLightFromColor
       );
-      setToColor(
-        user.preferences.toColor ||
-          (isDarkMode ? defaultDarkToColor : defaultLightToColor)
+      setLightModeToColor(
+        user.preferences.lightModeToColor || defaultLightToColor
+      );
+      setDarkModeFromColor(
+        user.preferences.darkModeFromColor || defaultDarkFromColor
+      );
+      setDarkModeToColor(
+        user.preferences.darkModeToColor || defaultDarkToColor
       );
       setTimezone(user.preferences.timezone || getUserTimezone());
 
@@ -203,8 +211,13 @@ const Settings = () => {
         // Parent component settings
         defaultProject,
         defaultMinutes,
-        fromColor,
-        toColor,
+        lightModeFromColor,
+        lightModeToColor,
+        darkModeFromColor,
+        darkModeToColor,
+        // For backward compatibility
+        fromColor: isDarkMode ? darkModeFromColor : lightModeFromColor,
+        toColor: isDarkMode ? darkModeToColor : lightModeToColor,
         timezone: finalTimezone,
 
         // Working hours settings
@@ -253,8 +266,13 @@ const Settings = () => {
   };
 
   const handleResetColors = () => {
-    setFromColor(isDarkMode ? defaultDarkFromColor : defaultLightFromColor);
-    setToColor(isDarkMode ? defaultDarkToColor : defaultLightToColor);
+    if (isDarkMode) {
+      setDarkModeFromColor(defaultDarkFromColor);
+      setDarkModeToColor(defaultDarkToColor);
+    } else {
+      setLightModeFromColor(defaultLightFromColor);
+      setLightModeToColor(defaultLightToColor);
+    }
   };
 
   const handleLogout = () => {
@@ -414,54 +432,113 @@ const Settings = () => {
               <div
                 className="h-20 w-full rounded-md border border-gray-200 dark:border-gray-800 mb-3"
                 style={{
-                  background: `linear-gradient(to right, ${fromColor}, ${toColor})`,
+                  background: `linear-gradient(to right, ${
+                    isDarkMode ? darkModeFromColor : lightModeFromColor
+                  }, ${isDarkMode ? darkModeToColor : lightModeToColor})`,
                 }}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    From Color
-                  </label>
-                  <div className="flex items-center">
-                    <input
-                      type="color"
-                      value={fromColor}
-                      onChange={(e) => setFromColor(e.target.value)}
-                      className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
-                    />
-                    <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
-                      {fromColor}
-                    </span>
+
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Light Mode Colors
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      From Color
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="color"
+                        value={lightModeFromColor}
+                        onChange={(e) => setLightModeFromColor(e.target.value)}
+                        className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
+                      />
+                      <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                        {lightModeFromColor}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      To Color
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="color"
+                        value={lightModeToColor}
+                        onChange={(e) => setLightModeToColor(e.target.value)}
+                        className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
+                      />
+                      <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                        {lightModeToColor}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    To Color
-                  </label>
-                  <div className="flex items-center">
-                    <input
-                      type="color"
-                      value={toColor}
-                      onChange={(e) => setToColor(e.target.value)}
-                      className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
-                    />
-                    <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
-                      {toColor}
-                    </span>
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    const temp = lightModeFromColor;
+                    setLightModeFromColor(lightModeToColor);
+                    setLightModeToColor(temp);
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 p-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                  Swap Light Mode Colors
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  const temp = fromColor;
-                  setFromColor(toColor);
-                  setToColor(temp);
-                }}
-                className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 p-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors"
-              >
-                <ArrowLeftRight className="w-3 h-3" />
-                Swap Colors
-              </button>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Dark Mode Colors
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      From Color
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="color"
+                        value={darkModeFromColor}
+                        onChange={(e) => setDarkModeFromColor(e.target.value)}
+                        className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
+                      />
+                      <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                        {darkModeFromColor}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      To Color
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="color"
+                        value={darkModeToColor}
+                        onChange={(e) => setDarkModeToColor(e.target.value)}
+                        className="h-8 w-8 p-0 border-0 bg-transparent rounded-md"
+                      />
+                      <span className="ml-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                        {darkModeToColor}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const temp = darkModeFromColor;
+                    setDarkModeFromColor(darkModeToColor);
+                    setDarkModeToColor(temp);
+                  }}
+                  className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 p-2 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                  Swap Dark Mode Colors
+                </button>
+              </div>
             </div>
           </div>
         </div>

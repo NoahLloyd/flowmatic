@@ -419,7 +419,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="w-64 flex flex-col pr-4 space-y-4">
-      <div className="p-4 flex items-center justify-between bg-white/10 dark:bg-slate-800 dark:border-slate-700 border rounded-xl">
+      <div className="p-4 flex items-center justify-between bg-white/10 dark:bg-slate-800/30 border-white/20 dark:border-slate-700/60 rounded-xl border">
         <div className="flex items-center">
           <img
             src={isDarkMode ? logoDarkImage : logoImage}
@@ -432,7 +432,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <button
           onClick={toggleDarkMode}
-          className="p-2 rounded-lg hover:bg-slate-200/20 dark:hover:bg-slate-700 transition-colors"
+          className="p-2 rounded-lg hover:bg-slate-200/20 dark:hover:bg-slate-700/30 transition-colors"
         >
           {isDarkMode ? (
             <Sun className="w-5 h-5 text-slate-200" />
@@ -500,7 +500,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div
         onClick={() => onSelect("Settings")}
-        className="p-4 cursor-pointer rounded-xl border bg-white/10 dark:bg-slate-800 border-white/20 dark:border-slate-700 flex items-center justify-between hover:bg-white/15 dark:hover:bg-slate-700/80 transition-colors"
+        className="p-4 cursor-pointer rounded-xl border bg-white/10 dark:bg-slate-800/30 border-white/20 dark:border-slate-700/60 flex items-center justify-between hover:bg-white/15 dark:hover:bg-slate-700/40 transition-colors"
       >
         <div className="flex items-center">
           <User className="w-6 h-6 mr-2 text-slate-700 dark:text-slate-200" />

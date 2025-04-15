@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Pause, Play, RefreshCw, Save } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 
 interface TimerDisplayProps {
   time: number;
@@ -77,13 +78,33 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onOpenRecordModal = () => {},
 }) => {
   const { user } = useAuth();
+  const { isDarkMode } = useTheme();
   // Always assume the initial time is 60 minutes (3600 seconds) for wave positioning
   const standardInitialTime = 3600;
   const [initialTime, setInitialTime] = useState(time);
 
-  // Get colors from user preferences, fallback to defaults
-  const fromColor = user?.preferences?.fromColor || "#E8CBC0";
-  const toColor = user?.preferences?.toColor || "#636FA4";
+  // Get theme-appropriate colors from user preferences, with fallbacks
+  const defaultLightFromColor = "#E8CBC0";
+  const defaultLightToColor = "#636FA4";
+  const defaultDarkFromColor = "#1E293B";
+  const defaultDarkToColor = "#0F172A";
+
+  // Use the appropriate colors based on theme
+  const fromColor = isDarkMode
+    ? user?.preferences?.darkModeFromColor ||
+      user?.preferences?.fromColor ||
+      defaultDarkFromColor
+    : user?.preferences?.lightModeFromColor ||
+      user?.preferences?.fromColor ||
+      defaultLightFromColor;
+
+  const toColor = isDarkMode
+    ? user?.preferences?.darkModeToColor ||
+      user?.preferences?.toColor ||
+      defaultDarkToColor
+    : user?.preferences?.lightModeToColor ||
+      user?.preferences?.toColor ||
+      defaultLightToColor;
 
   useEffect(() => {
     if (!isRunning) {
