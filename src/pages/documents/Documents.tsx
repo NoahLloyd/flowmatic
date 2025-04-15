@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { v4 as uuidv4 } from "uuid";
 import Editor from "./Editor";
 import { api } from "../../utils/api";
@@ -10,6 +16,9 @@ interface ApiDocument extends Omit<Document, "created_at" | "updated_at"> {
   created_at?: string;
   updated_at?: string;
 }
+
+// Sort options for documents
+type SortOption = "updated_at" | "created_at" | "title";
 
 const Documents = () => {
   // State for managing documents
@@ -28,6 +37,13 @@ const Documents = () => {
 
   // Publication status handling
   const [isPublicationMenuOpen, setIsPublicationMenuOpen] = useState(false);
+
+  // Sort options state
+  const [sortBy, setSortBy] = useState<SortOption>("updated_at");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+
+  // Editor ref for focusing
+  const editorRef = useRef<any>(null);
 
   // Get timezone utilities
   const { formatDateTime } = useTimezone();
@@ -299,13 +315,44 @@ const Documents = () => {
     [saveDocumentTitle]
   );
 
-  // Filter documents based on search query
-  const filteredDocuments = useMemo(() => {
-    if (!searchQuery.trim()) return documents;
+  // Get sort function based on current sort option
+  const getSortFunction = useCallback((option: SortOption) => {
+    switch (option) {
+      case "updated_at":
+        return (a: Document, b: Document) => {
+          const aDate = new Date(a.updated_at);
+          const bDate = new Date(b.updated_at);
+          return bDate.getTime() - aDate.getTime(); // newest first
+        };
+      case "created_at":
+        return (a: Document, b: Document) => {
+          const aDate = new Date(a.created_at);
+          const bDate = new Date(b.created_at);
+          return bDate.getTime() - aDate.getTime(); // newest first
+        };
+      case "title":
+        return (a: Document, b: Document) => {
+          return a.title.localeCompare(b.title); // alphabetical
+        };
+      default:
+        return (a: Document, b: Document) => {
+          const aDate = new Date(a.updated_at);
+          const bDate = new Date(b.updated_at);
+          return bDate.getTime() - aDate.getTime(); // newest first
+        };
+    }
+  }, []);
 
-    const query = searchQuery.toLowerCase().trim();
-    return documents.filter((doc) => doc.title.toLowerCase().includes(query));
-  }, [documents, searchQuery]);
+  // Filter and sort documents based on search query and sort option
+  const filteredAndSortedDocuments = useMemo(() => {
+    const filtered = !searchQuery.trim()
+      ? documents
+      : documents.filter((doc) =>
+          doc.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
+        );
+
+    return [...filtered].sort(getSortFunction(sortBy));
+  }, [documents, searchQuery, sortBy, getSortFunction]);
 
   // Get the current document
   const currentDocument = documents.find((doc) => doc._id === currentDocId);
@@ -340,6 +387,107 @@ const Documents = () => {
     [currentDocId]
   );
 
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if we're in an input, textarea or editor
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement &&
+          e.target.classList.contains("ProseMirror"))
+      ) {
+        return;
+      }
+
+      // When 'f' is pressed and a document is open, focus the editor
+      if (e.key === "f" && currentDocument) {
+        e.preventDefault();
+
+        // Try to focus the editor
+        const editorElement = document.querySelector(".ProseMirror");
+        if (editorElement) {
+          (editorElement as HTMLElement).focus();
+        }
+      }
+
+      // Arrow key navigation through documents
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+
+        if (filteredAndSortedDocuments.length === 0) return;
+
+        const currentIndex = currentDocId
+          ? filteredAndSortedDocuments.findIndex(
+              (doc) => doc._id === currentDocId
+            )
+          : -1;
+
+        let newIndex;
+        if (e.key === "ArrowDown") {
+          // Move down (next document)
+          newIndex =
+            currentIndex < filteredAndSortedDocuments.length - 1
+              ? currentIndex + 1
+              : 0; // Wrap to beginning
+        } else {
+          // Move up (previous document)
+          newIndex =
+            currentIndex > 0
+              ? currentIndex - 1
+              : filteredAndSortedDocuments.length - 1; // Wrap to end
+        }
+
+        setCurrentDocId(filteredAndSortedDocuments[newIndex]._id);
+      }
+
+      // Number keys (1-9, 0) to select documents by position
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+
+        const index = e.key === "0" ? 9 : parseInt(e.key) - 1;
+
+        if (index < filteredAndSortedDocuments.length) {
+          setCurrentDocId(filteredAndSortedDocuments[index]._id);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [filteredAndSortedDocuments, currentDocId, currentDocument]);
+
+  // Handle escape key to blur editor
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // Check if focus is within the editor
+        const editorElement = document.querySelector(".ProseMirror");
+        const activeElement = document.activeElement;
+
+        if (
+          editorElement &&
+          activeElement &&
+          (editorElement === activeElement ||
+            editorElement.contains(activeElement))
+        ) {
+          // Blur the editor
+          (activeElement as HTMLElement).blur();
+          e.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleEscapeKey);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, []);
+
   return (
     <div className="h-full w-full p-1.5">
       <div
@@ -350,9 +498,96 @@ const Documents = () => {
         <div className="w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full">
           {/* Header and search */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-            <h2 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-              Documents
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+                Documents
+              </h2>
+
+              {/* Sort dropdown */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSortMenuOpen(!sortMenuOpen);
+                  }}
+                  className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  <span>Sort: {sortBy.replace("_", " ")}</span>
+                  <svg
+                    className="h-3 w-3"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+
+                {sortMenuOpen && (
+                  <div
+                    className="absolute right-0 mt-1 w-40 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div
+                      className="py-1"
+                      role="menu"
+                      aria-orientation="vertical"
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy("updated_at");
+                          setSortMenuOpen(false);
+                        }}
+                        className={`w-full text-left block px-4 py-2 text-sm ${
+                          sortBy === "updated_at"
+                            ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                            : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        role="menuitem"
+                      >
+                        Last updated
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy("created_at");
+                          setSortMenuOpen(false);
+                        }}
+                        className={`w-full text-left block px-4 py-2 text-sm ${
+                          sortBy === "created_at"
+                            ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                            : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        role="menuitem"
+                      >
+                        Date created
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy("title");
+                          setSortMenuOpen(false);
+                        }}
+                        className={`w-full text-left block px-4 py-2 text-sm ${
+                          sortBy === "title"
+                            ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                            : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                        role="menuitem"
+                      >
+                        Title
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="relative mb-3">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
@@ -427,9 +662,9 @@ const Documents = () => {
               <div className="p-4 text-gray-500 dark:text-gray-400 text-center">
                 Loading documents...
               </div>
-            ) : filteredDocuments.length > 0 ? (
+            ) : filteredAndSortedDocuments.length > 0 ? (
               <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-                {filteredDocuments.map((doc) => (
+                {filteredAndSortedDocuments.map((doc, index) => (
                   <li key={doc._id} className="relative">
                     <div
                       className={`p-4 cursor-pointer flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 group ${
@@ -569,91 +804,125 @@ const Documents = () => {
                   )}
                 </div>
 
-                {/* Right side - publication status dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsPublicationMenuOpen(!isPublicationMenuOpen);
-                    }}
-                    className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
-                  >
-                    <span>
-                      {getPublicationStatusIcon(
-                        currentDocument.publication_status
-                      )}
-                    </span>
-                    <span>
-                      {getPublicationStatusText(
-                        currentDocument.publication_status
-                      )}
-                    </span>
-                    <svg
-                      className="h-4 w-4 text-gray-500"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
+                {/* Right side - publication status dropdown and copy link button */}
+                <div className="flex items-center space-x-2">
+                  {/* Copy link button - only show for published or hidden docs */}
+                  {currentDocument.publication_status &&
+                    currentDocument.publication_status !== "unpublished" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `https://noahlr.com/post/${currentDocument._id}`;
+                          navigator.clipboard.writeText(url);
 
-                  {isPublicationMenuOpen && (
-                    <div
-                      className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 z-10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div
-                        className="py-1"
-                        role="menu"
-                        aria-orientation="vertical"
+                          // Show temporary success message
+                          const target = e.currentTarget;
+                          const originalText = target.textContent;
+                          target.textContent = "Copied!";
+                          setTimeout(() => {
+                            target.textContent = originalText;
+                          }, 2000);
+                        }}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
                       >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updatePublicationStatus("unpublished");
-                          }}
-                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          role="menuitem"
+                        <svg
+                          className="h-4 w-4 text-gray-500"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
                         >
-                          <div className="flex items-center space-x-2">
-                            {getPublicationStatusIcon("unpublished")}
-                            <span>Not Published</span>
-                          </div>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updatePublicationStatus("hidden");
-                          }}
-                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          role="menuitem"
+                          <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
+                          <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" />
+                        </svg>
+                        <span>Copy Link</span>
+                      </button>
+                    )}
+
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsPublicationMenuOpen(!isPublicationMenuOpen);
+                      }}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-md text-xs font-medium bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
+                    >
+                      <span>
+                        {getPublicationStatusIcon(
+                          currentDocument.publication_status
+                        )}
+                      </span>
+                      <span>
+                        {getPublicationStatusText(
+                          currentDocument.publication_status
+                        )}
+                      </span>
+                      <svg
+                        className="h-4 w-4 text-gray-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+
+                    {isPublicationMenuOpen && (
+                      <div
+                        className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div
+                          className="py-1"
+                          role="menu"
+                          aria-orientation="vertical"
                         >
-                          <div className="flex items-center space-x-2">
-                            {getPublicationStatusIcon("hidden")}
-                            <span>Published - Hidden</span>
-                          </div>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updatePublicationStatus("live");
-                          }}
-                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          role="menuitem"
-                        >
-                          <div className="flex items-center space-x-2">
-                            {getPublicationStatusIcon("live")}
-                            <span>Published - Live</span>
-                          </div>
-                        </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updatePublicationStatus("unpublished");
+                            }}
+                            className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            role="menuitem"
+                          >
+                            <div className="flex items-center space-x-2">
+                              {getPublicationStatusIcon("unpublished")}
+                              <span>Not Published</span>
+                            </div>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updatePublicationStatus("hidden");
+                            }}
+                            className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            role="menuitem"
+                          >
+                            <div className="flex items-center space-x-2">
+                              {getPublicationStatusIcon("hidden")}
+                              <span>Published - Hidden</span>
+                            </div>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updatePublicationStatus("live");
+                            }}
+                            className="w-full text-left block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            role="menuitem"
+                          >
+                            <div className="flex items-center space-x-2">
+                              {getPublicationStatusIcon("live")}
+                              <span>Published - Live</span>
+                            </div>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex-1 overflow-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg m-4 shadow-sm">

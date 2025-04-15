@@ -13,9 +13,6 @@ export const useNavigation = () => {
       }
 
       switch (event.key.toLowerCase()) {
-        case "f":
-          setSelected("Friends");
-          break;
         case "c":
           setSelected("Compass");
           break;

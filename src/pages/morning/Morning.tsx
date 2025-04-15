@@ -635,7 +635,12 @@ const Morning = () => {
         if (currentActivityIndex > 0) {
           prevActivity();
         }
-      } else if (e.key === "Enter") {
+      } else if (e.key === "Enter" || e.key === "f") {
+        // Prevent default only for 'f' key to avoid inserting character into input
+        if (e.key === "f") {
+          e.preventDefault();
+        }
+
         // Focus the appropriate textarea based on current activity
         if (currentActivity?.type === "writing") {
           writingTextareaRef.current?.focus();

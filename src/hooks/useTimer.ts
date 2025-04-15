@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-
-// Import navigation hook
 import { useNavigation } from "./useNavigation";
 
 interface TimerState {
@@ -21,8 +19,6 @@ const saveTimerState = (state: TimerState) => {
   localStorage.setItem("timerState", stateStr);
 
   // Dispatch a storage event to notify other components
-  // This is necessary because localStorage events don't fire in the same window
-  // that made the change
   try {
     window.dispatchEvent(
       new StorageEvent("storage", {
@@ -38,27 +34,17 @@ const saveTimerState = (state: TimerState) => {
 
 export const useTimer = (directNavigate?: (page: string) => void) => {
   const { user } = useAuth();
+  const { setSelected } = useNavigation();
 
   // Get default minutes from user preferences, or use 60 minutes as fallback
   const defaultMinutes = user?.preferences?.defaultMinutes || 60;
   const defaultSeconds = defaultMinutes * 60;
 
-  // Get navigation controls
-  const { setSelected } = useNavigation();
-
+  // Main timer states
   const [duration, setDuration] = useState(defaultSeconds);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(defaultSeconds);
-  const [intervalId, setIntervalId] = useState<ReturnType<
-    typeof setInterval
-  > | null>(null);
-
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Add a dedicated state for tracking timer completion
-  const [timerJustCompleted, setTimerJustCompleted] = useState(false);
 
   // Break timer states
   const [isBreakMode, setIsBreakMode] = useState(false);
@@ -66,14 +52,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const [breakStartTime, setBreakStartTime] = useState<number | null>(null);
   const [breakIsRunning, setBreakIsRunning] = useState(false);
   const [breakTimeRemaining, setBreakTimeRemaining] = useState(300);
-  const [breakIntervalId, setBreakIntervalId] = useState<ReturnType<
-    typeof setInterval
-  > | null>(null);
 
-  // State for minimizing the timer to the sidebar
+  // UI states
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [showInSidebar, setShowInSidebar] = useState(false);
+  const [timerJustCompleted, setTimerJustCompleted] = useState(false);
 
-  // Add a ref to track the last adjustment time to prevent rapid clicking issues
+  // Refs for interval management
+  const timerIntervalRef = useRef<number | null>(null);
+  const breakTimerIntervalRef = useRef<number | null>(null);
+
+  // Ref to track the last adjustment time to prevent rapid clicking
   const lastAdjustmentTimeRef = useRef<number>(0);
   const adjustmentCooldown = 200; // ms cooldown between adjustments
 
@@ -86,112 +75,125 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   };
 
+  // Initialize timer from localStorage on mount
   useEffect(() => {
-    console.log("Timer useEffect running with states:", {
-      isRunning,
-      isBreakMode,
-      breakIsRunning,
-      startTime,
-      breakStartTime,
-    });
+    const loadTimerState = () => {
+      const storedState = localStorage.getItem("timerState");
+      if (!storedState) return;
 
-    const storedState = localStorage.getItem("timerState");
-    if (storedState) {
-      const parsedState = JSON.parse(storedState) as TimerState;
-      setDuration(parsedState.duration);
-      setStartTime(parsedState.startTime);
-      setIsRunning(parsedState.isRunning);
+      try {
+        const parsedState = JSON.parse(storedState) as TimerState;
 
-      // Only set sidebar visibility for main work timer, not for break timer
-      if (!parsedState.isBreakMode) {
-        setShowInSidebar(parsedState.minimized || false);
-      }
+        // Load main timer state
+        setDuration(parsedState.duration);
+        setStartTime(parsedState.startTime);
+        setIsRunning(parsedState.isRunning);
 
-      // Load break timer state if it exists
-      if (parsedState.isBreakMode) {
-        setIsBreakMode(parsedState.isBreakMode);
-        setBreakDuration(parsedState.breakDuration || 300);
-        setBreakStartTime(parsedState.breakStartTime);
-        setBreakIsRunning(parsedState.breakIsRunning || false);
-
-        if (parsedState.breakStartTime && parsedState.breakIsRunning) {
+        // Calculate time remaining for main timer
+        if (parsedState.startTime && parsedState.isRunning) {
           const elapsed = Math.floor(
-            (Date.now() - parsedState.breakStartTime) / 1000
+            (Date.now() - parsedState.startTime) / 1000
           );
-          const remaining = Math.max(
-            0,
-            (parsedState.breakDuration || 300) - elapsed
-          );
-          setBreakTimeRemaining(remaining);
-
-          // For break timers, always show in modal and never in sidebar
-          setIsModalOpen(true);
-          setShowInSidebar(false);
+          const remaining = Math.max(0, parsedState.duration - elapsed);
+          setTimeRemaining(remaining);
         } else {
-          setBreakTimeRemaining(parsedState.breakDuration || 300);
+          setTimeRemaining(parsedState.duration);
         }
-      }
 
-      if (parsedState.startTime && parsedState.isRunning) {
-        const elapsed = Math.floor((Date.now() - parsedState.startTime) / 1000);
-        const remaining = Math.max(0, parsedState.duration - elapsed);
-        setTimeRemaining(remaining);
+        // Load break timer state
+        setIsBreakMode(parsedState.isBreakMode || false);
 
-        // Show sidebar timer if minimized and not in break mode
+        if (parsedState.isBreakMode) {
+          setBreakDuration(parsedState.breakDuration || 300);
+          setBreakStartTime(parsedState.breakStartTime);
+          setBreakIsRunning(parsedState.breakIsRunning || false);
+
+          // Calculate time remaining for break timer
+          if (parsedState.breakStartTime && parsedState.breakIsRunning) {
+            const elapsed = Math.floor(
+              (Date.now() - parsedState.breakStartTime) / 1000
+            );
+            const remaining = Math.max(
+              0,
+              (parsedState.breakDuration || 300) - elapsed
+            );
+            setBreakTimeRemaining(remaining);
+            setIsModalOpen(true);
+          } else {
+            setBreakTimeRemaining(parsedState.breakDuration || 300);
+          }
+        }
+
+        // Set UI state
         if (parsedState.minimized && !parsedState.isBreakMode) {
           setShowInSidebar(true);
+        } else {
+          setShowInSidebar(false);
         }
-      } else {
-        setTimeRemaining(parsedState.duration);
+      } catch (error) {
+        console.error("Failed to parse timer state:", error);
       }
+    };
+
+    loadTimerState();
+  }, []);
+
+  // Main timer effect
+  useEffect(() => {
+    const updateMainTimer = () => {
+      if (!isRunning || !startTime) return;
+
+      const now = Date.now();
+      const elapsed = Math.floor((now - startTime) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+
+      setTimeRemaining(remaining);
+
+      // Update tray
+      const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
+      window.electron.send("update-tray", minutesLeft);
+
+      // Save state
+      saveTimerState({
+        duration,
+        startTime,
+        isRunning: true,
+        isBreakMode,
+        breakDuration,
+        breakStartTime,
+        breakIsRunning,
+        minimized: showInSidebar,
+      });
+
+      // Check if timer completed
+      if (remaining <= 0) {
+        handleTimerComplete();
+      }
+    };
+
+    // Clear any existing interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
 
-    // Clear any existing intervals to prevent duplicates
-    if (intervalId) {
-      console.log("Clearing existing main timer interval");
-      clearInterval(intervalId);
-      setIntervalId(null);
-    }
-
-    if (breakIntervalId) {
-      console.log("Clearing existing break timer interval");
-      clearInterval(breakIntervalId);
-      setBreakIntervalId(null);
-    }
-
-    // Setup main timer interval only if it's running
+    // Set up interval if timer is running
     if (isRunning && startTime) {
-      console.log("Setting up main timer interval");
-      const id = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const remaining = Math.max(0, duration - elapsed);
-        setTimeRemaining(remaining);
+      // Update immediately once
+      updateMainTimer();
 
-        const timerState: TimerState = {
-          duration,
-          startTime,
-          isRunning: true,
-          isBreakMode,
-          breakDuration,
-          breakStartTime,
-          breakIsRunning,
-          minimized: showInSidebar,
-        };
-        saveTimerState(timerState);
-        const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
+      // Then set up interval
+      timerIntervalRef.current = window.setInterval(updateMainTimer, 1000);
 
-        window.electron.send("update-tray", minutesLeft);
-
-        if (remaining <= 0) {
-          // Timer has reached zero
-          handleTimerComplete();
+      return () => {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
         }
-      }, 1000);
-
-      setIntervalId(id);
+      };
     } else if (!isRunning) {
-      // If not running, make sure we update localStorage to reflect that
-      const timerState: TimerState = {
+      // If not running, save that state
+      saveTimerState({
         duration,
         startTime: null,
         isRunning: false,
@@ -200,40 +202,65 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
+    }
+  }, [isRunning, startTime, duration, isBreakMode]);
+
+  // Break timer effect
+  useEffect(() => {
+    const updateBreakTimer = () => {
+      if (!breakIsRunning || !breakStartTime) return;
+
+      const now = Date.now();
+      const elapsed = Math.floor((now - breakStartTime) / 1000);
+      const remaining = Math.max(0, breakDuration - elapsed);
+
+      setBreakTimeRemaining(remaining);
+
+      // Save state
+      saveTimerState({
+        duration,
+        startTime,
+        isRunning,
+        isBreakMode: true,
+        breakDuration,
+        breakStartTime,
+        breakIsRunning: true,
+        minimized: showInSidebar,
+      });
+
+      // Check if timer completed
+      if (remaining <= 0) {
+        handleBreakComplete();
+      }
+    };
+
+    // Clear any existing interval
+    if (breakTimerIntervalRef.current) {
+      clearInterval(breakTimerIntervalRef.current);
+      breakTimerIntervalRef.current = null;
     }
 
-    // Setup break timer interval only if it's running
+    // Set up interval if break timer is running
     if (breakIsRunning && breakStartTime) {
-      console.log("Setting up break timer interval");
-      const id = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
-        const remaining = Math.max(0, breakDuration - elapsed);
-        setBreakTimeRemaining(remaining);
+      // Update immediately once
+      updateBreakTimer();
 
-        const timerState: TimerState = {
-          duration,
-          startTime,
-          isRunning,
-          isBreakMode: true,
-          breakDuration,
-          breakStartTime,
-          breakIsRunning: true,
-          minimized: showInSidebar,
-        };
-        saveTimerState(timerState);
+      // Then set up interval
+      breakTimerIntervalRef.current = window.setInterval(
+        updateBreakTimer,
+        1000
+      );
 
-        if (remaining <= 0) {
-          // Break timer has reached zero
-          handleBreakComplete();
+      return () => {
+        if (breakTimerIntervalRef.current) {
+          clearInterval(breakTimerIntervalRef.current);
+          breakTimerIntervalRef.current = null;
         }
-      }, 1000);
-
-      setBreakIntervalId(id);
+      };
     } else if (!breakIsRunning && isBreakMode) {
-      // If break timer is not running but we're in break mode, update localStorage
-      const timerState: TimerState = {
+      // If break mode but not running, save that state
+      saveTimerState({
         duration,
         startTime,
         isRunning,
@@ -242,30 +269,11 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime: null,
         breakIsRunning: false,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
     }
+  }, [breakIsRunning, breakStartTime, breakDuration, isBreakMode]);
 
-    return () => {
-      console.log("Cleaning up timer intervals");
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-      if (breakIntervalId) {
-        clearInterval(breakIntervalId);
-      }
-    };
-  }, [
-    isRunning,
-    startTime,
-    duration,
-    isBreakMode,
-    breakIsRunning,
-    breakStartTime,
-    breakDuration,
-  ]);
-
-  // Add a dedicated effect for navigation after timer completion
+  // Effect for navigation after timer completion
   useEffect(() => {
     if (timerJustCompleted) {
       const navigationTimer = setTimeout(() => {
@@ -279,8 +287,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
   // Handle main timer completion
   const handleTimerComplete = () => {
-    // First stop the timer
-    handleReset();
+    // Clear interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    // Reset timer state
+    setIsRunning(false);
+    setStartTime(null);
+    setTimeRemaining(defaultSeconds);
+    setDuration(defaultSeconds);
 
     // Show notification
     showNotification("Work session completed!");
@@ -294,32 +311,28 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     const totalTimePassed = Math.ceil(duration / 60).toString() + "m";
     window.electron.send("update-tray", " " + totalTimePassed + " done!");
 
-    // Wait for modal to be rendered before attempting navigation
-    setTimeout(() => {
-      navigateTo("Compass");
+    // Set timer completed flag
+    setTimerJustCompleted(true);
 
-      // Backup navigation attempts
-      setTimeout(() => {
-        navigateTo("Compass");
+    setTimeRemaining(defaultSeconds);
 
-        setTimeout(() => {
-          navigateTo("Compass");
-        }, 300);
-      }, 300);
-    }, 500);
+    // Remove from localStorage
+    localStorage.removeItem("timerState");
   };
 
   // Handle break timer completion
   const handleBreakComplete = () => {
-    // Reset break timer
+    // Clear interval
+    if (breakTimerIntervalRef.current) {
+      clearInterval(breakTimerIntervalRef.current);
+      breakTimerIntervalRef.current = null;
+    }
+
+    // Reset break timer state
     setBreakIsRunning(false);
     setBreakStartTime(null);
-
-    // Clear any running interval
-    if (breakIntervalId) {
-      clearInterval(breakIntervalId);
-      setBreakIntervalId(null);
-    }
+    setBreakTimeRemaining(300);
+    setBreakDuration(300);
 
     // Exit break mode
     setIsBreakMode(false);
@@ -334,124 +347,54 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     window.electron.send("update-tray", " Break over!");
 
     // Update localStorage
-    const timerState: TimerState = {
+    saveTimerState({
       duration,
       startTime,
       isRunning,
       isBreakMode: false,
       minimized: false,
-    };
-    saveTimerState(timerState);
+    });
   };
 
-  // Create a universal timer toggle function that both sidebar and main timer will use
+  // Toggle timer (start/pause)
   const toggleTimer = () => {
-    // Before toggling, check if localStorage has more recent state
-    const storedState = localStorage.getItem("timerState");
-    if (storedState) {
-      try {
-        const parsedState = JSON.parse(storedState) as TimerState;
-        // If localStorage has different values than our current state, sync first
-        if (
-          parsedState.isBreakMode !== isBreakMode ||
-          parsedState.isRunning !== isRunning ||
-          parsedState.breakIsRunning !== breakIsRunning
-        ) {
-          console.log("Detected state mismatch, synchronizing before toggle");
-          synchronizeTimerState();
-        }
-      } catch (error) {
-        console.error("Error checking timer state:", error);
+    if (isBreakMode) {
+      // Toggle break timer
+      if (breakIsRunning) {
+        // Pause break timer
+        setBreakIsRunning(false);
+        setBreakDuration(breakTimeRemaining);
+        setBreakStartTime(null);
+      } else {
+        // Start break timer
+        const newBreakStartTime =
+          Date.now() - (breakDuration - breakTimeRemaining) * 1000;
+        setBreakStartTime(newBreakStartTime);
+        setBreakIsRunning(true);
+      }
+    } else {
+      // Toggle main timer
+      if (isRunning) {
+        // Pause main timer
+        setIsRunning(false);
+        setDuration(timeRemaining);
+        setStartTime(null);
+
+        // Update tray
+        const trayString = ` Paused ${Math.ceil(
+          timeRemaining / 60
+        ).toString()}m`;
+        window.electron.send("update-tray", trayString);
+      } else {
+        // Start main timer
+        const newStartTime = Date.now() - (duration - timeRemaining) * 1000;
+        setStartTime(newStartTime);
+        setIsRunning(true);
       }
     }
-
-    // Now toggle based on current mode
-    if (isBreakMode) {
-      // Toggle break timer state
-      setBreakIsRunning((prev) => {
-        const newBreakIsRunning = !prev;
-
-        if (newBreakIsRunning) {
-          // Starting the break timer
-          const adjustedStartTime =
-            Date.now() - (breakDuration - breakTimeRemaining) * 1000;
-          setBreakStartTime(adjustedStartTime);
-        } else {
-          // Pausing the break timer
-          setBreakDuration(breakTimeRemaining);
-          setBreakStartTime(null);
-        }
-
-        // Always save state to localStorage with current sidebar visibility
-        const timerState: TimerState = {
-          duration,
-          startTime,
-          isRunning,
-          isBreakMode: true,
-          breakDuration: newBreakIsRunning ? breakDuration : breakTimeRemaining,
-          breakStartTime: newBreakIsRunning
-            ? Date.now() - (breakDuration - breakTimeRemaining) * 1000
-            : null,
-          breakIsRunning: newBreakIsRunning,
-          minimized: showInSidebar,
-        };
-        saveTimerState(timerState);
-
-        // Force clear any existing interval when pausing
-        if (!newBreakIsRunning && breakIntervalId) {
-          clearInterval(breakIntervalId);
-          setBreakIntervalId(null);
-        }
-
-        return newBreakIsRunning;
-      });
-    } else {
-      // Toggle main timer state
-      setIsRunning((prev) => {
-        const newIsRunning = !prev;
-
-        if (newIsRunning) {
-          // Starting the timer - use either existing start time or create new one
-          const newStartTime = Date.now() - (duration - timeRemaining) * 1000;
-          setStartTime(newStartTime);
-        } else {
-          // Pausing the timer - save current time remaining as the new duration
-          setDuration(timeRemaining);
-          setStartTime(null);
-
-          // Update tray
-          const trayString = ` Paused ${Math.ceil(
-            timeRemaining / 60
-          ).toString()}m`;
-          window.electron.send("update-tray", trayString);
-        }
-
-        // Always save state to localStorage with current sidebar visibility
-        const timerState: TimerState = {
-          duration: newIsRunning ? duration : timeRemaining,
-          startTime: newIsRunning
-            ? Date.now() - (duration - timeRemaining) * 1000
-            : null,
-          isRunning: newIsRunning,
-          isBreakMode,
-          breakDuration,
-          breakStartTime,
-          breakIsRunning,
-          minimized: showInSidebar,
-        };
-        saveTimerState(timerState);
-
-        // Force clear any existing interval when pausing
-        if (!newIsRunning && intervalId) {
-          clearInterval(intervalId);
-          setIntervalId(null);
-        }
-
-        return newIsRunning;
-      });
-    }
   };
 
+  // Adjust timer duration (+/-)
   const handleAdjustTime = (amount: number) => {
     // Implement debounce for rapid clicking
     const now = Date.now();
@@ -461,14 +404,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     lastAdjustmentTimeRef.current = now;
 
     if (isRunning && startTime) {
+      // Adjust running timer
       const newDuration = Math.max(duration + amount, 0);
       setDuration(newDuration);
 
+      // Calculate new time remaining
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const remaining = Math.max(0, newDuration - elapsed);
-      setTimeRemaining(remaining);
+      const newRemaining = Math.max(0, newDuration - elapsed);
+      setTimeRemaining(newRemaining);
 
-      const timerState: TimerState = {
+      // Save to localStorage
+      saveTimerState({
         duration: newDuration,
         startTime,
         isRunning,
@@ -477,14 +423,15 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
     } else {
-      const newTime = Math.max(duration + amount, 0);
-      setDuration(newTime);
+      // Adjust paused timer (change both duration and timeRemaining)
+      const newTime = Math.max(timeRemaining + amount, 0);
       setTimeRemaining(newTime);
+      setDuration(newTime);
 
-      const timerState: TimerState = {
+      // Save to localStorage
+      saveTimerState({
         duration: newTime,
         startTime,
         isRunning,
@@ -493,21 +440,30 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
     }
   };
 
+  // Reset timer
   const handleReset = () => {
+    // Clear interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    // Reset timer state
     setDuration(defaultSeconds);
     setTimeRemaining(defaultSeconds);
     setStartTime(null);
     setIsRunning(false);
     setShowInSidebar(false);
+
+    // Clear from localStorage
     localStorage.removeItem("timerState");
   };
 
-  // Function to start a break timer
+  // Start a break timer
   const handleStartBreak = (breakMinutes: number) => {
     // Set break duration
     const newBreakDuration = breakMinutes * 60;
@@ -518,27 +474,27 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setIsBreakMode(true);
 
     // Start the break timer
-    setBreakStartTime(Date.now());
+    const now = Date.now();
+    setBreakStartTime(now);
     setBreakIsRunning(true);
 
     // Save state
-    const timerState: TimerState = {
+    saveTimerState({
       duration,
       startTime,
       isRunning,
       isBreakMode: true,
       breakDuration: newBreakDuration,
-      breakStartTime: Date.now(),
+      breakStartTime: now,
       breakIsRunning: true,
       minimized: showInSidebar,
-    };
-    saveTimerState(timerState);
+    });
 
     // Update tray
     window.electron.send("update-tray", ` Break: ${breakMinutes}m`);
   };
 
-  // Restart work timer after a break or session
+  // Restart work timer after a break
   const handleRestartTimer = () => {
     // Reset break timer if it's running
     if (isBreakMode) {
@@ -546,39 +502,39 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
 
     // Set up a new work timer
+    const now = Date.now();
     setDuration(defaultSeconds);
     setTimeRemaining(defaultSeconds);
-    setStartTime(Date.now());
+    setStartTime(now);
     setIsRunning(true);
     setShowInSidebar(false);
 
     // Save state
-    const timerState: TimerState = {
+    saveTimerState({
       duration: defaultSeconds,
-      startTime: Date.now(),
+      startTime: now,
       isRunning: true,
       isBreakMode: false,
       minimized: false,
-    };
-    saveTimerState(timerState);
+    });
 
     // Update tray
     window.electron.send("update-tray", ` ${defaultMinutes}m`);
   };
 
-  // Close the modal but keep timer running in sidebar
+  // Close modal but keep timer running in sidebar
   const handleCloseModal = () => {
-    // Toggle the modal state
+    // Toggle modal state
     setIsModalOpen((prev) => !prev);
 
-    // If we're closing the modal (it was previously open), handle sidebar visibility
+    // If closing the modal, handle sidebar visibility
     if (isModalOpen) {
       // Only move main work timer to sidebar, never the break timer
       if (isRunning && !isBreakMode) {
         setShowInSidebar(true);
 
-        // Update localStorage with minimized state
-        const timerState: TimerState = {
+        // Update localStorage
+        saveTimerState({
           duration,
           startTime,
           isRunning,
@@ -587,8 +543,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakStartTime,
           breakIsRunning,
           minimized: true,
-        };
-        saveTimerState(timerState);
+        });
       }
     }
   };
@@ -604,13 +559,13 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setShowInSidebar(false);
   };
 
-  // Just hide the sidebar timer without stopping it
+  // Hide sidebar timer without stopping it
   const handleHideSidebarTimer = () => {
-    // Only change the visibility, don't affect the timer state
+    // Only change visibility
     setShowInSidebar(false);
 
-    // Create a complete state object with current values
-    const timerState: TimerState = {
+    // Save state
+    saveTimerState({
       duration,
       startTime,
       isRunning,
@@ -618,14 +573,11 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       breakDuration,
       breakStartTime,
       breakIsRunning,
-      minimized: false, // Update only the minimized flag
-    };
-
-    // Save to localStorage to persist the change
-    saveTimerState(timerState);
+      minimized: false,
+    });
   };
 
-  // Function to adjust break timer
+  // Adjust break timer
   const handleBreakTimerAdjust = (amount: number) => {
     // Implement debounce for rapid clicking
     const now = Date.now();
@@ -635,15 +587,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     lastAdjustmentTimeRef.current = now;
 
     if (breakIsRunning && breakStartTime) {
-      // Adjust running timer
+      // Adjust running break timer
       const newDuration = Math.max(breakDuration + amount, 0);
       setBreakDuration(newDuration);
 
+      // Calculate new time remaining
       const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
-      const remaining = Math.max(0, newDuration - elapsed);
-      setBreakTimeRemaining(remaining);
+      const newRemaining = Math.max(0, newDuration - elapsed);
+      setBreakTimeRemaining(newRemaining);
 
-      const timerState: TimerState = {
+      // Save to localStorage
+      saveTimerState({
         duration,
         startTime,
         isRunning,
@@ -652,15 +606,15 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning: true,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
     } else {
-      // Adjust paused timer
+      // Adjust paused break timer
       const newBreakTime = Math.max(breakTimeRemaining + amount, 0);
       setBreakDuration(newBreakTime);
       setBreakTimeRemaining(newBreakTime);
 
-      const timerState: TimerState = {
+      // Save to localStorage
+      saveTimerState({
         duration,
         startTime,
         isRunning,
@@ -669,42 +623,39 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning: false,
         minimized: showInSidebar,
-      };
-      saveTimerState(timerState);
+      });
     }
   };
 
-  // Function to reset break timer
+  // Reset break timer
   const handleBreakTimerReset = () => {
-    // Stop the break timer
-    setBreakIsRunning(false);
-    setBreakStartTime(null);
-
-    // Clear any running interval
-    if (breakIntervalId) {
-      clearInterval(breakIntervalId);
-      setBreakIntervalId(null);
+    // Clear interval
+    if (breakTimerIntervalRef.current) {
+      clearInterval(breakTimerIntervalRef.current);
+      breakTimerIntervalRef.current = null;
     }
 
-    // Reset to default values
-    setBreakDuration(300);
+    // Reset break timer state
+    setBreakIsRunning(false);
+    setBreakStartTime(null);
     setBreakTimeRemaining(300);
+    setBreakDuration(300);
 
     // Exit break mode
     setIsBreakMode(false);
     setShowInSidebar(false);
 
     // Update localStorage
-    const timerState: TimerState = {
+    saveTimerState({
       duration,
       startTime,
       isRunning,
       isBreakMode: false,
       minimized: false,
-    };
-    saveTimerState(timerState);
+    });
   };
 
+  // Show notifications
   const showNotification = (message: string) => {
     if (Notification.permission === "granted") {
       new Notification("Timer Alert", {
@@ -721,54 +672,35 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   };
 
-  // Function to force synchronize timer state with localStorage
+  // Force synchronize timer state with localStorage
   const synchronizeTimerState = () => {
-    // Force reload the timer state from localStorage
     const storedState = localStorage.getItem("timerState");
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState) as TimerState;
 
-        // Clear any existing intervals first to prevent conflicts
-        if (intervalId) {
-          clearInterval(intervalId);
-          setIntervalId(null);
-        }
-        if (breakIntervalId) {
-          clearInterval(breakIntervalId);
-          setBreakIntervalId(null);
-        }
-
-        // Set all timer states based on localStorage
+        // Set main timer state
         setDuration(parsedState.duration);
         setIsRunning(parsedState.isRunning);
         setIsBreakMode(parsedState.isBreakMode || false);
+        setStartTime(parsedState.startTime);
 
-        // Only show in sidebar if it's not a break timer
-        if (!parsedState.isBreakMode) {
-          setShowInSidebar(parsedState.minimized || false);
-        } else {
-          // Always ensure break timers are not in the sidebar
-          setShowInSidebar(false);
-        }
-
-        // Synchronize main timer
+        // Calculate current time remaining
         if (parsedState.startTime && parsedState.isRunning) {
           const elapsed = Math.floor(
             (Date.now() - parsedState.startTime) / 1000
           );
           const remaining = Math.max(0, parsedState.duration - elapsed);
           setTimeRemaining(remaining);
-          setStartTime(parsedState.startTime);
         } else {
           setTimeRemaining(parsedState.duration);
-          setStartTime(parsedState.startTime);
         }
 
-        // Synchronize break timer
+        // Set break timer state
         if (parsedState.isBreakMode) {
           setBreakDuration(parsedState.breakDuration || 300);
           setBreakIsRunning(parsedState.breakIsRunning || false);
+          setBreakStartTime(parsedState.breakStartTime);
 
           if (parsedState.breakStartTime && parsedState.breakIsRunning) {
             const elapsed = Math.floor(
@@ -779,11 +711,16 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
               (parsedState.breakDuration || 300) - elapsed
             );
             setBreakTimeRemaining(remaining);
-            setBreakStartTime(parsedState.breakStartTime);
           } else {
             setBreakTimeRemaining(parsedState.breakDuration || 300);
-            setBreakStartTime(parsedState.breakStartTime);
           }
+        }
+
+        // Set UI state
+        if (!parsedState.isBreakMode) {
+          setShowInSidebar(parsedState.minimized || false);
+        } else {
+          setShowInSidebar(false);
         }
       } catch (error) {
         console.error("Failed to parse timer state from localStorage:", error);
@@ -791,15 +728,14 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   };
 
-  // Function to force refresh the timer display without changing the time
+  // Force refresh timer display without changing time
   const forceRefreshTimerDisplay = () => {
-    // If we're on the Compass page, ensure the timer is not showing in sidebar
+    // If on Compass page, ensure timer isn't in sidebar
     if (isRunning) {
-      // When navigating to Compass, we should ensure the timer isn't in sidebar mode
       setShowInSidebar(false);
 
-      // Update localStorage to reflect that the timer is no longer minimized
-      const timerState: TimerState = {
+      // Update localStorage
+      saveTimerState({
         duration,
         startTime,
         isRunning,
@@ -808,52 +744,18 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         breakStartTime,
         breakIsRunning,
         minimized: false,
-      };
-      saveTimerState(timerState);
+      });
     }
 
+    // Recalculate time remaining for displayed timer
     if (isRunning && startTime) {
-      // Calculate the correct time remaining based on the current startTime
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, duration - elapsed);
       setTimeRemaining(remaining);
-
-      // Ensure the interval is running
-      if (!intervalId) {
-        const newIntervalId = setInterval(() => {
-          const nowElapsed = Math.floor((Date.now() - startTime) / 1000);
-          const nowRemaining = Math.max(0, duration - nowElapsed);
-          setTimeRemaining(nowRemaining);
-
-          // Check if timer has completed
-          if (nowRemaining <= 0) {
-            handleTimerComplete();
-          }
-        }, 1000);
-
-        setIntervalId(newIntervalId);
-      }
     } else if (breakIsRunning && breakStartTime) {
-      // Do the same for break timer
       const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
       const remaining = Math.max(0, breakDuration - elapsed);
       setBreakTimeRemaining(remaining);
-
-      // Ensure break interval is running
-      if (!breakIntervalId) {
-        const newBreakIntervalId = setInterval(() => {
-          const nowElapsed = Math.floor((Date.now() - breakStartTime) / 1000);
-          const nowRemaining = Math.max(0, breakDuration - nowElapsed);
-          setBreakTimeRemaining(nowRemaining);
-
-          // Check if break timer has completed
-          if (nowRemaining <= 0) {
-            handleBreakComplete();
-          }
-        }, 1000);
-
-        setBreakIntervalId(newBreakIntervalId);
-      }
     }
   };
 

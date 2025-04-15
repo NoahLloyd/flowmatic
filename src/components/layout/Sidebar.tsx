@@ -66,7 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const icons = [
     { label: "Compass", icon: Compass },
-    { label: "Friends", icon: Users },
     { label: "Tasks", icon: Check },
     { label: "Morning", icon: Sunrise },
     { label: "Notes", icon: StickyNote },
@@ -78,7 +77,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Define keyboard shortcuts
   const keyboardShortcuts: Record<string, string> = {
     Compass: "c",
-    Friends: "f",
     Tasks: "t",
     Morning: "m",
     Notes: "n",

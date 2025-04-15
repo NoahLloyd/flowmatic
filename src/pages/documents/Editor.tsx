@@ -9,12 +9,28 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import { useTheme } from "../../context/ThemeContext";
 import "./EditorStyles.css";
+import { Extension } from "@tiptap/core";
 
 interface EditorComponentProps {
   initialContent: string;
   onUpdate: (content: string) => void;
   documentId: string;
 }
+
+// Custom extension to handle Escape key
+const EscapeHandlerExtension = Extension.create({
+  name: "escapehandler",
+
+  addKeyboardShortcuts() {
+    return {
+      Escape: () => {
+        // Blur the editor when Escape key is pressed
+        this.editor.view.dom.blur();
+        return true;
+      },
+    };
+  },
+});
 
 const Editor: React.FC<EditorComponentProps> = ({
   initialContent,
@@ -42,6 +58,8 @@ const Editor: React.FC<EditorComponentProps> = ({
       Link.configure({
         openOnClick: false,
       }),
+      // Add our custom escape handler
+      EscapeHandlerExtension,
     ],
     content: initialContent || "",
     autofocus: true,

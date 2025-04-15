@@ -261,7 +261,11 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
       // Form field navigation shortcuts - only available in focus step
       if (currentStep === "focus") {
         // Handle the navigation shortcut keys with strong prevention
-        if (["t", "n", "p", "m"].includes(e.key.toLowerCase())) {
+        if (
+          ["t", "n", "p", "m", "1", "2", "3", "4", "5"].includes(
+            e.key.toLowerCase()
+          )
+        ) {
           console.log(`Key detected: ${e.key.toLowerCase()}`);
           // Prevent global navigation and default behavior
           e.preventDefault();
@@ -284,15 +288,22 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
               minutesInputRef.current?.focus();
               minutesInputRef.current?.select();
               return;
+            case "1":
+              handleFocusRating(1);
+              return;
+            case "2":
+              handleFocusRating(2);
+              return;
+            case "3":
+              handleFocusRating(3);
+              return;
+            case "4":
+              handleFocusRating(4);
+              return;
+            case "5":
+              handleFocusRating(5);
+              return;
           }
-          return;
-        }
-
-        // Focus rating shortcuts
-        if (/^[1-5]$/.test(e.key)) {
-          // Focus rating shortcuts (1-5)
-          const rating = parseInt(e.key);
-          handleFocusRating(rating);
           return;
         }
       } else if (currentStep === "break") {
