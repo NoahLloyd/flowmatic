@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Task } from "../../types/Task";
+import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
 import { useNavigation } from "../../hooks/useNavigation";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "react-beautiful-dnd";
 
 const DailyTasks: React.FC = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
@@ -26,6 +32,17 @@ const DailyTasks: React.FC = () => {
     );
   };
 
+  // Function to get task order from localStorage for a specific type
+  const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
+    const storedOrder = localStorage.getItem(`taskOrder_${type}`);
+    return storedOrder ? JSON.parse(storedOrder) : null;
+  };
+
+  // Function to save task order to localStorage for a specific type
+  const saveTaskOrderToStorage = (type: TaskType, order: string[]): void => {
+    localStorage.setItem(`taskOrder_${type}`, JSON.stringify(order));
+  };
+
   // Fetch daily tasks
   const fetchTasks = async () => {
     try {
@@ -35,11 +52,24 @@ const DailyTasks: React.FC = () => {
       console.log("All tasks loaded:", allTasks.length);
 
       // Filter active daily tasks
-      const active = allTasks.filter(
+      let active = allTasks.filter(
         (task) => task.type === "day" && !task.completed
       );
 
-      console.log("Active daily tasks:", active.length);
+      // Apply stored order
+      const taskOrderDay = getTaskOrderFromStorage("day");
+      if (taskOrderDay) {
+        active = active.sort((a, b) => {
+          const indexA = taskOrderDay.indexOf(a._id);
+          const indexB = taskOrderDay.indexOf(b._id);
+          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+      }
+
+      console.log("Active daily tasks (sorted):", active.length);
 
       // Filter completed tasks from today - with improved handling
       const completed = allTasks.filter((task) => {
@@ -103,13 +133,26 @@ const DailyTasks: React.FC = () => {
         if (taskToMove) {
           setActiveTasks((prev) => prev.filter((t) => t._id !== id));
           setCompletedTasks((prev) => [...prev, { ...taskToMove, ...updates }]);
+          // Remove from stored order
+          const currentOrder = getTaskOrderFromStorage("day") || [];
+          saveTaskOrderToStorage(
+            "day",
+            currentOrder.filter((taskId) => taskId !== id)
+          );
         }
       } else {
         // Task was unmarked (moved back to active)
         const taskToMove = completedTasks.find((t) => t._id === id);
         if (taskToMove) {
           setCompletedTasks((prev) => prev.filter((t) => t._id !== id));
-          setActiveTasks((prev) => [...prev, { ...taskToMove, ...updates }]);
+          const updatedTask = { ...taskToMove, ...updates };
+          setActiveTasks((prev) => [...prev, updatedTask]); // Add to end for now, order applied on next fetch or drag
+          // Add back to the beginning of the stored order
+          const currentOrder = getTaskOrderFromStorage("day") || [];
+          saveTaskOrderToStorage("day", [
+            id,
+            ...currentOrder.filter((taskId) => taskId !== id),
+          ]); // Ensure no duplicates
         }
       }
 
@@ -157,6 +200,38 @@ const DailyTasks: React.FC = () => {
 
   const getTotalCount = () => {
     return activeTasks.length + completedTasks.length;
+  };
+
+  // Drag and Drop Handler
+  const handleDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+
+    // Dropped outside the list or no movement
+    if (
+      !destination ||
+      (destination.droppableId === source.droppableId &&
+        destination.index === source.index)
+    ) {
+      return;
+    }
+
+    // Ensure drop happened within the active list
+    if (destination.droppableId !== "daily-active-tasks") {
+      console.warn("Drag and drop outside the active list is not supported.");
+      return;
+    }
+
+    // Reorder the activeTasks list
+    const items = Array.from(activeTasks);
+    const [reorderedItem] = items.splice(source.index, 1);
+    items.splice(destination.index, 0, reorderedItem);
+
+    // Update the state
+    setActiveTasks(items);
+
+    // Save the new order to localStorage
+    const newOrder = items.map((task) => task._id);
+    saveTaskOrderToStorage("day", newOrder);
   };
 
   if (isLoading) {
@@ -231,32 +306,67 @@ const DailyTasks: React.FC = () => {
         </span>
       </div>
       <div className="p-4 bg-white dark:bg-gray-900">
-        <div className="space-y-2 max-h-[179px] overflow-y-auto">
-          {/* Active tasks */}
-          {activeTasks.map((task) => (
-            <div key={task._id} className="flex items-center gap-3 py-1">
-              <div
-                onClick={() => handleToggleComplete(task._id)}
-                className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-              />
-              <span className="text-sm text-gray-800 dark:text-gray-200 truncate">
-                {task.title}
-              </span>
-            </div>
-          ))}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="space-y-2 max-h-[179px] overflow-y-auto">
+            <Droppable droppableId="daily-active-tasks">
+              {(provided, snapshot) => (
+                <div
+                  {...provided.droppableProps}
+                  ref={provided.innerRef}
+                  className={`space-y-2 ${
+                    snapshot.isDraggingOver
+                      ? "bg-gray-100 dark:bg-gray-800/50 rounded-md p-1"
+                      : ""
+                  }`}
+                >
+                  {activeTasks.map((task, index) => (
+                    <Draggable
+                      key={task._id}
+                      draggableId={task._id}
+                      index={index}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className={`flex items-center gap-3 py-1 ${
+                            snapshot.isDragging
+                              ? "bg-gray-200 dark:bg-gray-700 rounded shadow-md"
+                              : ""
+                          }`}
+                        >
+                          <div
+                            onClick={() => handleToggleComplete(task._id)}
+                            className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                          />
+                          <span className="text-sm text-gray-800 dark:text-gray-200 truncate">
+                            {task.title}
+                          </span>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
 
-          {/* Completed tasks */}
-          {completedTasks.map((task) => (
-            <div key={task._id} className="flex items-center gap-3 py-1">
-              <div onClick={() => handleToggleComplete(task._id)}>
-                <CompletedCheckbox />
+            {completedTasks.length > 0 && activeTasks.length > 0 && (
+              <hr className="border-gray-200 dark:border-gray-700 my-2" />
+            )}
+            {completedTasks.map((task) => (
+              <div key={task._id} className="flex items-center gap-3 py-1">
+                <div onClick={() => handleToggleComplete(task._id)}>
+                  <CompletedCheckbox />
+                </div>
+                <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {task.title}
+                </span>
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                {task.title}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </DragDropContext>
       </div>
     </div>
   );
