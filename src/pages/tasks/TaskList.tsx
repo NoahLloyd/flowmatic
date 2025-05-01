@@ -1,6 +1,7 @@
 import React from "react";
 import { Task } from "../../types/Task";
 import TaskItem from "./TaskItem";
+import { Droppable, Draggable } from "react-beautiful-dnd";
 
 interface TaskListProps {
   tasks: Task[];
@@ -8,6 +9,7 @@ interface TaskListProps {
   onDelete: (id: string) => void;
   onChangeTaskType: (id: string, type: "day" | "week" | "future") => void;
   onUpdateTitle: (id: string, title: string) => void;
+  droppableId: string;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -16,20 +18,35 @@ const TaskList: React.FC<TaskListProps> = ({
   onDelete,
   onChangeTaskType,
   onUpdateTitle,
+  droppableId,
 }) => {
   return (
-    <div className="space-y-3">
-      {tasks.map((task) => (
-        <TaskItem
-          key={task._id}
-          task={task}
-          onToggleComplete={onToggleComplete}
-          onDelete={onDelete}
-          onChangeTaskType={onChangeTaskType}
-          onUpdateTitle={onUpdateTitle}
-        />
-      ))}
-    </div>
+    <Droppable droppableId={droppableId}>
+      {(provided, snapshot) => (
+        <div
+          {...provided.droppableProps}
+          ref={provided.innerRef}
+          className={`space-y-3 ${
+            snapshot.isDraggingOver
+              ? "bg-gray-100 dark:bg-gray-800/50 rounded-md"
+              : ""
+          }`}
+        >
+          {tasks.map((task, index) => (
+            <TaskItem
+              key={task._id}
+              task={task}
+              index={index}
+              onToggleComplete={onToggleComplete}
+              onDelete={onDelete}
+              onChangeTaskType={onChangeTaskType}
+              onUpdateTitle={onUpdateTitle}
+            />
+          ))}
+          {provided.placeholder}
+        </div>
+      )}
+    </Droppable>
   );
 };
 

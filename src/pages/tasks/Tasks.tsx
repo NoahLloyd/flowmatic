@@ -6,6 +6,12 @@ import TaskTypeSelector from "./TaskTypeSelector";
 import CompletedTasks from "./CompletedTasks";
 import { api } from "../../utils/api";
 import { useNavigation } from "../../hooks/useNavigation";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "react-beautiful-dnd";
 
 /**
  * Ideal API Endpoints for Tasks:
@@ -105,6 +111,17 @@ const Tasks: React.FC<TasksProps> = ({
   const [actionCounter, setActionCounter] = useState(0);
   const incrementActionCounter = () => setActionCounter((prev) => prev + 1);
 
+  // Function to get task order from localStorage for a specific type
+  const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
+    const storedOrder = localStorage.getItem(`taskOrder_${type}`);
+    return storedOrder ? JSON.parse(storedOrder) : null;
+  };
+
+  // Function to save task order to localStorage for a specific type
+  const saveTaskOrderToStorage = (type: TaskType, order: string[]): void => {
+    localStorage.setItem(`taskOrder_${type}`, JSON.stringify(order));
+  };
+
   // Fetch tasks with limits for completed tasks - only for initial load and explicit refreshes
   const loadTasks = useCallback(async (fetchAll = false) => {
     setIsLoading(true);
@@ -112,7 +129,44 @@ const Tasks: React.FC<TasksProps> = ({
       console.log("Loading tasks from server...");
       const result = await fetchTasks(fetchAll);
       console.log(`Loaded ${result.length} tasks`);
-      setTasks(result);
+
+      // Apply stored order on initial load
+      const orderedTasks = [...result]; // Create a mutable copy
+      const taskOrderDay = getTaskOrderFromStorage("day");
+      const taskOrderWeek = getTaskOrderFromStorage("week");
+      const taskOrderFuture = getTaskOrderFromStorage("future");
+
+      const applyOrder = (type: TaskType, order: string[] | null) => {
+        if (order) {
+          const activeTasksOfType = orderedTasks.filter(
+            (t) => !t.completed && t.type === type
+          );
+          const completedTasks = orderedTasks.filter(
+            (t) => t.completed || t.type !== type
+          );
+          const sortedActive = activeTasksOfType.sort((a, b) => {
+            const indexA = order.indexOf(a._id);
+            const indexB = order.indexOf(b._id);
+            // Handle tasks not in the stored order (e.g., newly added)
+            if (indexA === -1 && indexB === -1) return 0; // Keep relative order or place at end
+            if (indexA === -1) return 1; // Place tasks not in order at the end
+            if (indexB === -1) return -1; // Place tasks not in order at the end
+            return indexA - indexB;
+          });
+          // Replace the original active tasks of this type with the sorted ones
+          const nonActiveOfType = orderedTasks.filter(
+            (t) => t.completed || t.type !== type
+          );
+          return [...sortedActive, ...nonActiveOfType];
+        }
+        return orderedTasks; // Return original if no order stored
+      };
+
+      let tempTasks = applyOrder("day", taskOrderDay);
+      tempTasks = applyOrder("week", taskOrderWeek);
+      tempTasks = applyOrder("future", taskOrderFuture);
+
+      setTasks(tempTasks);
       setTasksLoaded(true);
     } catch (error) {
       console.error("Failed to fetch tasks:", error);
@@ -181,6 +235,10 @@ const Tasks: React.FC<TasksProps> = ({
 
       // Update local state immediately
       setTasks((prev) => [tempTask, ...prev]);
+
+      // Add new task ID to the beginning of the stored order
+      const currentOrder = getTaskOrderFromStorage(type) || [];
+      saveTaskOrderToStorage(type, [tempId, ...currentOrder]);
     } catch (error) {
       console.error("Failed to add task:", error);
       // In case of error, reload from server
@@ -209,8 +267,20 @@ const Tasks: React.FC<TasksProps> = ({
   };
 
   const handleDeleteAndUpdateLocal = (id: string) => {
+    const taskToDelete = tasks.find((t) => t._id === id);
+    if (!taskToDelete) return;
+
     // Update local state immediately
     setTasks((prev) => prev.filter((task) => task._id !== id));
+
+    // Remove task ID from stored order
+    if (!taskToDelete.completed) {
+      const currentOrder = getTaskOrderFromStorage(taskToDelete.type) || [];
+      saveTaskOrderToStorage(
+        taskToDelete.type,
+        currentOrder.filter((taskId) => taskId !== id)
+      );
+    }
 
     // Call the parent handler which will make the API call
     onDelete(id);
@@ -220,6 +290,11 @@ const Tasks: React.FC<TasksProps> = ({
     id: string,
     newType: TaskType
   ) => {
+    const taskToChange = tasks.find((t) => t._id === id);
+    if (!taskToChange || taskToChange.completed) return; // Only change type for active tasks
+
+    const oldType = taskToChange.type;
+
     // Update local state immediately
     setTasks((prev) =>
       prev.map((task) => {
@@ -229,6 +304,17 @@ const Tasks: React.FC<TasksProps> = ({
         return task;
       })
     );
+
+    // Remove from old order, add to new order
+    const oldOrder = getTaskOrderFromStorage(oldType) || [];
+    saveTaskOrderToStorage(
+      oldType,
+      oldOrder.filter((taskId) => taskId !== id)
+    );
+
+    const newOrder = getTaskOrderFromStorage(newType) || [];
+    // Add to the beginning of the new list's order
+    saveTaskOrderToStorage(newType, [id, ...newOrder]);
 
     // Call the parent handler which will make the API call
     onChangeTaskType(id, newType);
@@ -260,6 +346,20 @@ const Tasks: React.FC<TasksProps> = ({
       }
       return true;
     });
+
+  // Apply stored order to the currently filtered active tasks
+  const currentTaskOrder = getTaskOrderFromStorage(selectedType);
+  const orderedActiveTasks = currentTaskOrder
+    ? [...activeTasks].sort((a, b) => {
+        // Sort a copy
+        const indexA = currentTaskOrder.indexOf(a._id);
+        const indexB = currentTaskOrder.indexOf(b._id);
+        if (indexA === -1 && indexB === -1) return 0;
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      })
+    : activeTasks; // Use original if no order stored or error
 
   // Filter completed tasks
   const filteredCompletedTasks = tasks
@@ -321,6 +421,43 @@ const Tasks: React.FC<TasksProps> = ({
     </div>
   );
 
+  // Drag and Drop Handler
+  const handleDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+
+    // Dropped outside the list
+    if (!destination) {
+      return;
+    }
+
+    // Ensure drop happened within the same list type
+    if (
+      source.droppableId !== destination.droppableId ||
+      destination.droppableId !== `active-tasks-${selectedType}`
+    ) {
+      console.warn(
+        "Drag and drop across different lists or types is not supported."
+      );
+      return;
+    }
+
+    // Reorder the 'orderedActiveTasks' list based on drag result
+    const items = Array.from(orderedActiveTasks);
+    const [reorderedItem] = items.splice(source.index, 1);
+    items.splice(destination.index, 0, reorderedItem);
+
+    // Update the main 'tasks' state
+    const completedTasks = tasks.filter((t) => t.completed);
+    const otherActiveTasks = tasks.filter(
+      (t) => !t.completed && t.type !== selectedType
+    );
+    setTasks([...items, ...otherActiveTasks, ...completedTasks]);
+
+    // Save the new order to localStorage
+    const newOrder = items.map((task) => task._id);
+    saveTaskOrderToStorage(selectedType, newOrder);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
       {/* Task type selector */}
@@ -348,90 +485,93 @@ const Tasks: React.FC<TasksProps> = ({
       </div>
 
       {/* Active tasks section */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
-        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex justify-between items-center bg-gray-50 dark:bg-gray-800/40">
-          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-            {selectedType === "day"
-              ? "Today's Tasks"
-              : selectedType === "week"
-              ? "This Week's Tasks"
-              : "Future Tasks"}
-          </h2>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {isLoading
-              ? "Loading..."
-              : `${activeTasks.length} ${
-                  activeTasks.length === 1 ? "task" : "tasks"
-                }`}
-          </span>
-        </div>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
+          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex justify-between items-center bg-gray-50 dark:bg-gray-800/40">
+            <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+              {selectedType === "day"
+                ? "Today's Tasks"
+                : selectedType === "week"
+                ? "This Week's Tasks"
+                : "Future Tasks"}
+            </h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {isLoading
+                ? "Loading..."
+                : `${orderedActiveTasks.length} ${
+                    orderedActiveTasks.length === 1 ? "task" : "tasks"
+                  }`}
+            </span>
+          </div>
 
-        {/* Active tasks search bar */}
-        <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={`Search ${
-                selectedType === "day"
-                  ? "today's"
-                  : selectedType === "week"
-                  ? "this week's"
-                  : "future"
-              } tasks...`}
-              value={activeSearchQuery}
-              onChange={(e) => {
-                setActiveSearchQuery(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.currentTarget.blur();
-                }
-              }}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
-            >
-              <path
-                fillRule="evenodd"
-                d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-                clipRule="evenodd"
+          {/* Active tasks search bar */}
+          <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Search ${
+                  selectedType === "day"
+                    ? "today's"
+                    : selectedType === "week"
+                    ? "this week's"
+                    : "future"
+                } tasks...`}
+                value={activeSearchQuery}
+                onChange={(e) => {
+                  setActiveSearchQuery(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-all"
               />
-            </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          </div>
+
+          <div className="p-5">
+            {isLoading ? (
+              <TasksSkeleton />
+            ) : (
+              <>
+                <TaskList
+                  tasks={orderedActiveTasks}
+                  onToggleComplete={handleToggleCompleteAndUpdateLocal}
+                  onDelete={handleDeleteAndUpdateLocal}
+                  onChangeTaskType={handleChangeTaskTypeAndUpdateLocal}
+                  onUpdateTitle={handleUpdateTitleAndUpdateLocal}
+                  droppableId={`active-tasks-${selectedType}`}
+                />
+                {orderedActiveTasks.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No active tasks
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      {activeSearchQuery
+                        ? "Try a different search term"
+                        : "Add a task to get started"}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-
-        <div className="p-5">
-          {isLoading ? (
-            <TasksSkeleton />
-          ) : (
-            <>
-              <TaskList
-                tasks={activeTasks}
-                onToggleComplete={handleToggleCompleteAndUpdateLocal}
-                onDelete={handleDeleteAndUpdateLocal}
-                onChangeTaskType={handleChangeTaskTypeAndUpdateLocal}
-                onUpdateTitle={handleUpdateTitleAndUpdateLocal}
-              />
-              {activeTasks.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No active tasks
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    {activeSearchQuery
-                      ? "Try a different search term"
-                      : "Add a task to get started"}
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      </DragDropContext>
 
       {/* Completed tasks section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
