@@ -162,7 +162,7 @@ const DailyTasks: React.FC = () => {
         .then(() => {
           // After successful update, refresh tasks to ensure everything is in sync
           // This helps capture other changes that might have happened
-          fetchTasks();
+          // fetchTasks(); // REMOVED: Rely on optimistic update
         })
         .catch((error) => {
           console.error("Failed to update task in database:", error);

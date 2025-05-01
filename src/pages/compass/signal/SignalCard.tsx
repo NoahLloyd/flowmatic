@@ -15,6 +15,7 @@ interface SignalCardProps {
   isHistoryLoading: boolean;
   goalValue?: number;
   onChange?: (value: number | boolean) => void;
+  isModalOpen?: boolean;
 }
 
 const SignalCard = ({
@@ -30,6 +31,7 @@ const SignalCard = ({
   isHistoryLoading,
   goalValue,
   onChange = () => {},
+  isModalOpen = false,
 }: SignalCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
@@ -71,6 +73,7 @@ const SignalCard = ({
   };
 
   const handleValueChange = (newValue: number | boolean) => {
+    if (isModalOpen) return;
     onChange(newValue);
     updateSignal(metric, newValue);
   };
@@ -95,8 +98,8 @@ const SignalCard = ({
     // Check if we have a goal value for comparison
     if (goalValue && label === "Minutes to Office") {
       if (minutes <= goalValue * 0.5) {
-        // Very fast - purple/indigo
-        return "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200";
+        // Very fast - purple/green
+        return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
       } else if (minutes <= goalValue) {
         // Good - green
         return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
@@ -117,7 +120,7 @@ const SignalCard = ({
 
     // Default colors if no goal is set
     if (minutes <= 15)
-      return "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200"; // Purple for excellent
+      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Purple for excellent
     if (minutes <= 30)
       return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Green for good
     if (minutes <= 45)
@@ -219,8 +222,8 @@ const SignalCard = ({
                 textColor = "text-green-700 dark:text-green-200";
               } else if (scaleValue === 5) {
                 // Use purple for highest value (mood, energy)
-                bgColor = "bg-indigo-100 dark:bg-indigo-900";
-                textColor = "text-indigo-700 dark:text-indigo-200";
+                bgColor = "bg-green-100 dark:bg-green-900";
+                textColor = "text-green-700 dark:text-green-200";
               }
             } else if (type === "number" || type === "water") {
               if (
@@ -231,9 +234,9 @@ const SignalCard = ({
                 // For Minutes to Office, lower is better (want to be under goal)
                 const value = day.value as number;
                 if (value <= goalValue * 0.5) {
-                  // Very fast - purple/indigo
-                  bgColor = "bg-indigo-100 dark:bg-indigo-900";
-                  textColor = "text-indigo-700 dark:text-indigo-200";
+                  // Very fast - purple/green
+                  bgColor = "bg-green-100 dark:bg-green-900";
+                  textColor = "text-green-700 dark:text-green-200";
                 } else if (value <= goalValue) {
                   // Good - green
                   bgColor = "bg-green-100 dark:bg-green-900";
@@ -259,9 +262,9 @@ const SignalCard = ({
                 // For other metrics with goals, higher is better (want to be over goal)
                 const value = day.value as number;
                 if (value >= goalValue * 1.5) {
-                  // Excellent - purple/indigo
-                  bgColor = "bg-indigo-100 dark:bg-indigo-900";
-                  textColor = "text-indigo-700 dark:text-indigo-200";
+                  // Excellent - purple/green
+                  bgColor = "bg-green-100 dark:bg-green-900";
+                  textColor = "text-green-700 dark:text-green-200";
                 } else if (value >= goalValue) {
                   // Good - green
                   bgColor = "bg-green-100 dark:bg-green-900";
@@ -330,14 +333,20 @@ const SignalCard = ({
         {options.map((option) => (
           <button
             key={option.value}
-            onClick={() => handleValueChange((value as number) + option.value)}
+            onClick={() => {
+              if (isModalOpen) return;
+              handleValueChange((value as number) + option.value);
+            }}
             className="py-1.5 px-3 rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
           >
             +{option.label}
           </button>
         ))}
         <div
-          onClick={() => setIsEditing(true)}
+          onClick={() => {
+            if (isModalOpen) return;
+            setIsEditing(true);
+          }}
           className="flex-1 text-center py-1.5 px-2 text-sm font-mono bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md cursor-pointer text-gray-800 dark:text-gray-200"
         >
           {isEditing ? (
@@ -347,6 +356,7 @@ const SignalCard = ({
               onChange={(e) => setTempValue(Number(e.target.value))}
               onKeyDown={handleKeyDown}
               onBlur={() => {
+                if (isModalOpen) return;
                 handleValueChange(Number(tempValue));
                 setIsEditing(false);
               }}
@@ -368,7 +378,7 @@ const SignalCard = ({
         2: "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200", // Lighter red
         3: "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200", // Yellow
         4: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200", // Green
-        5: "bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200", // Purple/indigo for highest
+        5: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200", // Purple/green for highest
       };
       return (
         colors[num as keyof typeof colors] ||
@@ -381,7 +391,10 @@ const SignalCard = ({
         {[1, 2, 3, 4, 5].map((num) => (
           <button
             key={num}
-            onClick={() => handleValueChange(num)}
+            onClick={() => {
+              if (isModalOpen) return;
+              handleValueChange(num);
+            }}
             className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
               value === num
                 ? getScaleColor(num)
@@ -398,7 +411,10 @@ const SignalCard = ({
   const renderNumber = () => {
     return (
       <div
-        onClick={() => setIsEditing(true)}
+        onClick={() => {
+          if (isModalOpen) return;
+          setIsEditing(true);
+        }}
         className={`w-full text-center py-1.5 px-2 text-sm font-medium rounded-md cursor-pointer ${
           isEditing
             ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-gray-200"
@@ -412,6 +428,7 @@ const SignalCard = ({
             onChange={(e) => setTempValue(Number(e.target.value))}
             onKeyDown={handleKeyDown}
             onBlur={() => {
+              if (isModalOpen) return;
               handleValueChange(Number(tempValue));
               setIsEditing(false);
             }}
@@ -438,7 +455,10 @@ const SignalCard = ({
 
       {type === "binary" ? (
         <button
-          onClick={() => handleValueChange(!value)}
+          onClick={() => {
+            if (isModalOpen) return;
+            handleValueChange(!value);
+          }}
           className={`w-full py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
             value
               ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"

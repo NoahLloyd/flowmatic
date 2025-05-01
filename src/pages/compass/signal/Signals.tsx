@@ -14,7 +14,11 @@ const SIGNAL_UNITS: Record<string, string> = {
   minutesToOffice: "min",
 };
 
-const Signals: React.FC = () => {
+interface SignalsProps {
+  isModalOpen?: boolean;
+}
+
+const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
   // Use the Signals context instead of local state
   const { signals, updateSignal, refreshSignals } = useSignals();
@@ -162,6 +166,7 @@ const Signals: React.FC = () => {
                 goalValue={getGoalForSignal(key)}
                 history={signalHistory[key] || []}
                 isHistoryLoading={isHistoryLoading}
+                isModalOpen={isModalOpen}
               />
             ))}
         </div>

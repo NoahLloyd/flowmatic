@@ -447,7 +447,7 @@ const Compass: React.FC<CompassProps> = ({
 
       {/* Signals Section - Added ref for keyboard shortcuts */}
       <div ref={signalsRef}>
-        <Signals />
+        <Signals isModalOpen={isModalOpen} />
       </div>
 
       {/* Timer and Sessions Section */}
