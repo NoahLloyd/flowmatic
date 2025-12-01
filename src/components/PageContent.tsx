@@ -10,6 +10,7 @@ import Notes from "../pages/notes/Notes";
 import { useTimer } from "../hooks/useTimer";
 import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
+import { useToast } from "../context/ToastContext";
 import { api } from "../utils/api";
 import { Session } from "../types/Session";
 import Auth from "../pages/auth/Auth";
@@ -20,6 +21,7 @@ import QuickAddNoteModal from "./note/QuickAddNoteModal";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
+  const { showToast } = useToast();
   // State for QuickAddTaskModal
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
   // State for QuickAddNoteModal
@@ -251,7 +253,12 @@ const PageContent = () => {
     title: string,
     type: "day" | "week" | "future"
   ) => {
-    await handleAddTask(title, type);
+    const success = await handleAddTask(title, type);
+    if (success) {
+      showToast("Task added", "success");
+    } else {
+      showToast("Failed to add task", "error");
+    }
     return Promise.resolve();
   };
 
@@ -259,6 +266,7 @@ const PageContent = () => {
   const handleQuickAddNote = async (content: string) => {
     try {
       await api.createNote({ content, tags: [] });
+      showToast("Note added", "success");
       // If we're on the Notes page, we might want to refresh the notes list
       if (selected === "Notes") {
         // This assumes your Notes component has a prop to trigger a refresh
@@ -267,6 +275,7 @@ const PageContent = () => {
       return Promise.resolve();
     } catch (error) {
       console.error("Failed to create note:", error);
+      showToast("Failed to add note", "error");
       return Promise.reject(error);
     }
   };

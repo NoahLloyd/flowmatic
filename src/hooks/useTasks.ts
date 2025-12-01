@@ -22,7 +22,7 @@ export const useTasks = () => {
     fetchTasks();
   }, []);
 
-  const handleAddTask = async (title: string, type: TaskType) => {
+  const handleAddTask = async (title: string, type: TaskType): Promise<boolean> => {
     try {
       const taskData: Omit<Task, "_id"> = {
         title,
@@ -34,40 +34,59 @@ export const useTasks = () => {
 
       const newTask = await api.createTask(taskData);
       setTasks((prev) => [newTask, ...prev]);
+      return true;
     } catch (error) {
       console.error("Failed to create task:", error);
+      return false;
     }
   };
 
-  const handleToggleComplete = async (id: string) => {
+  const handleToggleComplete = async (id: string, completed?: boolean): Promise<boolean> => {
     try {
-      const task = tasks.find((t) => t._id === id);
-      if (!task) return;
+      // If completed status is passed directly, use it; otherwise look up the task
+      let newCompletedStatus: boolean;
+      
+      if (completed !== undefined) {
+        // Caller is telling us what the new status should be
+        newCompletedStatus = completed;
+      } else {
+        // Fallback: look up in local state (may be out of sync)
+        const task = tasks.find((t) => t._id === id);
+        if (!task) {
+          console.error("Task not found in useTasks state:", id);
+          return false;
+        }
+        newCompletedStatus = !task.completed;
+      }
 
       const updates = {
-        completed: !task.completed,
-        completedAt: !task.completed ? new Date() : null,
+        completed: newCompletedStatus,
+        completedAt: newCompletedStatus ? new Date() : null,
       };
 
       await api.updateTask(id, updates);
       setTasks((prev) =>
         prev.map((task) => (task._id === id ? { ...task, ...updates } : task))
       );
+      return true;
     } catch (error) {
       console.error("Failed to update task:", error);
+      return false;
     }
   };
 
-  const handleDeleteTask = async (id: string) => {
+  const handleDeleteTask = async (id: string): Promise<boolean> => {
     try {
       await api.deleteTask(id);
       setTasks((prev) => prev.filter((task) => task._id !== id));
+      return true;
     } catch (error) {
       console.error("Failed to delete task:", error);
+      return false;
     }
   };
 
-  const handleChangeTaskType = async (id: string, newType: TaskType) => {
+  const handleChangeTaskType = async (id: string, newType: TaskType): Promise<boolean> => {
     try {
       await api.updateTask(id, { type: newType });
       setTasks((prev) =>
@@ -75,22 +94,26 @@ export const useTasks = () => {
           task._id === id ? { ...task, type: newType } : task
         )
       );
+      return true;
     } catch (error) {
       console.error("Failed to update task type:", error);
+      return false;
     }
   };
 
-  const handleUpdateTitle = async (id: string, newTitle: string) => {
+  const handleUpdateTitle = async (id: string, newTitle: string): Promise<boolean> => {
     try {
-      if (!newTitle.trim()) return; // Don't update if title is empty
+      if (!newTitle.trim()) return false; // Don't update if title is empty
       await api.updateTask(id, { title: newTitle });
       setTasks((prev) =>
         prev.map((task) =>
           task._id === id ? { ...task, title: newTitle } : task
         )
       );
+      return true;
     } catch (error) {
       console.error("Failed to update task title:", error);
+      return false;
     }
   };
 

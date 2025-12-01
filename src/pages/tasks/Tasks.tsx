@@ -6,6 +6,7 @@ import TaskTypeSelector from "./TaskTypeSelector";
 import CompletedTasks from "./CompletedTasks";
 import { api } from "../../utils/api";
 import { useNavigation } from "../../hooks/useNavigation";
+import { useToast } from "../../context/ToastContext";
 import {
   DragDropContext,
   Droppable,
@@ -72,11 +73,11 @@ const fetchTasks = async (fetchAll = false): Promise<Task[]> => {
 };
 
 interface TasksProps {
-  onAddTask: (title: string, type: TaskType) => void;
-  onToggleComplete: (id: string) => void;
-  onDelete: (id: string) => void;
-  onChangeTaskType: (id: string, newType: TaskType) => void;
-  onUpdateTitle: (id: string, title: string) => void;
+  onAddTask: (title: string, type: TaskType) => Promise<boolean>;
+  onToggleComplete: (id: string, completed?: boolean) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
+  onChangeTaskType: (id: string, newType: TaskType) => Promise<boolean>;
+  onUpdateTitle: (id: string, title: string) => Promise<boolean>;
 }
 
 const Tasks: React.FC<TasksProps> = ({
@@ -88,6 +89,7 @@ const Tasks: React.FC<TasksProps> = ({
 }) => {
   // Navigation state to detect when the Tasks page is opened
   const { selected } = useNavigation();
+  const { showToast } = useToast();
 
   // Task state
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -215,78 +217,126 @@ const Tasks: React.FC<TasksProps> = ({
 
   // Wrap the handler functions to update local state after actions
   const handleAddTaskAndUpdateLocal = async (title: string, type: TaskType) => {
-    try {
-      // Create task object similar to what the API would return
-      const newTask: Partial<Task> = {
-        title,
+    // Create task object similar to what the API would return
+    const newTask: Partial<Task> = {
+      title,
+      type,
+      completed: false,
+      completedAt: null,
+      createdAt: new Date(),
+    };
+
+    // Simulate the server response by adding a temporary ID
+    // This will be replaced when we reload the page
+    const tempId = `temp-${Date.now()}`;
+    const tempTask = { ...newTask, _id: tempId } as Task;
+
+    // Update local state immediately (optimistic update)
+    setTasks((prev) => [tempTask, ...prev]);
+
+    // Add new task ID to the beginning of the stored order
+    const currentOrder = getTaskOrderFromStorage(type) || [];
+    saveTaskOrderToStorage(type, [tempId, ...currentOrder]);
+
+    // Call the parent handler which will make the API call
+    const success = await onAddTask(title, type);
+
+    if (success) {
+      showToast("Task added", "success");
+    } else {
+      // Rollback on failure - remove the temp task
+      setTasks((prev) => prev.filter((t) => t._id !== tempId));
+      saveTaskOrderToStorage(
         type,
-        completed: false,
-        completedAt: null,
-        createdAt: new Date(),
-      };
-
-      // Call the parent handler which will make the API call
-      await onAddTask(title, type);
-
-      // Simulate the server response by adding a temporary ID
-      // This will be replaced when we reload the page
-      const tempId = `temp-${Date.now()}`;
-      const tempTask = { ...newTask, _id: tempId } as Task;
-
-      // Update local state immediately
-      setTasks((prev) => [tempTask, ...prev]);
-
-      // Add new task ID to the beginning of the stored order
-      const currentOrder = getTaskOrderFromStorage(type) || [];
-      saveTaskOrderToStorage(type, [tempId, ...currentOrder]);
-    } catch (error) {
-      console.error("Failed to add task:", error);
-      // In case of error, reload from server
-      loadTasks(loadAllCompleted);
+        currentOrder.filter((id) => id !== tempId)
+      );
+      showToast("Failed to add task", "error");
     }
   };
 
-  const handleToggleCompleteAndUpdateLocal = (id: string) => {
-    // Update local state immediately
+  const handleToggleCompleteAndUpdateLocal = async (id: string) => {
+    // Store the original state for potential rollback
+    const originalTask = tasks.find((t) => t._id === id);
+    if (!originalTask) return;
+
+    const wasCompleted = originalTask.completed;
+    const newCompletedStatus = !wasCompleted;
+
+    // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
         if (task._id === id) {
-          const completed = !task.completed;
           return {
             ...task,
-            completed,
-            completedAt: completed ? new Date() : null,
+            completed: newCompletedStatus,
+            completedAt: newCompletedStatus ? new Date() : null,
           };
         }
         return task;
       })
     );
 
-    // Call the parent handler which will make the API call
-    onToggleComplete(id);
+    // Call the parent handler with the new completed status directly
+    // This avoids the state sync issue between Tasks.tsx and useTasks.ts
+    const success = await onToggleComplete(id, newCompletedStatus);
+
+    if (success) {
+      showToast(wasCompleted ? "Task restored" : "Task completed", "success");
+    } else {
+      // Rollback on failure
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task._id === id) {
+            return {
+              ...task,
+              completed: wasCompleted,
+              completedAt: originalTask.completedAt,
+            };
+          }
+          return task;
+        })
+      );
+      showToast("Failed to update task", "error");
+    }
   };
 
-  const handleDeleteAndUpdateLocal = (id: string) => {
+  const handleDeleteAndUpdateLocal = async (id: string) => {
     const taskToDelete = tasks.find((t) => t._id === id);
     if (!taskToDelete) return;
 
-    // Update local state immediately
+    // Store original state for rollback
+    const originalTasks = [...tasks];
+    const originalOrder = !taskToDelete.completed
+      ? getTaskOrderFromStorage(taskToDelete.type)
+      : null;
+
+    // Update local state immediately (optimistic update)
     setTasks((prev) => prev.filter((task) => task._id !== id));
 
     // Remove task ID from stored order
-    if (!taskToDelete.completed) {
-      const currentOrder = getTaskOrderFromStorage(taskToDelete.type) || [];
+    if (!taskToDelete.completed && originalOrder) {
       saveTaskOrderToStorage(
         taskToDelete.type,
-        currentOrder.filter((taskId) => taskId !== id)
+        originalOrder.filter((taskId) => taskId !== id)
       );
     }
 
     // Call the parent handler which will make the API call
-    onDelete(id);
+    const success = await onDelete(id);
+
+    if (success) {
+      showToast("Task deleted", "success");
+    } else {
+      // Rollback on failure
+      setTasks(originalTasks);
+      if (originalOrder) {
+        saveTaskOrderToStorage(taskToDelete.type, originalOrder);
+      }
+      showToast("Failed to delete task", "error");
+    }
   };
 
-  const handleChangeTaskTypeAndUpdateLocal = (
+  const handleChangeTaskTypeAndUpdateLocal = async (
     id: string,
     newType: TaskType
   ) => {
@@ -295,7 +345,11 @@ const Tasks: React.FC<TasksProps> = ({
 
     const oldType = taskToChange.type;
 
-    // Update local state immediately
+    // Store original orders for rollback
+    const oldOrder = getTaskOrderFromStorage(oldType) || [];
+    const originalNewOrder = getTaskOrderFromStorage(newType) || [];
+
+    // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
         if (task._id === id) {
@@ -306,22 +360,42 @@ const Tasks: React.FC<TasksProps> = ({
     );
 
     // Remove from old order, add to new order
-    const oldOrder = getTaskOrderFromStorage(oldType) || [];
     saveTaskOrderToStorage(
       oldType,
       oldOrder.filter((taskId) => taskId !== id)
     );
 
-    const newOrder = getTaskOrderFromStorage(newType) || [];
     // Add to the beginning of the new list's order
-    saveTaskOrderToStorage(newType, [id, ...newOrder]);
+    saveTaskOrderToStorage(newType, [id, ...originalNewOrder]);
 
     // Call the parent handler which will make the API call
-    onChangeTaskType(id, newType);
+    const success = await onChangeTaskType(id, newType);
+
+    if (success) {
+      showToast("Task moved", "success");
+    } else {
+      // Rollback on failure
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task._id === id) {
+            return { ...task, type: oldType };
+          }
+          return task;
+        })
+      );
+      saveTaskOrderToStorage(oldType, oldOrder);
+      saveTaskOrderToStorage(newType, originalNewOrder);
+      showToast("Failed to move task", "error");
+    }
   };
 
-  const handleUpdateTitleAndUpdateLocal = (id: string, title: string) => {
-    // Update local state immediately
+  const handleUpdateTitleAndUpdateLocal = async (id: string, title: string) => {
+    const originalTask = tasks.find((t) => t._id === id);
+    if (!originalTask) return;
+
+    const originalTitle = originalTask.title;
+
+    // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
         if (task._id === id) {
@@ -332,7 +406,22 @@ const Tasks: React.FC<TasksProps> = ({
     );
 
     // Call the parent handler which will make the API call
-    onUpdateTitle(id, title);
+    const success = await onUpdateTitle(id, title);
+
+    if (success) {
+      showToast("Task updated", "success");
+    } else {
+      // Rollback on failure
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task._id === id) {
+            return { ...task, title: originalTitle };
+          }
+          return task;
+        })
+      );
+      showToast("Failed to update task", "error");
+    }
   };
 
   // Filter active tasks by selected type and search
