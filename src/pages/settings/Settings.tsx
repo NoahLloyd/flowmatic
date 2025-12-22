@@ -13,12 +13,16 @@ import {
   Calendar,
   BarChart,
   Globe,
+  ClipboardList,
+  Keyboard,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useTimezone } from "../../context/TimezoneContext";
 import MorningSettings from "../morning/MorningSettings";
 import WorkingHoursSettings from "./components/WorkingHoursSettings";
 import SignalSettings from "./components/SignalSettings";
+import ReviewSettings from "./components/ReviewSettings";
+import ShortcutSettings from "./components/ShortcutSettings";
 
 // List of common timezones
 const COMMON_TIMEZONES = [
@@ -198,6 +202,7 @@ const Settings = () => {
       const workingHoursSettings = (window as any).__workingHoursSettings || {};
       const signalSettings = (window as any).__signalSettings || {};
       const morningSettings = (window as any).__morningSettings || {};
+      const reviewSettings = (window as any).__reviewSettings || {};
 
       // Use the custom timezone if showing custom input
       const finalTimezone = showCustomTimezone ? customTimezone : timezone;
@@ -239,6 +244,14 @@ const Settings = () => {
         // Morning settings
         ...(morningSettings.weeklyMorningSchedule
           ? { weeklyMorningSchedule: morningSettings.weeklyMorningSchedule }
+          : {}),
+
+        // Review settings
+        ...(reviewSettings.reviewChecklistItems
+          ? { reviewChecklistItems: reviewSettings.reviewChecklistItems }
+          : {}),
+        ...(reviewSettings.reviewQuestions
+          ? { reviewQuestions: reviewSettings.reviewQuestions }
           : {}),
       };
 
@@ -623,6 +636,19 @@ const Settings = () => {
         </div>
       </div>
 
+      {/* Keyboard Shortcuts Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <Keyboard className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Keyboard Shortcuts
+          </h2>
+        </div>
+        <div className="p-5">
+          <ShortcutSettings />
+        </div>
+      </div>
+
       {/* Working Hours Goals Settings */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
         <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
@@ -662,6 +688,19 @@ const Settings = () => {
         </div>
       </div>
 
+      {/* Weekly Review Settings */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mt-6">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+          <ClipboardList className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+            Weekly Review
+          </h2>
+        </div>
+        <div className="p-5">
+          <ReviewSettings />
+        </div>
+      </div>
+
       {/* Coming Soon Section */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-5 mt-6">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center">
@@ -670,7 +709,6 @@ const Settings = () => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            "Customizable shortcuts",
             "Theme preferences",
             "Notification settings",
             "Integration with third-party services",

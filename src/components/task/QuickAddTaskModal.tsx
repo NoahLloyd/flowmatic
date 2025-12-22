@@ -5,13 +5,15 @@ import { X, ArrowRight, CheckCircle2 } from "lucide-react";
 interface QuickAddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (title: string, type: "day" | "week" | "future") => Promise<void>;
+  onAddTask: (title: string, type: "day" | "week" | "future" | "blocked") => Promise<void>;
+  onAddToReviewInbox: (item: string) => Promise<void>;
 }
 
 const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
   isOpen,
   onClose,
   onAddTask,
+  onAddToReviewInbox,
 }) => {
   const [taskTitle, setTaskTitle] = useState("");
   const [step, setStep] = useState<"input" | "type">("input");
@@ -72,6 +74,14 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
       // Add as future task
       onClose(); // Close immediately
       onAddTask(taskTitle, "future"); // Let it run in background
+    } else if (e.key.toLowerCase() === "b") {
+      // Add as blocked task
+      onClose(); // Close immediately
+      onAddTask(taskTitle, "blocked"); // Let it run in background
+    } else if (e.key.toLowerCase() === "r") {
+      // Add to review inbox
+      onClose(); // Close immediately
+      onAddToReviewInbox(taskTitle); // Let it run in background
     }
   };
 
@@ -199,6 +209,38 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
                       </kbd>
                     </div>
                     <span className="font-medium">Future Task</span>
+                  </button>
+
+                  {/* Blocked Task */}
+                  <button
+                    onClick={() => {
+                      onClose(); // Close immediately
+                      onAddTask(taskTitle, "blocked"); // Let it run in background
+                    }}
+                    className="w-full flex items-center p-3 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mr-3">
+                      <kbd className="inline-flex items-center justify-center w-7 h-7 rounded border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 font-mono text-gray-800 dark:text-gray-200">
+                        B
+                      </kbd>
+                    </div>
+                    <span className="font-medium">Blocked Task</span>
+                  </button>
+
+                  {/* Review Inbox */}
+                  <button
+                    onClick={() => {
+                      onClose(); // Close immediately
+                      onAddToReviewInbox(taskTitle); // Let it run in background
+                    }}
+                    className="w-full flex items-center p-3 text-sm rounded-md border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mr-3">
+                      <kbd className="inline-flex items-center justify-center w-7 h-7 rounded border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 font-mono text-gray-800 dark:text-gray-200">
+                        R
+                      </kbd>
+                    </div>
+                    <span className="font-medium">Review Inbox</span>
                   </button>
                 </div>
 

@@ -3,10 +3,11 @@ import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
 import Tasks from "../pages/tasks/Tasks";
-import Insights from "../pages/insights/insights";
+import Insights from "../pages/insights/Insights";
 import Settings from "../pages/settings/Settings";
 import Morning from "../pages/morning/Morning";
 import Notes from "../pages/notes/Notes";
+import Review from "../pages/review/Review";
 import { useTimer } from "../hooks/useTimer";
 import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
@@ -18,6 +19,9 @@ import { useAuth } from "../context/AuthContext";
 import Documents from "../pages/documents/Documents";
 import QuickAddTaskModal from "./task/QuickAddTaskModal";
 import QuickAddNoteModal from "./note/QuickAddNoteModal";
+import GlobalQuickAddTask from "./global/GlobalQuickAddTask";
+import GlobalQuickAddNote from "./global/GlobalQuickAddNote";
+import { dispatchTaskAdded } from "../utils/taskEvents";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
@@ -26,6 +30,11 @@ const PageContent = () => {
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
   // State for QuickAddNoteModal
   const [isQuickAddNoteModalOpen, setIsQuickAddNoteModalOpen] = useState(false);
+  // State for Global Quick Add modals (triggered by global shortcuts)
+  const [isGlobalQuickAddTaskOpen, setIsGlobalQuickAddTaskOpen] =
+    useState(false);
+  const [isGlobalQuickAddNoteOpen, setIsGlobalQuickAddNoteOpen] =
+    useState(false);
 
   // Create a direct navigation function
   const directNavigate = useCallback(
@@ -34,6 +43,51 @@ const PageContent = () => {
     },
     [setSelected]
   );
+
+  // Set up IPC listeners for global shortcuts and overlay events
+  useEffect(() => {
+    const handleGlobalQuickAddTask = () => {
+      setIsGlobalQuickAddTaskOpen(true);
+    };
+
+    const handleGlobalQuickAddNote = () => {
+      setIsGlobalQuickAddNoteOpen(true);
+    };
+
+    // Handle tasks added from the overlay window
+    const handleTaskAddedFromOverlay = (task: any) => {
+      // Dispatch event so task lists update
+      dispatchTaskAdded(task);
+      showToast("Daily task added", "success");
+    };
+
+    // Register listeners
+    if (window.electron?.on) {
+      window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
+      window.electron.on("global-quick-add-note", handleGlobalQuickAddNote);
+      window.electron.on("task-added-from-overlay", handleTaskAddedFromOverlay);
+    }
+
+    // Cleanup listeners on unmount
+    return () => {
+      // Cast to any to access removeListener which is available at runtime
+      const electron = window.electron as any;
+      if (electron?.removeListener) {
+        electron.removeListener(
+          "global-quick-add-task",
+          handleGlobalQuickAddTask
+        );
+        electron.removeListener(
+          "global-quick-add-note",
+          handleGlobalQuickAddNote
+        );
+        electron.removeListener(
+          "task-added-from-overlay",
+          handleTaskAddedFromOverlay
+        );
+      }
+    };
+  }, [showToast]);
 
   // Add keyboard handler for global navigation
   useEffect(() => {
@@ -49,8 +103,12 @@ const PageContent = () => {
         return;
       }
 
-      // Global "a" key to open quick add task modal
+      // Global "a" key to open quick add task modal (except on Tasks page where it focuses the input)
       if (e.key === "a" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen) {
+        // On Tasks page, let the AddTaskForm handle the 'a' key to focus its input
+        if (selected === "Tasks") {
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         setIsQuickAddModalOpen(true);
@@ -138,7 +196,7 @@ const PageContent = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [isQuickAddModalOpen, isQuickAddNoteModalOpen]);
+  }, [isQuickAddModalOpen, isQuickAddNoteModalOpen, selected]);
 
   const {
     timeRemaining: time,
@@ -181,6 +239,9 @@ const PageContent = () => {
       setIsLoadingSessions(true);
       const response = await api.getUserSessions();
       setSessions(response);
+
+      // Dispatch event to notify other components (like SignalsContext) that sessions have been updated
+      window.dispatchEvent(new CustomEvent("sessionCreated"));
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
       if (error.response?.status === 401) {
@@ -251,13 +312,26 @@ const PageContent = () => {
   // Handle adding a task from the quick add modal
   const handleQuickAddTask = async (
     title: string,
-    type: "day" | "week" | "future"
+    type: "day" | "week" | "future" | "blocked"
   ) => {
-    const success = await handleAddTask(title, type);
-    if (success) {
+    const createdTask = await handleAddTask(title, type);
+    if (createdTask) {
+      // Dispatch event so other components (Tasks, DailyTasks, BlockedTasks) can update
+      dispatchTaskAdded(createdTask);
       showToast("Task added", "success");
     } else {
       showToast("Failed to add task", "error");
+    }
+    return Promise.resolve();
+  };
+
+  // Handle adding to review inbox from the quick add modal
+  const handleAddToReviewInbox = async (item: string) => {
+    const success = await api.addToReviewInbox(item);
+    if (success) {
+      showToast("Added to review inbox", "success");
+    } else {
+      showToast("Failed to add to inbox", "error");
     }
     return Promise.resolve();
   };
@@ -272,6 +346,32 @@ const PageContent = () => {
         // This assumes your Notes component has a prop to trigger a refresh
         // You might need to add this functionality
       }
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Failed to create note:", error);
+      showToast("Failed to add note", "error");
+      return Promise.reject(error);
+    }
+  };
+
+  // Handle adding a daily task from the global quick add (adds directly as daily task)
+  const handleGlobalQuickAddTask = async (title: string) => {
+    const createdTask = await handleAddTask(title, "day");
+    if (createdTask) {
+      // Dispatch event so other components (Tasks, DailyTasks) can update
+      dispatchTaskAdded(createdTask);
+      showToast("Daily task added", "success");
+    } else {
+      showToast("Failed to add task", "error");
+    }
+    return Promise.resolve();
+  };
+
+  // Handle adding a note from the global quick add
+  const handleGlobalQuickAddNote = async (content: string) => {
+    try {
+      await api.createNote({ content, tags: [] });
+      showToast("Note added", "success");
       return Promise.resolve();
     } catch (error) {
       console.error("Failed to create note:", error);
@@ -334,10 +434,11 @@ const PageContent = () => {
       case "Morning":
         content = <Morning />;
         break;
+      case "Review":
+        content = <Review />;
+        break;
       case "Insights":
-        content = (
-          <Insights sessions={sessions} isLoadingSessions={isLoadingSessions} />
-        );
+        content = <Insights />;
         break;
       case "Friends":
         content = <Friends />;
@@ -361,11 +462,23 @@ const PageContent = () => {
         isOpen={isQuickAddModalOpen}
         onClose={() => setIsQuickAddModalOpen(false)}
         onAddTask={handleQuickAddTask}
+        onAddToReviewInbox={handleAddToReviewInbox}
       />
       <QuickAddNoteModal
         isOpen={isQuickAddNoteModalOpen}
         onClose={() => setIsQuickAddNoteModalOpen(false)}
         onAddNote={handleQuickAddNote}
+      />
+      {/* Global Quick Add Modals (triggered by global shortcuts) */}
+      <GlobalQuickAddTask
+        isOpen={isGlobalQuickAddTaskOpen}
+        onClose={() => setIsGlobalQuickAddTaskOpen(false)}
+        onAddTask={handleGlobalQuickAddTask}
+      />
+      <GlobalQuickAddNote
+        isOpen={isGlobalQuickAddNoteOpen}
+        onClose={() => setIsGlobalQuickAddNoteOpen(false)}
+        onAddNote={handleGlobalQuickAddNote}
       />
     </Layout>
   );

@@ -1,10 +1,3 @@
-import { IpcRenderer } from "electron";
-
-declare global {
-  interface Window {
-    electron: {
-      send: (channel: string, data?: any) => void;
-      on: (channel: string, func: (...args: any[]) => void) => void;
-    };
-  }
-}
+// Types are defined in renderer.d.ts
+// This file is kept for backwards compatibility
+export {};

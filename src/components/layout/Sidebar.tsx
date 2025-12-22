@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import SidebarItem from "./SidebarItem";
 import SidebarScoreCard from "./SidebarScoreCard";
 import {
-  Users,
   Settings,
   Sunrise,
   Check,
@@ -12,11 +11,10 @@ import {
   User,
   Moon,
   Sun,
+  Monitor,
   StickyNote,
   BookOpen,
-  Trophy,
-  Flame,
-  Activity,
+  ClipboardList,
 } from "lucide-react";
 import logoImage from "../../assets/logo-black-Template.png";
 import logoDarkImage from "../../assets/logo-white-Template.png";
@@ -24,8 +22,6 @@ import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import SidebarTimer from "./SidebarTimer";
 import { api } from "../../utils/api";
-import { Session } from "../../types/Session";
-import { AVAILABLE_SIGNALS } from "../../pages/settings/components/SignalSettings";
 import { useSignals } from "../../context/SignalsContext";
 import { useTimezone } from "../../context/TimezoneContext";
 
@@ -46,14 +42,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   title,
   timerProps,
 }) => {
-  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { isDarkMode, themeMode, setThemeMode } = useTheme();
+  const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+  const themeDropdownRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const [hoursToday, setHoursToday] = useState(0);
-  const [dailyGoal, setDailyGoal] = useState(4); // Default 4 hours
-  const [streak, setStreak] = useState(0);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  // For testing: set to true to simulate under 4 hours
-  const [testUnderFourHours, setTestUnderFourHours] = useState(false);
+
+  // Weekly review completion state for indicator
+  // Default to true (completed) so we don't show red while loading
+  const [isReviewCompleted, setIsReviewCompleted] = useState(true);
+  const [isReviewStatusLoaded, setIsReviewStatusLoaded] = useState(false);
+  const [currentDayOfWeek, setCurrentDayOfWeek] = useState(-1); // -1 = not loaded yet
 
   // Use the SignalsContext instead of local state for signals
   const { signals, signalScore, totalSignals, completedSignals, updateSignal } =
@@ -68,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { label: "Compass", icon: Compass },
     { label: "Tasks", icon: Check },
     { label: "Morning", icon: Sunrise },
+    { label: "Review", icon: ClipboardList },
     { label: "Notes", icon: StickyNote },
     { label: "Documents", icon: BookOpen },
     { label: "Insights", icon: BarChart2 },
@@ -79,304 +78,90 @@ const Sidebar: React.FC<SidebarProps> = ({
     Compass: "c",
     Tasks: "t",
     Morning: "m",
+    Review: "r",
     Notes: "n",
     Documents: "d",
     Insights: "i",
     Settings: "s",
   };
 
-  // Get date in user's timezone
-  const getDateInUserTimezone = (date: Date) => {
-    try {
-      // Get the date string in the user's timezone
-      const dateInTZ = new Date(
-        date.toLocaleString("en-US", { timeZone: timezone })
-      );
-
-      // Create a fixed offset to compensate for the timezone difference
-      const utcDate = new Date(date.toISOString());
-      const tzOffset = utcDate.getTime() - dateInTZ.getTime();
-
-      // Apply the offset to get the correct date in user's timezone
-      return new Date(date.getTime() - tzOffset);
-    } catch (error) {
-      console.error("Error formatting date with timezone:", error);
-      return date; // Fallback to original date
-    }
-  };
-
-  // Get today's date string in user's timezone (YYYY-MM-DD)
-  const getTodayStringInUserTimezone = () => {
-    try {
-      const now = new Date();
-      const todayInUserTZ = getDateInUserTimezone(now);
-      return todayInUserTZ.toISOString().split("T")[0];
-    } catch (error) {
-      console.error("Error getting today's date string:", error);
-      return new Date().toISOString().split("T")[0]; // Fallback
-    }
-  };
-
-  // Modified to use timezone-aware date
-  const getDailyGoal = (date: Date = new Date()) => {
-    // Get the day of week in user's timezone
-    const dateInUserTZ = getDateInUserTimezone(date);
-    const day = dateInUserTZ.getDay();
-
-    // Convert to our day format (monday, tuesday, etc.)
-    const dayNames = [
-      "sunday",
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ];
-    const dayName = dayNames[day];
-
-    // Check if user has preferences set
-    if (
-      user?.preferences?.dailyHoursGoals &&
-      dayName in user.preferences.dailyHoursGoals
-    ) {
-      return user.preferences.dailyHoursGoals[dayName];
-    }
-    return 4; // Default if not set
-  };
-
-  // Use timezone-aware date string for today
-  const todayString = getTodayStringInUserTimezone();
-
-  // Calculate the current streak
-  const calculateStreak = (allSessions: Session[]) => {
-    if (!allSessions.length) return 0;
-
-    // Sort sessions by date (newest first)
-    const sortedSessions = [...allSessions].sort((a, b) => {
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    });
-
-    // Group sessions by day
-    const sessionsByDay: Record<string, Session[]> = {};
-    sortedSessions.forEach((session) => {
-      try {
-        // Get date in user's timezone in a consistent format
-        const rawDate = new Date(session.created_at);
-        const dateStr = rawDate.toLocaleString("en-US", {
-          timeZone: timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        });
-
-        if (!sessionsByDay[dateStr]) {
-          sessionsByDay[dateStr] = [];
-        }
-        sessionsByDay[dateStr].push(session);
-      } catch (error) {
-        console.error("Error grouping session by day:", error);
-        // Fallback to previous method
-        const sessionDate = getDateInUserTimezone(new Date(session.created_at));
-        const date = sessionDate.toISOString().split("T")[0];
-        if (!sessionsByDay[date]) {
-          sessionsByDay[date] = [];
-        }
-        sessionsByDay[date].push(session);
-      }
-    });
-
-    // Get sorted unique dates
-    const dates = Object.keys(sessionsByDay).sort().reverse();
-    if (!dates.length) return 0;
-
-    // Check if each day met the goal
-    let currentStreak = 0;
-
-    // Get today's date in user's timezone in the same format as session grouping
-    const now = new Date();
-    const today = now.toLocaleString("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-
-    // Start from today or the most recent date with sessions
-    let currentDate = today;
-    const mostRecentDate = dates[0];
-
-    // If today has no sessions yet but yesterday did and met the goal, we still count the streak
-    if (!sessionsByDay[today] && dates[0] !== today) {
-      // Calculate yesterday's date in user's timezone
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toLocaleString("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      });
-
-      if (mostRecentDate === yesterdayStr) {
-        currentDate = yesterdayStr;
-      }
-    }
-
-    // Start checking from the current date backwards
-    while (true) {
-      const dateObj = new Date(currentDate);
-      const sessionsOnDay = sessionsByDay[currentDate] || [];
-
-      if (sessionsOnDay.length === 0) {
-        // No sessions on this day, streak ends
-        break;
-      }
-
-      // Calculate total hours for this day
-      const hoursOnDay = sessionsOnDay.reduce(
-        (total, session) => total + session.minutes / 60,
-        0
-      );
-
-      // Get the goal for this specific day
-      const goalForDay = getDailyGoal(dateObj);
-
-      if (hoursOnDay >= goalForDay) {
-        // Goal met, continue streak
-        currentStreak++;
-      } else {
-        // Goal not met, streak ends
-        break;
-      }
-
-      // Move to the previous day
-      dateObj.setDate(dateObj.getDate() - 1);
-      currentDate = dateObj.toISOString().split("T")[0];
-    }
-
-    return currentStreak;
-  };
-
-  // Toggle test mode for displaying under 4 hours
-  const toggleTestMode = () => {
-    setTestUnderFourHours(!testUnderFourHours);
-  };
-
-  // Fetch sessions and calculate hours today
+  // Fetch weekly review status and update day of week for indicator
   useEffect(() => {
-    const fetchSessions = async () => {
+    const checkReviewStatus = async () => {
       if (!user) return;
 
       try {
-        // Fetch all sessions for the user
-        const fetchedSessions = await api.getUserSessions();
-        // Explicitly cast the response to Session[] to help TypeScript
-        const allSessions = fetchedSessions as Session[];
-        setSessions(allSessions);
-
-        // Calculate streak
-        const currentStreak = calculateStreak(allSessions);
-        setStreak(currentStreak);
-
-        // ----- Calculate today's hours exactly as SessionStats does -----
-        // Set to start of today
-        const today = new Date().toISOString().split("T")[0];
-        const todayInTZ = getTodayStringInUserTimezone();
-
-        console.log("Timezone debugging:");
-        console.log("- Current timezone:", timezone);
-        console.log("- Raw today:", today);
-        console.log("- Today in user timezone:", todayInTZ);
-
-        // Log the last few sessions to debug
-        const recentSessions = [...allSessions]
-          .sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-          )
-          .slice(0, 3);
-
-        recentSessions.forEach((session, i) => {
-          const rawDate = new Date(session.created_at);
-          const tzDate = getDateInUserTimezone(rawDate);
-          console.log(`- Session ${i}:`);
-          console.log(`  * Raw date: ${rawDate.toISOString()}`);
-          console.log(`  * TZ date: ${tzDate.toISOString()}`);
-          console.log(
-            `  * TZ date string: ${tzDate.toISOString().split("T")[0]}`
-          );
-          console.log(
-            `  * Included in today: ${
-              tzDate.toISOString().split("T")[0] === todayInTZ
-            }`
-          );
-        });
-
-        // Filter sessions for today (using same filter logic as SessionStats)
-        const todaySessions = allSessions.filter((session) => {
-          try {
-            // Convert the session date to the user's timezone
-            const rawDate = new Date(session.created_at);
-
-            // Create a date string in the user's timezone format
-            const sessionDateStr = rawDate.toLocaleString("en-US", {
-              timeZone: timezone,
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-            });
-
-            // Create today's date string in the same format
-            const now = new Date();
-            const todayDateStr = now.toLocaleString("en-US", {
-              timeZone: timezone,
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-            });
-
-            // Compare the date strings directly
-            return sessionDateStr === todayDateStr;
-          } catch (error) {
-            console.error("Error filtering session date:", error);
-            // Fallback to the previous approach
-            const sessionDate = getDateInUserTimezone(
-              new Date(session.created_at)
-            );
-            return sessionDate.toISOString().split("T")[0] === todayInTZ;
-          }
-        });
-
-        console.log("- Today's sessions count:", todaySessions.length);
-
-        // Calculate hours using same reducer logic as SessionStats
-        const hours = todaySessions.reduce(
-          (acc, session) => acc + session.minutes / 60,
-          0
+        // Get current day of week in user's timezone
+        const now = new Date();
+        const dateInTZ = new Date(
+          now.toLocaleString("en-US", { timeZone: timezone })
         );
+        const day = dateInTZ.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, etc.
+        setCurrentDayOfWeek(day);
 
-        console.log("- Hours today:", hours);
+        // Calculate current review week start (Wednesday).
+        // Week runs Wed-Tue, so Mon/Tue belong to the previous week.
+        let daysToSubtract;
+        if (day >= 3) {
+          // Wed-Sat: subtract day-3 to get to Wed
+          daysToSubtract = day - 3;
+        } else {
+          // Sun-Tue: subtract day+4 to get to previous Wed
+          daysToSubtract = day + 4;
+        }
 
-        setHoursToday(hours);
+        const weekWednesday = new Date(dateInTZ);
+        weekWednesday.setDate(dateInTZ.getDate() - daysToSubtract);
+        const weekStart = weekWednesday.toISOString().split("T")[0];
 
-        // Update daily goal
-        setDailyGoal(getDailyGoal());
+        // Review is considered "done" only if it exists AND is marked completed.
+        const review = await api.getWeeklyReview(weekStart);
+        setIsReviewCompleted(Boolean(review?.is_completed));
+        setIsReviewStatusLoaded(true);
       } catch (error) {
-        console.error("Failed to fetch sessions:", error);
+        console.error("Failed to fetch review status:", error);
+        // On error, don't show red (assume completed to avoid false alarms)
+        setIsReviewCompleted(true);
+        setIsReviewStatusLoaded(true);
       }
     };
 
-    fetchSessions();
+    checkReviewStatus();
 
-    // Set up interval to refresh the data every 5 minutes
-    const interval = setInterval(fetchSessions, 5 * 60 * 1000);
+    // Refresh every hour to catch day changes
+    const interval = setInterval(checkReviewStatus, 60 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    // Also refresh immediately when the review is saved/completed
+    const onReviewUpdated = () => {
+      checkReviewStatus();
+    };
+    window.addEventListener("weekly-review-updated", onReviewUpdated);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("weekly-review-updated", onReviewUpdated);
+    };
   }, [user, timezone]);
+
+  // Determine review highlight status
+  // Red on Sat, Sun, Mon, Tue if the current Wed–Tue review is not completed
+  // Only show indicator after status has loaded (default to none while loading)
+  const getReviewHighlight = (): "none" | "warning" | "urgent" => {
+    // Don't show red while loading or if review is completed
+    if (!isReviewStatusLoaded || isReviewCompleted) return "none";
+
+    // Show red on Sat(6), Sun(0), Mon(1), Tue(2) if review not completed
+    if (
+      currentDayOfWeek === 6 ||
+      currentDayOfWeek === 0 ||
+      currentDayOfWeek === 1 ||
+      currentDayOfWeek === 2
+    ) {
+      return "urgent";
+    }
+
+    return "none";
+  };
 
   // Add keyboard shortcut handlers
   useEffect(() => {
@@ -405,17 +190,32 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [onSelect]);
 
-  // Get display hours (either real or test mode)
-  const displayHours = testUnderFourHours ? 2.5 : hoursToday;
+  // Close theme dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        themeDropdownRef.current &&
+        !themeDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsThemeDropdownOpen(false);
+      }
+    };
 
-  // Calculate progress percentage - don't cap it for internal calculations
-  const rawProgressPercentage = Math.round((displayHours / dailyGoal) * 100);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
-  // For display, cap at 100%
-  const progressPercentage = Math.min(rawProgressPercentage, 100);
+  const themeOptions = [
+    { value: "light" as const, label: "Light", icon: Sun },
+    { value: "dark" as const, label: "Dark", icon: Moon },
+    { value: "system" as const, label: "System", icon: Monitor },
+  ];
 
-  // Determine if we exceeded the goal - now requires exactly meeting or exceeding the goal
-  const exceededGoal = displayHours >= dailyGoal;
+  const currentThemeOption =
+    themeOptions.find((opt) => opt.value === themeMode) || themeOptions[2];
+  const CurrentThemeIcon = currentThemeOption.icon;
 
   return (
     <div className="w-64 flex flex-col pr-4 space-y-4">
@@ -430,16 +230,43 @@ const Sidebar: React.FC<SidebarProps> = ({
             Flowmatic
           </h1>
         </div>
-        <button
-          onClick={toggleDarkMode}
-          className="p-2 rounded-lg hover:bg-slate-200/20 dark:hover:bg-slate-700/30 transition-colors"
-        >
-          {isDarkMode ? (
-            <Sun className="w-5 h-5 text-slate-200" />
-          ) : (
-            <Moon className="w-5 h-5 text-slate-600" />
+
+        {/* Theme Dropdown */}
+        <div className="relative" ref={themeDropdownRef}>
+          <button
+            onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+            className="p-2 rounded-lg hover:bg-slate-200/20 dark:hover:bg-slate-700/30 transition-colors"
+          >
+            <CurrentThemeIcon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+          </button>
+
+          {isThemeDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-36 py-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50">
+              {themeOptions.map((option) => {
+                const Icon = option.icon;
+                const isActive = themeMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setThemeMode(option.value);
+                      setIsThemeDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 flex items-center gap-3 text-left text-sm transition-colors ${
+                      isActive
+                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{option.label}</span>
+                    {isActive && <Check className="w-4 h-4 ml-auto" />}
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </button>
+        </div>
       </div>
 
       {icons.map((icon) => (
@@ -449,6 +276,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           label={icon.label}
           isSelected={selected === icon.label}
           onSelect={onSelect}
+          highlight={icon.label === "Review" ? getReviewHighlight() : "none"}
         />
       ))}
 
@@ -472,30 +300,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         exceededGoal={signalScore >= 80}
         showTrophy={signalScore >= 80}
         onClick={() => onSelect("Compass")}
-      />
-
-      {/* Hours Today Visualization */}
-      <SidebarScoreCard
-        title="Hours"
-        value={displayHours.toFixed(1)}
-        suffix="h"
-        goal={dailyGoal}
-        percentage={rawProgressPercentage}
-        exceededGoal={exceededGoal}
-        showTrophy={exceededGoal}
-        onClick={() => onSelect("Compass")}
-        extraDisplay={
-          exceededGoal ? ` (+${(displayHours - dailyGoal).toFixed(1)}h)` : ""
-        }
-        progressColor={
-          exceededGoal
-            ? "green"
-            : progressPercentage >= 75
-            ? "blue"
-            : progressPercentage >= 50
-            ? "yellow"
-            : "red"
-        }
       />
 
       <div

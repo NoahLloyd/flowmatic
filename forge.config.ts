@@ -43,6 +43,14 @@ const config: ForgeConfig = {
               js: "./src/preload.ts",
             },
           },
+          {
+            html: "./src/overlay.html",
+            js: "./src/overlayRenderer.ts",
+            name: "overlay_window",
+            preload: {
+              js: "./src/overlayPreload.ts",
+            },
+          },
         ],
       },
     }),

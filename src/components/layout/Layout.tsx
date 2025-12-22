@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import { useTheme } from "../../context/ThemeContext";
 import SidebarTimer from "./SidebarTimer";
@@ -14,6 +14,7 @@ type LayoutProps = {
 const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // Theme-based default colors for dark/light mode
   const defaultLightFromColor = "#E8CBC0";
@@ -81,6 +82,33 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     };
   }, [synchronizeTimerState]);
 
+  // Focus mode keyboard shortcut (backslash to toggle)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if focused on input elements
+      if (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement ||
+        document.activeElement instanceof HTMLSelectElement ||
+        (document.activeElement &&
+          document.activeElement.hasAttribute("contenteditable"))
+      ) {
+        return;
+      }
+
+      // Toggle focus mode with backslash
+      if (e.key === "\\") {
+        e.preventDefault();
+        setIsFocusMode((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   // Determine if we should show the timer in the sidebar
   // - Show only if timer is actually running (not paused)
   // - And either 1) showInSidebar flag is true, or 2) not on Compass page with active timer
@@ -105,34 +133,50 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
 
   return (
     <div
-      style={{
-        background: `linear-gradient(to bottom right, ${fromColor}, ${toColor})`,
-      }}
-      className="flex h-screen p-4"
+      style={
+        isFocusMode
+          ? { background: isDarkMode ? "#0f172a" : "#ffffff" }
+          : {
+              background: `linear-gradient(to bottom right, ${fromColor}, ${toColor})`,
+            }
+      }
+      className={`flex h-screen overflow-hidden transition-all duration-300 ${
+        isFocusMode ? "p-0" : "p-4"
+      }`}
     >
       {/* Sidebar with timer and title */}
-      <Sidebar
-        title="User"
-        selected={selected}
-        onSelect={setSelected}
-        timerProps={
-          displaySidebarTimer
-            ? {
-                isVisible: true,
-                time: isBreakMode ? breakTimeRemaining : timeRemaining,
-                isBreakTimer: isBreakMode,
-              }
-            : undefined
-        }
-      />
+      {!isFocusMode && (
+        <Sidebar
+          title="User"
+          selected={selected}
+          onSelect={setSelected}
+          timerProps={
+            displaySidebarTimer
+              ? {
+                  isVisible: true,
+                  time: isBreakMode ? breakTimeRemaining : timeRemaining,
+                  isBreakTimer: isBreakMode,
+                }
+              : undefined
+          }
+        />
+      )}
 
       {/* Main content area */}
       <div
-        className={`flex-1 ${
+        className={`flex-1 flex flex-col min-h-0 overflow-hidden ${
           isDarkMode ? "bg-slate-900" : "bg-white"
-        } rounded-xl overflow-auto p-6 shadow-lg`}
+        } transition-all duration-300 ${
+          isFocusMode ? "rounded-none" : "rounded-xl shadow-lg"
+        }`}
       >
-        {children}
+        <div
+          className={`flex-1 min-h-0 flex flex-col overflow-auto ${
+            isFocusMode ? "p-8" : "p-6"
+          }`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

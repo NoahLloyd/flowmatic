@@ -13,6 +13,7 @@ import {
   Draggable,
   DropResult,
 } from "react-beautiful-dnd";
+import { subscribeToTaskAdded } from "../../utils/taskEvents";
 
 /**
  * Ideal API Endpoints for Tasks:
@@ -73,7 +74,7 @@ const fetchTasks = async (fetchAll = false): Promise<Task[]> => {
 };
 
 interface TasksProps {
-  onAddTask: (title: string, type: TaskType) => Promise<boolean>;
+  onAddTask: (title: string, type: TaskType) => Promise<Task | null>;
   onToggleComplete: (id: string, completed?: boolean) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
   onChangeTaskType: (id: string, newType: TaskType) => Promise<boolean>;
@@ -137,6 +138,7 @@ const Tasks: React.FC<TasksProps> = ({
       const taskOrderDay = getTaskOrderFromStorage("day");
       const taskOrderWeek = getTaskOrderFromStorage("week");
       const taskOrderFuture = getTaskOrderFromStorage("future");
+      const taskOrderBlocked = getTaskOrderFromStorage("blocked");
 
       const applyOrder = (type: TaskType, order: string[] | null) => {
         if (order) {
@@ -167,6 +169,7 @@ const Tasks: React.FC<TasksProps> = ({
       let tempTasks = applyOrder("day", taskOrderDay);
       tempTasks = applyOrder("week", taskOrderWeek);
       tempTasks = applyOrder("future", taskOrderFuture);
+      tempTasks = applyOrder("blocked", taskOrderBlocked);
 
       setTasks(tempTasks);
       setTasksLoaded(true);
@@ -190,6 +193,27 @@ const Tasks: React.FC<TasksProps> = ({
       loadTasks(true);
     }
   }, [completedSearchQuery, loadTasks, tasksLoaded, loadAllCompleted]);
+
+  // Listen for tasks added via quick add modals (from other pages)
+  useEffect(() => {
+    const unsubscribe = subscribeToTaskAdded((newTask) => {
+      // Add the task to local state
+      setTasks((prev) => {
+        // Check if task already exists (avoid duplicates)
+        if (prev.some((t) => t._id === newTask._id)) {
+          return prev;
+        }
+        return [newTask, ...prev];
+      });
+      // Add to stored order for the task's type
+      const currentOrder = getTaskOrderFromStorage(newTask.type) || [];
+      if (!currentOrder.includes(newTask._id)) {
+        saveTaskOrderToStorage(newTask.type, [newTask._id, ...currentOrder]);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   // Handle scroll to load more
   useEffect(() => {
@@ -217,31 +241,39 @@ const Tasks: React.FC<TasksProps> = ({
 
   // Wrap the handler functions to update local state after actions
   const handleAddTaskAndUpdateLocal = async (title: string, type: TaskType) => {
-    // Create task object similar to what the API would return
-    const newTask: Partial<Task> = {
-      title,
-      type,
-      completed: false,
-      completedAt: null,
-      createdAt: new Date(),
-    };
+      // Create task object similar to what the API would return
+      const newTask: Partial<Task> = {
+        title,
+        type,
+        completed: false,
+        completedAt: null,
+        createdAt: new Date(),
+      };
 
-    // Simulate the server response by adding a temporary ID
-    // This will be replaced when we reload the page
-    const tempId = `temp-${Date.now()}`;
-    const tempTask = { ...newTask, _id: tempId } as Task;
+      // Simulate the server response by adding a temporary ID
+      // This will be replaced once the API call completes
+      const tempId = `temp-${Date.now()}`;
+      const tempTask = { ...newTask, _id: tempId } as Task;
 
     // Update local state immediately (optimistic update)
-    setTasks((prev) => [tempTask, ...prev]);
+      setTasks((prev) => [tempTask, ...prev]);
 
-    // Add new task ID to the beginning of the stored order
-    const currentOrder = getTaskOrderFromStorage(type) || [];
-    saveTaskOrderToStorage(type, [tempId, ...currentOrder]);
+      // Add new task ID to the beginning of the stored order
+      const currentOrder = getTaskOrderFromStorage(type) || [];
+      saveTaskOrderToStorage(type, [tempId, ...currentOrder]);
 
-    // Call the parent handler which will make the API call
-    const success = await onAddTask(title, type);
+    // Call the parent handler which will make the API call and return the real task
+    const createdTask = await onAddTask(title, type);
 
-    if (success) {
+    if (createdTask) {
+      // Replace the temp task with the real task (which has the real _id from the backend)
+      setTasks((prev) => prev.map((t) => t._id === tempId ? createdTask : t));
+      // Update the stored order to use the real ID instead of the temp ID
+      const updatedOrder = getTaskOrderFromStorage(type) || [];
+      saveTaskOrderToStorage(
+        type,
+        updatedOrder.map((id) => id === tempId ? createdTask._id : id)
+      );
       showToast("Task added", "success");
     } else {
       // Rollback on failure - remove the temp task
@@ -582,6 +614,8 @@ const Tasks: React.FC<TasksProps> = ({
                 ? "Today's Tasks"
                 : selectedType === "week"
                 ? "This Week's Tasks"
+                : selectedType === "blocked"
+                ? "Blocked Tasks"
                 : "Future Tasks"}
             </h2>
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -603,6 +637,8 @@ const Tasks: React.FC<TasksProps> = ({
                     ? "today's"
                     : selectedType === "week"
                     ? "this week's"
+                    : selectedType === "blocked"
+                    ? "blocked"
                     : "future"
                 } tasks...`}
                 value={activeSearchQuery}
@@ -782,6 +818,18 @@ const Tasks: React.FC<TasksProps> = ({
                     }`}
                   >
                     Future
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCompletedFilter("blocked");
+                    }}
+                    className={`px-3 py-2 rounded-md font-medium transition-colors ${
+                      completedFilter === "blocked"
+                        ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/70 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    Blocked
                   </button>
                 </div>
               </div>

@@ -5,6 +5,8 @@ import { useAuth } from "../../../context/AuthContext";
 import { AVAILABLE_SIGNALS } from "../../../pages/settings/components/SignalSettings";
 import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
 import { useSignals } from "../../../context/SignalsContext";
+import { useTimezone } from "../../../context/TimezoneContext";
+import { MorningEntry } from "../../../types/Morning";
 
 type SignalKey = keyof typeof AVAILABLE_SIGNALS;
 
@@ -14,25 +16,144 @@ const SIGNAL_UNITS: Record<string, string> = {
   minutesToOffice: "min",
 };
 
+// Display labels for signals (override the default label from AVAILABLE_SIGNALS)
+const SIGNAL_DISPLAY_LABELS: Record<string, string> = {
+  minutesToOffice: "Minutes",
+};
+
+// Helper function to check if a morning entry has journaling content
+const hasJournalingContent = (entry: MorningEntry | undefined): boolean => {
+  if (!entry) return false;
+
+  // Check for new activityContent format
+  if (entry.activityContent) {
+    const { writing, gratitude, affirmations } = entry.activityContent;
+    if (
+      (writing && writing.trim().length > 0) ||
+      (gratitude && gratitude.trim().length > 0) ||
+      (affirmations && affirmations.trim().length > 0)
+    ) {
+      return true;
+    }
+  }
+
+  // Check for legacy content format
+  if (entry.content && entry.content.trim().length > 0) {
+    return true;
+  }
+
+  return false;
+};
+
 interface SignalsProps {
   isModalOpen?: boolean;
 }
 
 const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
+  const { timezone } = useTimezone();
   // Use the Signals context instead of local state
   const { signals, updateSignal, refreshSignals } = useSignals();
 
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
 
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0];
+  // State for journaling signal (derived from morning entries)
+  // Initialize from localStorage to avoid loading flash
+  const [journalingValue, setJournalingValue] = useState<boolean>(() => {
+    const cached = localStorage.getItem("journalingValue");
+    return cached === "true";
+  });
+  const [journalingHistory, setJournalingHistory] = useState<SignalHistory[]>(
+    () => {
+      const cached = localStorage.getItem("journalingHistory");
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
+  );
 
-  // Initial load of signal history
+  // Function to get today's date in YYYY-MM-DD format in user's timezone
+  const getTodayInUserTimezone = () => {
+    try {
+      const date = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+
+      const month = date.find((part) => part.type === "month")?.value || "01";
+      const day = date.find((part) => part.type === "day")?.value || "01";
+      const year = date.find((part) => part.type === "year")?.value || "2023";
+
+      return `${year}-${month}-${day}`;
+    } catch (error) {
+      console.error("Error formatting date with timezone:", error);
+      return new Date().toISOString().split("T")[0];
+    }
+  };
+
+  // Get today's date in YYYY-MM-DD format
+  const today = getTodayInUserTimezone();
+
+  // Initial load of signal history and morning entries
   useEffect(() => {
     loadSignalHistory();
+    loadMorningEntries();
   }, [user]);
+
+  // Load morning entries for journaling signal
+  const loadMorningEntries = async () => {
+    if (!user) return;
+
+    try {
+      const data = await api.getAllEntries();
+
+      // Check today's journaling status
+      const todayEntry = data.entries?.find(
+        (entry: MorningEntry) => entry.date === today
+      );
+      const newJournalingValue = hasJournalingContent(todayEntry);
+
+      // Build journaling history for the past 7 days
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - 6 + i);
+        return date.toISOString().split("T")[0];
+      });
+
+      const journalingHistoryData: SignalHistory[] = last7Days.map((date) => {
+        const entry = data.entries?.find((e: MorningEntry) => e.date === date);
+        return {
+          date,
+          value: hasJournalingContent(entry),
+        };
+      });
+
+      // Update state and localStorage if data changed
+      const cachedValue = localStorage.getItem("journalingValue") === "true";
+      const cachedHistory = localStorage.getItem("journalingHistory");
+      const newHistoryJson = JSON.stringify(journalingHistoryData);
+
+      if (newJournalingValue !== cachedValue) {
+        setJournalingValue(newJournalingValue);
+        localStorage.setItem("journalingValue", String(newJournalingValue));
+      }
+
+      if (cachedHistory !== newHistoryJson) {
+        setJournalingHistory(journalingHistoryData);
+        localStorage.setItem("journalingHistory", newHistoryJson);
+      }
+    } catch (error) {
+      console.error("Failed to load morning entries for journaling:", error);
+    }
+  };
 
   const loadSignalHistory = async () => {
     if (!user) return;
@@ -139,7 +260,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const activeSignals = getActiveSignals();
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden mb-6">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
@@ -149,26 +270,75 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Object.entries(AVAILABLE_SIGNALS)
             .filter(([key]) => activeSignals.includes(key as SignalKey))
-            .map(([key, config]) => (
-              <SignalCard
-                key={key}
-                metric={key}
-                label={config.label}
-                format="" // Add empty string as format is required but not used
-                value={signals[key] ?? (config.type === "binary" ? false : 0)}
-                unit={SIGNAL_UNITS[key] || ""} // Add unit based on signal type
-                type={config.type}
-                status={"active"} // Default to active status
-                timestamp={new Date()} // Use current date as default
-                onChange={(value: number | boolean) =>
-                  handleSignalChange(key, value)
-                }
-                goalValue={getGoalForSignal(key)}
-                history={signalHistory[key] || []}
-                isHistoryLoading={isHistoryLoading}
-                isModalOpen={isModalOpen}
-              />
-            ))}
+            .map(([key, config]) => {
+              // Special handling for journaling signal - use morning entries data
+              if (key === "journaling") {
+                return (
+                  <SignalCard
+                    key={key}
+                    metric={key}
+                    label={SIGNAL_DISPLAY_LABELS[key] || config.label}
+                    format=""
+                    value={journalingValue}
+                    unit=""
+                    type={config.type}
+                    status={"active"}
+                    timestamp={new Date()}
+                    onChange={() => {}} // Read-only - journaling is determined by Morning page
+                    goalValue={undefined}
+                    history={journalingHistory}
+                    isHistoryLoading={false} // Always false - we use localStorage cache to avoid loading flash
+                    isModalOpen={isModalOpen}
+                    isReadOnly={true}
+                  />
+                );
+              }
+
+              // Special handling for focusHours signal - read-only, computed from sessions
+              if (key === "focusHours") {
+                return (
+                  <SignalCard
+                    key={key}
+                    metric={key}
+                    label={SIGNAL_DISPLAY_LABELS[key] || config.label}
+                    format=""
+                    value={signals[key] ?? false}
+                    unit=""
+                    type={config.type}
+                    status={"active"}
+                    timestamp={new Date()}
+                    onChange={() => {}} // Read-only - focusHours is determined by sessions
+                    goalValue={undefined}
+                    history={signalHistory[key] || []}
+                    isHistoryLoading={isHistoryLoading}
+                    isModalOpen={isModalOpen}
+                    isReadOnly={true}
+                  />
+                );
+              }
+
+              // Regular signal handling
+              return (
+                <SignalCard
+                  key={key}
+                  metric={key}
+                  label={SIGNAL_DISPLAY_LABELS[key] || config.label}
+                  format="" // Add empty string as format is required but not used
+                  value={signals[key] ?? (config.type === "binary" ? false : 0)}
+                  unit={SIGNAL_UNITS[key] || ""} // Add unit based on signal type
+                  type={config.type}
+                  status={"active"} // Default to active status
+                  timestamp={new Date()} // Use current date as default
+                  onChange={(value: number | boolean) =>
+                    handleSignalChange(key, value)
+                  }
+                  goalValue={getGoalForSignal(key)}
+                  history={signalHistory[key] || []}
+                  isHistoryLoading={isHistoryLoading}
+                  isModalOpen={isModalOpen}
+                />
+              );
+            })}
         </div>
       </div>
     </div>

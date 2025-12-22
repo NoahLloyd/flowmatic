@@ -16,6 +16,7 @@ interface SignalCardProps {
   goalValue?: number;
   onChange?: (value: number | boolean) => void;
   isModalOpen?: boolean;
+  isReadOnly?: boolean;
 }
 
 const SignalCard = ({
@@ -32,6 +33,7 @@ const SignalCard = ({
   goalValue,
   onChange = () => {},
   isModalOpen = false,
+  isReadOnly = false,
 }: SignalCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
@@ -95,8 +97,8 @@ const SignalCard = ({
   const bgClass = "bg-white dark:bg-gray-900";
 
   const getTimeColor = (minutes: number) => {
-    // Check if we have a goal value for comparison
-    if (goalValue && label === "Minutes to Office") {
+    // Check if we have a goal value for comparison (use metric key, not display label)
+    if (goalValue && metric === "minutesToOffice") {
       if (minutes <= goalValue * 0.5) {
         // Very fast - purple/green
         return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
@@ -118,19 +120,19 @@ const SignalCard = ({
       }
     }
 
-    // Default colors if no goal is set
-    if (minutes <= 15)
-      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Purple for excellent
+    // Default colors if no goal is set (60 or less is green/good)
     if (minutes <= 30)
-      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Green for good
-    if (minutes <= 45)
-      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"; // Yellow for acceptable
+      return "bg-green-200 dark:bg-green-900 text-green-800 dark:text-green-200"; // Excellent - darker green
     if (minutes <= 60)
-      return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200"; // Orange for borderline
+      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Good - green
+    if (minutes <= 75)
+      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"; // Acceptable - yellow
     if (minutes <= 90)
-      return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200"; // Light red for bad
+      return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200"; // Borderline - orange
+    if (minutes <= 120)
+      return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200"; // Bad - red
 
-    // Very bad - dark red for anything above 90 mins
+    // Very bad - dark red for anything above 120 mins
     return "bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-100";
   };
 
@@ -152,7 +154,7 @@ const SignalCard = ({
         : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200";
     }
 
-    if (type === "number" && label === "Minutes to Office") {
+    if (type === "number" && metric === "minutesToOffice") {
       return value <= goalValue
         ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"
         : value <= goalValue * 1.5
@@ -192,103 +194,129 @@ const SignalCard = ({
     return (
       <div className="flex">
         {formattedHistory.map((day, index) => {
-          let bgColor = "bg-gray-100 dark:bg-gray-800";
+          let bgColor = "bg-gray-200 dark:bg-gray-800";
           let textColor = "text-gray-400 dark:text-gray-500";
 
           if (day.value !== null) {
             if (type === "binary") {
               bgColor = (day.value as boolean)
-                ? "bg-green-100 dark:bg-green-900"
-                : "bg-red-100 dark:bg-red-900";
+                ? "bg-green-400 dark:bg-green-900"
+                : "bg-red-400 dark:bg-red-900";
               textColor = (day.value as boolean)
-                ? "text-green-700 dark:text-green-200"
-                : "text-red-700 dark:text-red-200";
+                ? "text-green-800 dark:text-green-200"
+                : "text-red-800 dark:text-red-200";
             } else if (type === "scale") {
               const scaleValue = day.value as number;
               if (scaleValue === 1) {
                 // Darkest red for lowest value
-                bgColor = "bg-red-200 dark:bg-red-900";
-                textColor = "text-red-800 dark:text-red-200";
+                bgColor = "bg-red-500 dark:bg-red-900";
+                textColor = "text-red-900 dark:text-red-200";
               } else if (scaleValue === 2) {
                 // Lighter red for low value
-                bgColor = "bg-red-100 dark:bg-red-800";
-                textColor = "text-red-700 dark:text-red-200";
+                bgColor = "bg-red-400 dark:bg-red-800";
+                textColor = "text-red-800 dark:text-red-200";
               } else if (scaleValue === 3) {
-                bgColor = "bg-yellow-100 dark:bg-yellow-900";
-                textColor = "text-yellow-700 dark:text-yellow-200";
+                bgColor = "bg-yellow-400 dark:bg-yellow-900";
+                textColor = "text-yellow-800 dark:text-yellow-200";
               } else if (scaleValue === 4) {
                 // Use green for high value
-                bgColor = "bg-green-100 dark:bg-green-900";
-                textColor = "text-green-700 dark:text-green-200";
+                bgColor = "bg-green-400 dark:bg-green-900";
+                textColor = "text-green-800 dark:text-green-200";
               } else if (scaleValue === 5) {
-                // Use purple for highest value (mood, energy)
-                bgColor = "bg-green-100 dark:bg-green-900";
-                textColor = "text-green-700 dark:text-green-200";
+                // Use darker green for highest value (mood, energy)
+                bgColor = "bg-green-500 dark:bg-green-900";
+                textColor = "text-green-900 dark:text-green-200";
               }
             } else if (type === "number" || type === "water") {
-              if (
-                goalValue &&
-                type === "number" &&
-                label === "Minutes to Office"
-              ) {
-                // For Minutes to Office, lower is better (want to be under goal)
-                const value = day.value as number;
-                if (value <= goalValue * 0.5) {
-                  // Very fast - purple/green
-                  bgColor = "bg-green-100 dark:bg-green-900";
-                  textColor = "text-green-700 dark:text-green-200";
-                } else if (value <= goalValue) {
-                  // Good - green
-                  bgColor = "bg-green-100 dark:bg-green-900";
-                  textColor = "text-green-700 dark:text-green-200";
-                } else if (value <= goalValue * 1.25) {
-                  // Acceptable - yellow
-                  bgColor = "bg-yellow-100 dark:bg-yellow-900";
-                  textColor = "text-yellow-700 dark:text-yellow-200";
-                } else if (value <= goalValue * 1.5) {
-                  // Borderline - orange
-                  bgColor = "bg-orange-100 dark:bg-orange-900";
-                  textColor = "text-orange-700 dark:text-orange-200";
-                } else if (value <= goalValue * 2) {
-                  // Bad - light red
-                  bgColor = "bg-red-100 dark:bg-red-800";
-                  textColor = "text-red-700 dark:text-red-200";
+              if (type === "number" && metric === "minutesToOffice") {
+                // For Minutes to Office, lower is better
+                const histValue = day.value as number;
+                if (goalValue) {
+                  // Use goal-based thresholds
+                  if (histValue <= goalValue * 0.5) {
+                    // Very fast - darker green
+                    bgColor = "bg-green-500 dark:bg-green-900";
+                    textColor = "text-green-900 dark:text-green-200";
+                  } else if (histValue <= goalValue) {
+                    // Good - green
+                    bgColor = "bg-green-400 dark:bg-green-900";
+                    textColor = "text-green-800 dark:text-green-200";
+                  } else if (histValue <= goalValue * 1.25) {
+                    // Acceptable - yellow
+                    bgColor = "bg-yellow-400 dark:bg-yellow-900";
+                    textColor = "text-yellow-800 dark:text-yellow-200";
+                  } else if (histValue <= goalValue * 1.5) {
+                    // Borderline - orange
+                    bgColor = "bg-orange-400 dark:bg-orange-900";
+                    textColor = "text-orange-800 dark:text-orange-200";
+                  } else if (histValue <= goalValue * 2) {
+                    // Bad - red
+                    bgColor = "bg-red-400 dark:bg-red-800";
+                    textColor = "text-red-800 dark:text-red-200";
+                  } else {
+                    // Very bad - dark red
+                    bgColor = "bg-red-500 dark:bg-red-900";
+                    textColor = "text-red-900 dark:text-red-100";
+                  }
                 } else {
-                  // Very bad - dark red
-                  bgColor = "bg-red-200 dark:bg-red-900";
-                  textColor = "text-red-800 dark:text-red-100";
+                  // Default thresholds when no goal set (60 or less is good)
+                  if (histValue <= 30) {
+                    // Excellent - darker green
+                    bgColor = "bg-green-500 dark:bg-green-900";
+                    textColor = "text-green-900 dark:text-green-200";
+                  } else if (histValue <= 60) {
+                    // Good - green
+                    bgColor = "bg-green-400 dark:bg-green-900";
+                    textColor = "text-green-800 dark:text-green-200";
+                  } else if (histValue <= 75) {
+                    // Acceptable - yellow
+                    bgColor = "bg-yellow-400 dark:bg-yellow-900";
+                    textColor = "text-yellow-800 dark:text-yellow-200";
+                  } else if (histValue <= 90) {
+                    // Borderline - orange
+                    bgColor = "bg-orange-400 dark:bg-orange-900";
+                    textColor = "text-orange-800 dark:text-orange-200";
+                  } else if (histValue <= 120) {
+                    // Bad - red
+                    bgColor = "bg-red-400 dark:bg-red-800";
+                    textColor = "text-red-800 dark:text-red-200";
+                  } else {
+                    // Very bad - dark red
+                    bgColor = "bg-red-500 dark:bg-red-900";
+                    textColor = "text-red-900 dark:text-red-100";
+                  }
                 }
               } else if (goalValue) {
                 // For other metrics with goals, higher is better (want to be over goal)
                 const value = day.value as number;
                 if (value >= goalValue * 1.5) {
-                  // Excellent - purple/green
-                  bgColor = "bg-green-100 dark:bg-green-900";
-                  textColor = "text-green-700 dark:text-green-200";
+                  // Excellent - darker green
+                  bgColor = "bg-green-500 dark:bg-green-900";
+                  textColor = "text-green-900 dark:text-green-200";
                 } else if (value >= goalValue) {
                   // Good - green
-                  bgColor = "bg-green-100 dark:bg-green-900";
-                  textColor = "text-green-700 dark:text-green-200";
+                  bgColor = "bg-green-400 dark:bg-green-900";
+                  textColor = "text-green-800 dark:text-green-200";
                 } else if (value >= goalValue * 0.8) {
                   // Close - yellow
-                  bgColor = "bg-yellow-100 dark:bg-yellow-900";
-                  textColor = "text-yellow-700 dark:text-yellow-200";
+                  bgColor = "bg-yellow-400 dark:bg-yellow-900";
+                  textColor = "text-yellow-800 dark:text-yellow-200";
                 } else if (value >= goalValue * 0.6) {
                   // Getting there - orange
-                  bgColor = "bg-orange-100 dark:bg-orange-900";
-                  textColor = "text-orange-700 dark:text-orange-200";
+                  bgColor = "bg-orange-400 dark:bg-orange-900";
+                  textColor = "text-orange-800 dark:text-orange-200";
                 } else if (value >= goalValue * 0.4) {
-                  // Not great - light red
-                  bgColor = "bg-red-100 dark:bg-red-800";
-                  textColor = "text-red-700 dark:text-red-200";
+                  // Not great - red
+                  bgColor = "bg-red-400 dark:bg-red-800";
+                  textColor = "text-red-800 dark:text-red-200";
                 } else {
                   // Bad - dark red
-                  bgColor = "bg-red-200 dark:bg-red-900";
-                  textColor = "text-red-800 dark:text-red-100";
+                  bgColor = "bg-red-500 dark:bg-red-900";
+                  textColor = "text-red-900 dark:text-red-100";
                 }
               } else {
-                bgColor = "bg-blue-100 dark:bg-blue-900";
-                textColor = "text-blue-700 dark:text-blue-200";
+                bgColor = "bg-blue-400 dark:bg-blue-900";
+                textColor = "text-blue-800 dark:text-blue-200";
               }
             }
           }
@@ -456,14 +484,26 @@ const SignalCard = ({
       {type === "binary" ? (
         <button
           onClick={() => {
-            if (isModalOpen) return;
+            if (isModalOpen || isReadOnly) return;
             handleValueChange(!value);
           }}
+          disabled={isReadOnly}
           className={`w-full py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
             value
-              ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200"
-              : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              ? `bg-gray-900 dark:bg-white text-white dark:text-gray-900 ${
+                  isReadOnly
+                    ? "cursor-not-allowed opacity-90"
+                    : "hover:bg-gray-800 dark:hover:bg-gray-200"
+                }`
+              : `bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 ${
+                  isReadOnly
+                    ? "cursor-not-allowed opacity-90"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                }`
           }`}
+          title={
+            isReadOnly ? "Automatically tracked from Morning page" : undefined
+          }
         >
           {value ? "Yes" : "No"}
         </button>

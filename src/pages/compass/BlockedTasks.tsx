@@ -10,32 +10,14 @@ import {
 } from "react-beautiful-dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
 
-const DailyTasks: React.FC = () => {
+const BlockedTasks: React.FC = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
-  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { selected, setSelected } = useNavigation();
+  const { selected } = useNavigation();
   
   // Editing state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
-
-  // Improved helper to check if a date is today (more robust)
-  const isToday = (dateInput: Date | string | null) => {
-    if (!dateInput) return false;
-
-    const date = new Date(dateInput);
-    const today = new Date();
-
-    // Check if date is valid
-    if (isNaN(date.getTime())) return false;
-
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
-  };
 
   // Function to get task order from localStorage for a specific type
   const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
@@ -48,25 +30,23 @@ const DailyTasks: React.FC = () => {
     localStorage.setItem(`taskOrder_${type}`, JSON.stringify(order));
   };
 
-  // Fetch daily tasks
+  // Fetch blocked tasks
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
       const allTasks = await api.getUserTasks();
 
-      console.log("All tasks loaded:", allTasks.length);
-
-      // Filter active daily tasks
+      // Filter active blocked tasks
       let active = allTasks.filter(
-        (task) => task.type === "day" && !task.completed
+        (task) => task.type === "blocked" && !task.completed
       );
 
       // Apply stored order
-      const taskOrderDay = getTaskOrderFromStorage("day");
-      if (taskOrderDay) {
+      const taskOrderBlocked = getTaskOrderFromStorage("blocked");
+      if (taskOrderBlocked) {
         active = active.sort((a, b) => {
-          const indexA = taskOrderDay.indexOf(a._id);
-          const indexB = taskOrderDay.indexOf(b._id);
+          const indexA = taskOrderBlocked.indexOf(a._id);
+          const indexB = taskOrderBlocked.indexOf(b._id);
           if (indexA === -1 && indexB === -1) return 0;
           if (indexA === -1) return 1;
           if (indexB === -1) return -1;
@@ -74,33 +54,9 @@ const DailyTasks: React.FC = () => {
         });
       }
 
-      console.log("Active daily tasks (sorted):", active.length);
-
-      // Filter completed tasks from today - with improved handling
-      const completed = allTasks.filter((task) => {
-        const isCompletedToday =
-          task.type === "day" && task.completed && isToday(task.completedAt);
-
-        if (task.completed && task.type === "day") {
-          console.log(
-            "Completed task:",
-            task.title,
-            "completedAt:",
-            task.completedAt,
-            "isToday:",
-            isToday(task.completedAt)
-          );
-        }
-
-        return isCompletedToday;
-      });
-
-      console.log("Completed today tasks:", completed.length);
-
       setActiveTasks(active);
-      setCompletedTasks(completed);
     } catch (error) {
-      console.error("Failed to fetch daily tasks:", error);
+      console.error("Failed to fetch blocked tasks:", error);
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +77,8 @@ const DailyTasks: React.FC = () => {
   // Listen for tasks added via quick add modals
   useEffect(() => {
     const unsubscribe = subscribeToTaskAdded((newTask) => {
-      // Only add if it's a daily task
-      if (newTask.type === "day" && !newTask.completed) {
+      // Only add if it's a blocked task
+      if (newTask.type === "blocked" && !newTask.completed) {
         setActiveTasks((prev) => {
           // Check if task already exists (avoid duplicates)
           if (prev.some((t) => t._id === newTask._id)) {
@@ -131,9 +87,9 @@ const DailyTasks: React.FC = () => {
           return [newTask, ...prev];
         });
         // Add to stored order
-        const currentOrder = getTaskOrderFromStorage("day") || [];
+        const currentOrder = getTaskOrderFromStorage("blocked") || [];
         if (!currentOrder.includes(newTask._id)) {
-          saveTaskOrderToStorage("day", [newTask._id, ...currentOrder]);
+          saveTaskOrderToStorage("blocked", [newTask._id, ...currentOrder]);
         }
       }
     });
@@ -143,91 +99,33 @@ const DailyTasks: React.FC = () => {
 
   const handleToggleComplete = async (id: string) => {
     try {
-      // Find the task in either active or completed arrays
-      const task = [...activeTasks, ...completedTasks].find(
-        (t) => t._id === id
-      );
+      const task = activeTasks.find((t) => t._id === id);
       if (!task) return;
 
       const updates = {
-        completed: !task.completed,
-        completedAt: !task.completed ? new Date() : null,
+        completed: true,
+        completedAt: new Date(),
       };
 
-      // Optimistically update the UI first
-      if (updates.completed) {
-        // Task was marked complete
-        const taskToMove = activeTasks.find((t) => t._id === id);
-        if (taskToMove) {
-          setActiveTasks((prev) => prev.filter((t) => t._id !== id));
-          setCompletedTasks((prev) => [...prev, { ...taskToMove, ...updates }]);
-          // Remove from stored order
-          const currentOrder = getTaskOrderFromStorage("day") || [];
-          saveTaskOrderToStorage(
-            "day",
-            currentOrder.filter((taskId) => taskId !== id)
-          );
-        }
-      } else {
-        // Task was unmarked (moved back to active)
-        const taskToMove = completedTasks.find((t) => t._id === id);
-        if (taskToMove) {
-          setCompletedTasks((prev) => prev.filter((t) => t._id !== id));
-          const updatedTask = { ...taskToMove, ...updates };
-          setActiveTasks((prev) => [...prev, updatedTask]); // Add to end for now, order applied on next fetch or drag
-          // Add back to the beginning of the stored order
-          const currentOrder = getTaskOrderFromStorage("day") || [];
-          saveTaskOrderToStorage("day", [
-            id,
-            ...currentOrder.filter((taskId) => taskId !== id),
-          ]); // Ensure no duplicates
-        }
-      }
+      // Optimistically update the UI
+      setActiveTasks((prev) => prev.filter((t) => t._id !== id));
+      
+      // Remove from stored order
+      const currentOrder = getTaskOrderFromStorage("blocked") || [];
+      saveTaskOrderToStorage(
+        "blocked",
+        currentOrder.filter((taskId) => taskId !== id)
+      );
 
       // Then update in the database
-      api
-        .updateTask(id, updates)
-        .then(() => {
-          // After successful update, refresh tasks to ensure everything is in sync
-          // This helps capture other changes that might have happened
-          // fetchTasks(); // REMOVED: Rely on optimistic update
-        })
-        .catch((error) => {
-          console.error("Failed to update task in database:", error);
-          // If the API call fails, revert the optimistic update
-          if (updates.completed) {
-            // Revert completed task back to active
-            const taskToRevert = completedTasks.find((t) => t._id === id);
-            if (taskToRevert) {
-              setCompletedTasks((prev) => prev.filter((t) => t._id !== id));
-              setActiveTasks((prev) => [
-                ...prev,
-                { ...taskToRevert, completed: false, completedAt: null },
-              ]);
-            }
-          } else {
-            // Revert active task back to completed
-            const taskToRevert = activeTasks.find((t) => t._id === id);
-            if (taskToRevert) {
-              setActiveTasks((prev) => prev.filter((t) => t._id !== id));
-              setCompletedTasks((prev) => [
-                ...prev,
-                {
-                  ...taskToRevert,
-                  completed: true,
-                  completedAt: task.completedAt,
-                },
-              ]);
-            }
-          }
-        });
+      api.updateTask(id, updates).catch((error) => {
+        console.error("Failed to update task in database:", error);
+        // If the API call fails, revert the optimistic update
+        setActiveTasks((prev) => [...prev, task]);
+      });
     } catch (error) {
       console.error("Failed to toggle task:", error);
     }
-  };
-
-  const getTotalCount = () => {
-    return activeTasks.length + completedTasks.length;
   };
 
   // Handle updating task title
@@ -237,7 +135,7 @@ const DailyTasks: React.FC = () => {
       return;
     }
 
-    const originalTask = [...activeTasks, ...completedTasks].find(t => t._id === id);
+    const originalTask = activeTasks.find(t => t._id === id);
     if (!originalTask || originalTask.title === newTitle) {
       setEditingTaskId(null);
       return;
@@ -245,7 +143,6 @@ const DailyTasks: React.FC = () => {
 
     // Optimistic update
     setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: newTitle } : t));
-    setCompletedTasks(prev => prev.map(t => t._id === id ? { ...t, title: newTitle } : t));
     setEditingTaskId(null);
 
     try {
@@ -254,7 +151,6 @@ const DailyTasks: React.FC = () => {
       console.error("Failed to update task title:", error);
       // Rollback on failure
       setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: originalTask.title } : t));
-      setCompletedTasks(prev => prev.map(t => t._id === id ? { ...t, title: originalTask.title } : t));
     }
   };
 
@@ -276,9 +172,8 @@ const DailyTasks: React.FC = () => {
       return;
     }
 
-    // Ensure drop happened within the active list
-    if (destination.droppableId !== "daily-active-tasks") {
-      console.warn("Drag and drop outside the active list is not supported.");
+    // Ensure drop happened within the blocked list
+    if (destination.droppableId !== "blocked-active-tasks") {
       return;
     }
 
@@ -292,15 +187,15 @@ const DailyTasks: React.FC = () => {
 
     // Save the new order to localStorage
     const newOrder = items.map((task) => task._id);
-    saveTaskOrderToStorage("day", newOrder);
+    saveTaskOrderToStorage("blocked", newOrder);
   };
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
         <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-            Tasks
+            Blocked
           </h2>
           <span className="text-xs text-gray-500 dark:text-gray-400">
             Loading...
@@ -320,56 +215,38 @@ const DailyTasks: React.FC = () => {
     );
   }
 
-  if (activeTasks.length === 0 && completedTasks.length === 0) {
+  if (activeTasks.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
         <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-            Tasks
+            Blocked
           </h2>
           <span className="text-xs text-gray-500 dark:text-gray-400">
             0 tasks
           </span>
         </div>
         <div className="p-4 bg-white dark:bg-gray-900 text-center text-sm text-gray-500 dark:text-gray-400 flex-1">
-          No tasks yet
+          No blocked tasks
         </div>
       </div>
     );
   }
 
-  // Custom checkbox for completed task
-  const CompletedCheckbox = () => (
-    <div className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-900 dark:border-white bg-gray-900 dark:bg-white">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-2.5 w-2.5 text-white dark:text-gray-900"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-      >
-        <path
-          fillRule="evenodd"
-          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-          clipRule="evenodd"
-        />
-      </svg>
-    </div>
-  );
-
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
       <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-          Tasks
+          Blocked
         </h2>
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {getTotalCount()} task{getTotalCount() !== 1 ? "s" : ""}
+          {activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}
         </span>
       </div>
       <div className="p-4 bg-white dark:bg-gray-900 flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="space-y-2 h-full overflow-y-auto">
-            <Droppable droppableId="daily-active-tasks">
+            <Droppable droppableId="blocked-active-tasks">
               {(provided, snapshot) => (
                 <div
                   {...provided.droppableProps}
@@ -433,41 +310,6 @@ const DailyTasks: React.FC = () => {
                 </div>
               )}
             </Droppable>
-
-            {completedTasks.length > 0 && activeTasks.length > 0 && (
-              <hr className="border-gray-200 dark:border-gray-700 my-2" />
-            )}
-            {completedTasks.map((task) => (
-              <div key={task._id} className="flex items-center gap-3 py-1">
-                <div onClick={() => handleToggleComplete(task._id)}>
-                  <CompletedCheckbox />
-                </div>
-                {editingTaskId === task._id ? (
-                  <input
-                    type="text"
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleUpdateTitle(task._id, editedTitle);
-                      } else if (e.key === "Escape") {
-                        setEditingTaskId(null);
-                      }
-                    }}
-                    onBlur={() => handleUpdateTitle(task._id, editedTitle)}
-                    className="flex-1 text-sm text-gray-500 dark:text-gray-400 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
-                    autoFocus
-                  />
-                ) : (
-                  <span
-                    onClick={() => startEditing(task)}
-                    className="text-sm text-gray-500 dark:text-gray-400 truncate cursor-text"
-                  >
-                    {task.title}
-                  </span>
-                )}
-              </div>
-            ))}
           </div>
         </DragDropContext>
       </div>
@@ -475,4 +317,5 @@ const DailyTasks: React.FC = () => {
   );
 };
 
-export default DailyTasks;
+export default BlockedTasks;
+

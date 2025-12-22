@@ -6,15 +6,153 @@ import {
   nativeImage,
   Menu,
   globalShortcut,
+  screen,
 } from "electron";
 import axios from "axios";
 import path from "path";
+import * as fs from "fs";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
+declare const OVERLAY_WINDOW_WEBPACK_ENTRY: string;
+declare const OVERLAY_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 let mainWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
+let overlayType: "task" | "note" = "task";
 let tray: Tray | null = null;
+
+// Default shortcuts
+const DEFAULT_SHORTCUTS = {
+  quickAddTask: "Alt+T",
+  quickAddNote: "Alt+N",
+};
+
+// Get shortcuts config file path
+const getShortcutsPath = () => {
+  return path.join(app.getPath("userData"), "shortcuts.json");
+};
+
+// Load shortcuts from file
+const loadShortcuts = (): typeof DEFAULT_SHORTCUTS => {
+  try {
+    const shortcutsPath = getShortcutsPath();
+    if (fs.existsSync(shortcutsPath)) {
+      const data = fs.readFileSync(shortcutsPath, "utf-8");
+      return { ...DEFAULT_SHORTCUTS, ...JSON.parse(data) };
+    }
+  } catch (error) {
+    console.error("Error loading shortcuts:", error);
+  }
+  return DEFAULT_SHORTCUTS;
+};
+
+// Save shortcuts to file
+const saveShortcuts = (shortcuts: typeof DEFAULT_SHORTCUTS) => {
+  try {
+    const shortcutsPath = getShortcutsPath();
+    fs.writeFileSync(shortcutsPath, JSON.stringify(shortcuts, null, 2));
+  } catch (error) {
+    console.error("Error saving shortcuts:", error);
+  }
+};
+
+// Create overlay window
+const createOverlayWindow = (type: "task" | "note") => {
+  // If overlay already exists, just focus it
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.focus();
+    overlayWindow.webContents.send("overlay-focus");
+    return;
+  }
+
+  overlayType = type;
+
+  // Get the display where the cursor is
+  const cursorPoint = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursorPoint);
+  const { width, height } = display.workAreaSize;
+  const { x, y } = display.workArea;
+
+  overlayWindow = new BrowserWindow({
+    width: width,
+    height: height,
+    x: x,
+    y: y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    focusable: true,
+    webPreferences: {
+      preload: OVERLAY_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  overlayWindow.loadURL(OVERLAY_WINDOW_WEBPACK_ENTRY);
+
+  // Hide from dock on macOS
+  if (process.platform === "darwin") {
+    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+
+  // Focus the window
+  overlayWindow.once("ready-to-show", () => {
+    overlayWindow?.show();
+    overlayWindow?.focus();
+  });
+
+  // Clean up on close
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
+
+  // Note: We don't close on blur because the overlay handles its own backdrop click
+  // The user can close with Escape or by clicking the backdrop
+};
+
+// Register global shortcuts
+const registerGlobalShortcuts = () => {
+  // Unregister existing shortcuts first
+  globalShortcut.unregisterAll();
+
+  const shortcuts = loadShortcuts();
+
+  // Register toggle timer shortcut
+  globalShortcut.register("Alt+Space", () => {
+    if (mainWindow) {
+      mainWindow.webContents.send("toggle-timer");
+    }
+  });
+
+  // Register quick add task shortcut
+  if (shortcuts.quickAddTask) {
+    try {
+      globalShortcut.register(shortcuts.quickAddTask, () => {
+        createOverlayWindow("task");
+      });
+    } catch (error) {
+      console.error("Failed to register quickAddTask shortcut:", error);
+    }
+  }
+
+  // Register quick add note shortcut
+  if (shortcuts.quickAddNote) {
+    try {
+      globalShortcut.register(shortcuts.quickAddNote, () => {
+        createOverlayWindow("note");
+      });
+    } catch (error) {
+      console.error("Failed to register quickAddNote shortcut:", error);
+    }
+  }
+};
+
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     height: 600,
@@ -30,12 +168,8 @@ const createWindow = (): void => {
     app.dock.setIcon(path.join(__dirname, "assets", "icon.jpg"));
   }
 
-  // Register global shortcut
-  globalShortcut.register("Alt+Space", () => {
-    if (mainWindow) {
-      mainWindow.webContents.send("toggle-timer");
-    }
-  });
+  // Register all global shortcuts
+  registerGlobalShortcuts();
 
   // Clean up shortcuts when window is closed
   mainWindow.on("closed", () => {
@@ -141,6 +275,103 @@ ipcMain.on("update-tray", (_event, text: string) => {
 ipcMain.on("show-window", () => {
   if (mainWindow) {
     mainWindow.show();
+  }
+});
+
+// Get shortcuts
+ipcMain.handle("get-shortcuts", () => {
+  return loadShortcuts();
+});
+
+// Update shortcuts
+ipcMain.handle("update-shortcuts", (_event, newShortcuts: typeof DEFAULT_SHORTCUTS) => {
+  saveShortcuts(newShortcuts);
+  registerGlobalShortcuts();
+  return loadShortcuts();
+});
+
+// Overlay window IPC handlers
+ipcMain.handle("get-overlay-type", () => {
+  return overlayType;
+});
+
+ipcMain.handle("overlay-submit-task", async (_event, title: string) => {
+  try {
+    // Get auth token from main window
+    const token = await mainWindow?.webContents.executeJavaScript(
+      'localStorage.getItem("token")'
+    );
+
+    if (!token) {
+      console.error("No auth token found");
+      return false;
+    }
+
+    // Create the task via API
+    const response = await axios({
+      method: "POST",
+      url: `${API_BASE_URL}/tasks/new`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      data: {
+        title,
+        type: "day",
+        completed: false,
+        completedAt: null,
+        createdAt: new Date(),
+      },
+    });
+
+    // Notify the main window to update its task list
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("task-added-from-overlay", response.data);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Failed to create task from overlay:", error);
+    return false;
+  }
+});
+
+ipcMain.handle("overlay-submit-note", async (_event, content: string) => {
+  try {
+    // Get auth token from main window
+    const token = await mainWindow?.webContents.executeJavaScript(
+      'localStorage.getItem("token")'
+    );
+
+    if (!token) {
+      console.error("No auth token found");
+      return false;
+    }
+
+    // Create the note via API
+    await axios({
+      method: "POST",
+      url: `${API_BASE_URL}/notes`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      data: {
+        content,
+        tags: [],
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Failed to create note from overlay:", error);
+    return false;
+  }
+});
+
+ipcMain.on("overlay-close", () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.close();
   }
 });
 

@@ -29,13 +29,13 @@ const AppWrapper = () => {
       <AuthProvider>
         <ThemeProvider>
           <ToastProvider>
-            <TimezoneProvider>
-              <SignalsProvider>
-                <div className="min-h-screen bg-gray-50">
-                  <PageContent />
-                </div>
-              </SignalsProvider>
-            </TimezoneProvider>
+          <TimezoneProvider>
+            <SignalsProvider>
+              <div className="min-h-screen bg-gray-50">
+                <PageContent />
+              </div>
+            </SignalsProvider>
+          </TimezoneProvider>
           </ToastProvider>
         </ThemeProvider>
       </AuthProvider>

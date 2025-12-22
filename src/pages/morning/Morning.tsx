@@ -436,6 +436,10 @@ const Morning = () => {
               ];
             }
           });
+
+          // Dispatch event to notify other components (like SignalsContext) that morning entry has been updated
+          // This will update the journaling signal in real-time
+          window.dispatchEvent(new CustomEvent("morningEntryUpdated"));
         } catch (error) {
           console.error("Failed to save entry:", error);
         } finally {
@@ -726,7 +730,7 @@ const Morning = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-8 dark:bg-slate-900">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             <Star className="w-5 h-5 text-yellow-500" />

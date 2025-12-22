@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Session } from "../../types/Session";
+import { Clock, Calendar, Timer, Brain } from "lucide-react";
 
 interface SessionEditModalProps {
   session: Session;
@@ -15,6 +16,72 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
   onDelete,
 }) => {
   const [formData, setFormData] = useState<Session>({ ...session });
+
+  // Calculate session timing info
+  const sessionInfo = useMemo(() => {
+    if (!session.created_at) return null;
+
+    const endTime = new Date(session.created_at);
+    const startTime = new Date(endTime.getTime() - session.minutes * 60 * 1000);
+    
+    const formatTime = (date: Date) => {
+      return date.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    };
+
+    const formatDate = (date: Date) => {
+      const today = new Date();
+      const isToday = date.toDateString() === today.toDateString();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = date.toDateString() === yesterday.toDateString();
+
+      if (isToday) return 'Today';
+      if (isYesterday) return 'Yesterday';
+      return date.toLocaleDateString([], { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric' 
+      });
+    };
+
+    const formatDuration = (minutes: number) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      if (hours === 0) return `${mins}m`;
+      if (mins === 0) return `${hours}h`;
+      return `${hours}h ${mins}m`;
+    };
+
+    const getFocusLabel = (focus: number) => {
+      const labels = ['', 'Very Low', 'Low', 'Medium', 'High', 'Very High'];
+      return labels[focus] || '';
+    };
+
+    const getFocusColor = (focus: number) => {
+      const colors = [
+        '',
+        'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30',
+        'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30',
+        'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30',
+        'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30',
+        'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/30',
+      ];
+      return colors[focus] || '';
+    };
+
+    return {
+      startTime: formatTime(startTime),
+      endTime: formatTime(endTime),
+      date: formatDate(endTime),
+      duration: formatDuration(session.minutes),
+      focusLabel: getFocusLabel(session.focus),
+      focusColor: getFocusColor(session.focus),
+    };
+  }, [session]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -43,6 +110,56 @@ const SessionEditModal: React.FC<SessionEditModalProps> = ({
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
           Edit Session
         </h2>
+
+        {/* Session Info Display */}
+        {sessionInfo && (
+          <div className="mb-5 p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Date */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">{sessionInfo.date}</span>
+              </div>
+              
+              {/* Duration */}
+              <div className="flex items-center gap-2">
+                <Timer className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">{sessionInfo.duration}</span>
+              </div>
+              
+              {/* Time Range */}
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  {sessionInfo.startTime} – {sessionInfo.endTime}
+                </span>
+              </div>
+              
+              {/* Focus Level */}
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-gray-400" />
+                <span className={`text-sm px-2 py-0.5 rounded-full ${sessionInfo.focusColor}`}>
+                  {sessionInfo.focusLabel}
+                </span>
+              </div>
+            </div>
+
+            {/* Project/Task display */}
+            {(session.project || session.task) && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-900 dark:text-white font-medium">
+                  {session.project || session.task}
+                </div>
+                {session.project && session.task && session.project !== session.task && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {session.task}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">

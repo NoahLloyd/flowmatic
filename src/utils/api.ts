@@ -3,6 +3,7 @@ import { MorningEntries } from "src/types/Morning";
 import { Task } from "src/types/Task";
 import { User } from "src/types/User";
 import { Document } from "src/types/Document";
+import { WeeklyReview, ReviewStreak } from "src/types/Review";
 
 const withAuth = () => ({
   headers: {
@@ -253,4 +254,102 @@ export const api = {
       `/documents/${documentId}`,
       withAuth()
     ),
+
+  // Weekly Review endpoints
+  getWeeklyReview: async (weekStart: string): Promise<WeeklyReview | null> => {
+    try {
+      const response = await window.electron.apiRequest(
+        "GET",
+        `/reviews/week/${weekStart}`,
+        withAuth()
+      );
+      return response;
+    } catch (error) {
+      // Return null if no review exists for this week
+      return null;
+    }
+  },
+
+  saveWeeklyReview: async (review: Omit<WeeklyReview, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<WeeklyReview> =>
+    window.electron.apiRequest("POST", "/reviews", {
+      body: review,
+      ...withAuth(),
+    }),
+
+  completeWeeklyReview: async (weekStart: string): Promise<WeeklyReview> =>
+    window.electron.apiRequest("POST", `/reviews/week/${weekStart}/complete`, {
+      ...withAuth(),
+    }),
+
+  getReviewStreak: async (): Promise<ReviewStreak> => {
+    try {
+      const response = await window.electron.apiRequest(
+        "GET",
+        "/reviews/streak",
+        withAuth()
+      );
+      return response;
+    } catch (error) {
+      // Return default streak if endpoint doesn't exist yet
+      return { current_streak: 0, longest_streak: 0 };
+    }
+  },
+
+  getAllReviews: async (): Promise<WeeklyReview[]> => {
+    try {
+      const response = await window.electron.apiRequest(
+        "GET",
+        "/reviews",
+        withAuth()
+      );
+      return response;
+    } catch (error) {
+      return [];
+    }
+  },
+
+  // Add item to current week's review inbox
+  addToReviewInbox: async (item: string, timezone: string = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<boolean> => {
+    try {
+      // Calculate current week start (Wednesday)
+      const now = new Date();
+      const dateInTZ = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+      const day = dateInTZ.getDay();
+      let daysToSubtract;
+      if (day >= 3) {
+        daysToSubtract = day - 3;
+      } else {
+        daysToSubtract = day + 4;
+      }
+      const wednesday = new Date(dateInTZ);
+      wednesday.setDate(dateInTZ.getDate() - daysToSubtract);
+      const weekStart = wednesday.toISOString().split("T")[0];
+      
+      // Calculate week end (Tuesday)
+      const tuesday = new Date(wednesday);
+      tuesday.setDate(wednesday.getDate() + 6);
+      const weekEnd = tuesday.toISOString().split("T")[0];
+
+      // Get existing review or create new one
+      let review = await api.getWeeklyReview(weekStart);
+      
+      const inboxItems = review?.inbox_items || [];
+      inboxItems.push(item);
+
+      // Save the review with the new inbox item
+      await api.saveWeeklyReview({
+        week_start: weekStart,
+        week_end: weekEnd,
+        checklist: review?.checklist || [],
+        questions: review?.questions || [],
+        is_completed: review?.is_completed || false,
+        inbox_items: inboxItems,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to add to review inbox:", error);
+      return false;
+    }
+  },
 };

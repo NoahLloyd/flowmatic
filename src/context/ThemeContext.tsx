@@ -1,26 +1,50 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
+type ThemeMode = "light" | "dark" | "system";
+
 type ThemeContextType = {
   isDarkMode: boolean;
-  toggleDarkMode: () => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const getSystemPreference = () => {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check localStorage and system preference
-    const saved = localStorage.getItem("darkMode");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    return saved ? JSON.parse(saved) : prefersDark;
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    // Check localStorage for saved preference, default to "system"
+    const saved = localStorage.getItem("themeMode") as ThemeMode | null;
+    return saved && ["light", "dark", "system"].includes(saved) ? saved : "system";
   });
 
+  const [systemPrefersDark, setSystemPrefersDark] = useState(getSystemPreference);
+
+  // Calculate actual dark mode based on themeMode and system preference
+  const isDarkMode = themeMode === "system" ? systemPrefersDark : themeMode === "dark";
+
+  // Listen for system theme changes
   useEffect(() => {
-    localStorage.setItem("darkMode", JSON.stringify(isDarkMode));
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemPrefersDark(e.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  // Apply theme class to document
+  useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
     } else {
@@ -28,12 +52,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [isDarkMode]);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+  // Save theme mode to localStorage
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    localStorage.setItem("themeMode", mode);
   };
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ isDarkMode, themeMode, setThemeMode }}>
       {children}
     </ThemeContext.Provider>
   );

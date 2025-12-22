@@ -22,7 +22,7 @@ export const useTasks = () => {
     fetchTasks();
   }, []);
 
-  const handleAddTask = async (title: string, type: TaskType): Promise<boolean> => {
+  const handleAddTask = async (title: string, type: TaskType): Promise<Task | null> => {
     try {
       const taskData: Omit<Task, "_id"> = {
         title,
@@ -34,10 +34,10 @@ export const useTasks = () => {
 
       const newTask = await api.createTask(taskData);
       setTasks((prev) => [newTask, ...prev]);
-      return true;
+      return newTask;
     } catch (error) {
       console.error("Failed to create task:", error);
-      return false;
+      return null;
     }
   };
 
@@ -51,7 +51,7 @@ export const useTasks = () => {
         newCompletedStatus = completed;
       } else {
         // Fallback: look up in local state (may be out of sync)
-        const task = tasks.find((t) => t._id === id);
+      const task = tasks.find((t) => t._id === id);
         if (!task) {
           console.error("Task not found in useTasks state:", id);
           return false;

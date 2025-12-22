@@ -19,6 +19,7 @@ const WaveComponent = ({
   color,
   xOffset,
   yOffset,
+  duration,
 }: {
   offset: number;
   opacity: number;
@@ -26,44 +27,45 @@ const WaveComponent = ({
   color: string;
   xOffset: number;
   yOffset: number;
+  duration: number;
 }) => (
   <motion.path
     d="M-100 0 C 200 50, 400 -50, 500 0 C 600 50, 800 -50, 900 0 L 900 400 L -100 400 Z"
     fill={color}
     opacity={opacity}
-    initial={{ y: yOffset }}
+    initial={{ y: yOffset, x: xOffset }}
     animate={{
-      y: [yOffset, yOffset - 10, yOffset],
-      x: [xOffset, xOffset + 5, xOffset],
+      y: [yOffset, yOffset - 10],
+      x: [xOffset, xOffset + 5],
       scale: scale,
     }}
     transition={{
       repeat: Infinity,
-      duration: 4 + Math.random(),
+      repeatType: "mirror",
+      duration: duration,
       ease: "easeInOut",
     }}
   />
 );
 
-const Particle = ({ index }: { index: number }) => {
-  const randomX = Math.random() * 100;
-  const randomDelay = Math.random() * 2;
-
+const Particle = ({ index, randomX, randomDelay, duration }: { index: number; randomX: number; randomDelay: number; duration: number }) => {
   return (
     <motion.circle
       cx={randomX}
       cy="100"
       r="1"
       fill="rgba(255, 255, 255, 0.3)"
-      initial={{ y: 0 }}
+      initial={{ y: -10, opacity: 0.1 }}
       animate={{
-        y: [-10, -20, -10],
-        opacity: [0.1, 0.3, 0.1],
+        y: [-10, -20],
+        opacity: [0.1, 0.3],
       }}
       transition={{
         repeat: Infinity,
-        duration: 3 + Math.random() * 2,
+        repeatType: "mirror",
+        duration: duration,
         delay: randomDelay,
+        ease: "easeInOut",
       }}
     />
   );
@@ -82,6 +84,15 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   // Always assume the initial time is 60 minutes (3600 seconds) for wave positioning
   const standardInitialTime = 3600;
   const [initialTime, setInitialTime] = useState(time);
+  const [isSimpleMode, setIsSimpleMode] = useState(() => {
+    const saved = localStorage.getItem('timerSimpleMode');
+    return saved === 'true';
+  });
+
+  // Save simple mode preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('timerSimpleMode', String(isSimpleMode));
+  }, [isSimpleMode]);
 
   // Get theme-appropriate colors from user preferences, with fallbacks
   const defaultLightFromColor = "#E8CBC0";
@@ -119,48 +130,86 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
     return (timeElapsed / standardInitialTime) * 100;
   }, [time]);
 
+  // Memoize random values for waves and particles to keep them stable across renders
+  const waveDurations = useMemo(() => [0, 1, 2, 3].map(() => 4 + Math.random()), []);
+  const particleData = useMemo(() => 
+    [...Array(20)].map(() => ({
+      randomX: Math.random() * 100,
+      randomDelay: Math.random() * 2,
+      duration: 3 + Math.random() * 2,
+    })), 
+  []);
+
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
 
+  // Simple mode display: show only minutes, or 0:XX when < 1 minute
+  const simpleTimeDisplay = minutes >= 1 ? `${minutes}` : `0:${seconds < 10 ? "0" : ""}${seconds}`;
+
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
-        <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center">
+        <h2 
+          className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
+          onClick={() => setIsSimpleMode(!isSimpleMode)}
+        >
           Timer
         </h2>
       </div>
-      <div className="relative flex flex-col w-full items-center justify-center overflow-hidden bg-white dark:bg-gray-900 h-[calc(100%-48px)]">
-        <div className="absolute inset-0 overflow-hidden">
-          <svg
-            viewBox="0 0 800 400"
-            className="w-full h-full absolute bottom-0"
-            preserveAspectRatio="none"
-          >
-            <motion.g
+      <div 
+        className="relative flex flex-col w-full items-center justify-center overflow-hidden h-[calc(100%-48px)]"
+      >
+        <div className="absolute inset-0 overflow-hidden bg-white dark:bg-gray-900">
+          {isSimpleMode ? (
+            /* Simple mode: solid block with straight line that rises */
+            <div
+              className="absolute inset-x-0 w-full"
               style={{
-                y: `${Math.min(
-                  Math.max(0, 120 - progressPercentage * 1.2),
-                  120
-                )}%`,
+                background: `linear-gradient(135deg, ${fromColor}, ${toColor})`,
+                height: '200%',
+                top: `${100 - progressPercentage}%`,
               }}
-              transition={{ type: "spring", damping: 30 }}
+            />
+          ) : (
+            /* Normal mode: animated waves */
+            <svg
+              viewBox="0 0 800 400"
+              className="w-full h-full absolute bottom-0"
+              preserveAspectRatio="none"
             >
-              {[...Array(4)].map((_, i) => (
-                <WaveComponent
-                  key={i}
-                  offset={i}
-                  yOffset={i * 15}
-                  xOffset={i * 30}
-                  opacity={0.3 - i * 0.01}
-                  scale={1 + i * 0.02}
-                  color={i % 2 === 0 ? fromColor : toColor}
-                />
-              ))}
-              {[...Array(20)].map((_, i) => (
-                <Particle key={i} index={i} />
-              ))}
-            </motion.g>
-          </svg>
+              <motion.g
+                style={{
+                  y: `${Math.min(
+                    Math.max(0, 120 - progressPercentage * 1.2),
+                    120
+                  )}%`,
+                }}
+                transition={{ type: "spring", damping: 30 }}
+              >
+                {[...Array(4)].map((_, i) => (
+                  <WaveComponent
+                    key={i}
+                    offset={i}
+                    yOffset={i * 15}
+                    xOffset={i * 30}
+                    opacity={0.3 - i * 0.01}
+                    scale={1 + i * 0.02}
+                    color={i % 2 === 0 ? fromColor : toColor}
+                    duration={waveDurations[i]}
+                  />
+                ))}
+                {particleData.map((particle, i) => (
+                  <Particle 
+                    key={i} 
+                    index={i} 
+                    randomX={particle.randomX}
+                    randomDelay={particle.randomDelay}
+                    duration={particle.duration}
+                  />
+                ))}
+              </motion.g>
+            </svg>
+          )}
         </div>
 
         <div className="relative z-10 p-5 flex flex-col items-center justify-center">
@@ -169,8 +218,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
             animate={{ scale: isRunning ? [1, 1.02, 1] : 1 }}
             transition={{ repeat: Infinity, duration: 2 }}
           >
-            {minutes}:{seconds < 10 ? "0" : ""}
-            {seconds}
+            {isSimpleMode ? simpleTimeDisplay : `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`}
           </motion.div>
 
           <div className="flex space-x-2 mb-6">

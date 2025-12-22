@@ -22,6 +22,9 @@ export const useNavigation = () => {
         case "m":
           setSelected("Morning");
           break;
+        case "r":
+          setSelected("Review");
+          break;
         case "i":
           setSelected("Insights");
           break;

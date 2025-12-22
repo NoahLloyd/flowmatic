@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import TimerDisplay from "./TimerDisplay";
 import SessionForm from "./SessionForm";
-import SessionCard from "../../components/session/SessionCard";
 import { Session } from "../../types/Session";
-import SessionsOverview from "../../components/session/SessionsOverview";
-import SessionStats from "../../components/session/SessionStats";
 import FriendsProgressStats from "../../components/session/FriendsProgressStats";
 import Signals from "./signal/Signals";
 import TimerCompleteModal from "../../components/session/TimerCompleteModal";
 import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { AVAILABLE_SIGNALS } from "../settings/components/SignalSettings";
-import { Task } from "../../types/Task";
 import DailyTasks from "./DailyTasks";
+import BlockedTasks from "./BlockedTasks";
 
 // Define the session form data interface
 interface SessionFormData {
@@ -24,13 +21,6 @@ interface SessionFormData {
   minutes: number;
   focus: number;
   created_at: string;
-}
-
-// Define the stats interface
-interface SessionStats {
-  todayHours: number;
-  weekHours: number;
-  averageFocus: number;
 }
 
 interface CompassProps {
@@ -79,11 +69,6 @@ const Compass: React.FC<CompassProps> = ({
   onSessionsUpdate,
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
-  const [stats, setStats] = useState<SessionStats>({
-    todayHours: 0,
-    weekHours: 0,
-    averageFocus: 0,
-  });
   const { user } = useAuth();
 
   // Refs for keyboard shortcuts
@@ -137,11 +122,6 @@ const Compass: React.FC<CompassProps> = ({
     }
   };
 
-  // Function to handle stats updates
-  const handleStatsCalculated = (newStats: SessionStats) => {
-    setStats(newStats);
-  };
-
   // Effect to add visual highlight to selected signal
   useEffect(() => {
     if (selectedSignalIndex === null) return;
@@ -188,8 +168,8 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
-      // 'r' key to open record session modal
-      if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) {
+      // 'f' key to open record session modal (focus session)
+      if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         if (isRunning) {
           onStartPause(); // Pause the timer if it's running
@@ -418,20 +398,8 @@ const Compass: React.FC<CompassProps> = ({
     isModalOpen,
   ]);
 
-  // Force refresh the timer every 3 seconds when it's running to prevent UI freezes
-  useEffect(() => {
-    if (isRunning) {
-      const refreshInterval = setInterval(() => {
-        // This is just a dummy state update to force re-render
-        setStats((prevStats) => ({ ...prevStats }));
-      }, 3000);
-
-      return () => clearInterval(refreshInterval);
-    }
-  }, [isRunning]);
-
   return (
-    <div className="p-0 space-y-6">
+    <div className="p-0 gap-4 flex flex-col h-full">
       <TimerCompleteModal
         isOpen={isModalOpen}
         onClose={onCloseModal}
@@ -450,8 +418,8 @@ const Compass: React.FC<CompassProps> = ({
         <Signals isModalOpen={isModalOpen} />
       </div>
 
-      {/* Timer and Sessions Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Timer Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Timer */}
         <div className="h-full">
           <TimerDisplay
@@ -464,35 +432,22 @@ const Compass: React.FC<CompassProps> = ({
           />
         </div>
 
-        {/* Sessions Overview */}
+        {/* Progress Stats with date navigation */}
         <div className="lg:col-span-2">
-          <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-            <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
-              <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-                Sessions
-              </h2>
-            </div>
-            <div className="p-5 bg-white dark:bg-gray-900 h-[calc(100%-48px)]">
-              <SessionsOverview
-                sessions={sessions}
-                isLoading={isLoadingSessions}
-                onSessionsUpdate={onSessionsUpdate}
-                onStatsCalculated={handleStatsCalculated}
-              />
-            </div>
-          </div>
+          <FriendsProgressStats
+            sessions={sessions}
+            onSessionsUpdate={onSessionsUpdate}
+          />
         </div>
       </div>
 
-      {/* Bottom section: Stats and Daily Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-2">
-          <FriendsProgressStats sessions={sessions} />
+      {/* Bottom section: Daily Tasks and Blocked Tasks */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
+        <div className="lg:col-span-3 flex flex-col min-h-0">
+          <DailyTasks />
         </div>
-        <div className="lg:col-span-2">
-          <div className="">
-            <DailyTasks />
-          </div>
+        <div className="lg:col-span-2 flex flex-col min-h-0">
+          <BlockedTasks />
         </div>
       </div>
     </div>

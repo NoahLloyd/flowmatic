@@ -2,6 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/api";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Clock,
+  Brain,
+} from "lucide-react";
+import SessionEditModal from "./SessionEditModal";
+import { format, isToday, addDays, subDays, startOfDay } from "date-fns";
 
 interface FriendStats {
   todayHours: number;
@@ -21,10 +30,12 @@ interface FriendStats {
   yearlyExpectedProgress: number;
   activities: string[];
   todaySessions?: Session[]; // Add sessions for detailed visualization
+  averageFocus: number;
 }
 
 interface FriendsProgressStatsProps {
   sessions: Session[];
+  onSessionsUpdate?: () => Promise<void>;
 }
 
 // Create a separate component for daily session visualization
@@ -32,10 +43,12 @@ const DailySessionBar = ({
   sessions,
   target,
   expectedProgress,
+  onSessionClick,
 }: {
   sessions: Session[];
   target: number;
   expectedProgress: number;
+  onSessionClick?: (session: Session) => void;
 }) => {
   // Sort sessions by created_at
   const sortedSessions = [...sessions].sort(
@@ -191,7 +204,7 @@ const DailySessionBar = ({
   const totalProgress = Math.min(100, (totalHours / target) * 100);
 
   return (
-    <div className="w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-12 relative overflow-hidden">
+    <div className="w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-[100px] relative overflow-hidden">
       {/* Background for entire bar */}
       <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900"></div>
 
@@ -210,8 +223,15 @@ const DailySessionBar = ({
           return (
             <div
               key={idx}
-              className={`h-full relative ${focusBg}`}
+              className={`h-full relative ${focusBg} ${
+                onSessionClick
+                  ? "cursor-pointer hover:opacity-80 transition-opacity"
+                  : ""
+              }`}
               style={{ width: `${widthPercent}%` }}
+              onClick={
+                onSessionClick ? () => onSessionClick(session) : undefined
+              }
             >
               {/* Only show divider if it's not the same project as previous */}
               {showLeftDivider && (
@@ -254,7 +274,13 @@ const DailySessionBar = ({
 };
 
 // Create separate component for day progress
-const DayProgress = ({ stats }: { stats: FriendStats }) => {
+const DayProgress = ({
+  stats,
+  onSessionClick,
+}: {
+  stats: FriendStats;
+  onSessionClick?: (session: Session) => void;
+}) => {
   const hours = stats.todayHours;
   const target = stats.todayTarget;
   const offset = stats.todayOffset;
@@ -279,6 +305,7 @@ const DayProgress = ({ stats }: { stats: FriendStats }) => {
           sessions={stats.todaySessions}
           target={target}
           expectedProgress={expectedProgress}
+          onSessionClick={onSessionClick}
         />
       </div>
     );
@@ -286,7 +313,7 @@ const DayProgress = ({ stats }: { stats: FriendStats }) => {
 
   // Fall back to simplified version if no session data
   return (
-    <div className="w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-12 relative overflow-hidden">
+    <div className="w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 h-[100px] relative overflow-hidden">
       {/* Expected progress background */}
       <div
         className="absolute inset-0 bg-gray-100 dark:bg-gray-800 opacity-30"
@@ -327,90 +354,30 @@ const DayProgress = ({ stats }: { stats: FriendStats }) => {
   );
 };
 
-const FriendsProgressCard = ({
-  friend,
-  stats,
-  onClick,
-}: {
-  friend: string;
-  stats: FriendStats;
-  onClick?: () => void;
-}) => {
-  const hours = stats.todayHours;
-  const target = stats.todayTarget;
-  const offset = stats.todayOffset;
-  const progress = stats.todayProgress;
-
-  // Format hours for display
-  const formattedHours =
-    typeof hours === "number" ? hours.toFixed(1).replace(/\.0$/, "") : hours;
-  const formattedOffset = Math.round(offset);
-  const offsetDisplay = `(${offset >= 0 ? "+" : ""}${formattedOffset}h)`;
-  const offsetClass =
-    offset >= 0
-      ? "text-green-600 dark:text-green-400"
-      : "text-red-600 dark:text-red-400";
-
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white dark:bg-gray-950 p-3 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm ${
-        onClick ? "cursor-pointer" : ""
-      }`}
-    >
-      <div className="flex mb-2 items-center">
-        <div className="font-medium text-gray-900 dark:text-gray-100">
-          {friend}
-        </div>
-        <div className="ml-auto flex items-center space-x-1 text-sm">
-          <span className="text-gray-700 dark:text-gray-300">
-            {formattedHours}/{target}h
-          </span>
-          <span className={offsetClass}>{offsetDisplay}</span>
-        </div>
-      </div>
-      <DayProgress stats={stats} />
-    </div>
-  );
-};
-
 const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
   sessions,
+  onSessionsUpdate,
 }) => {
   const { user } = useAuth();
-  const [friends, setFriends] = useState<string[]>([]);
   const [statsData, setStatsData] = useState<Record<string, FriendStats>>({});
   const [isLoading, setIsLoading] = useState(true);
-
-  // Get user info for display
-  const userName = user?.name || "You";
-  const userEmail = user?.email?.split("@")[0] || "You";
-  const displayName = userName !== "You" ? userName : userEmail;
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    startOfDay(new Date())
+  );
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
   // Calculate the user's own stats based on sessions
   useEffect(() => {
-    // Get friends list from localStorage (matching the Friends page implementation)
-    const storedFriends = localStorage.getItem("friends");
-    if (storedFriends) {
-      try {
-        setFriends(JSON.parse(storedFriends));
-      } catch (error) {
-        console.error("Error parsing friends from localStorage:", error);
-        setFriends([]);
-      }
-    }
-
-    // Calculate user's stats using the same methods as in SessionStats
     calculateUserStats();
-  }, [sessions]);
+  }, [sessions, selectedDate]);
 
   // Calculate user stats
   const calculateUserStats = () => {
     setIsLoading(true);
 
     // Get daily target (match SessionStats implementation)
-    const getDailyTarget = () => {
-      const day = new Date().getDay();
+    const getDailyTarget = (date: Date) => {
+      const day = date.getDay();
       const dayNames = [
         "sunday",
         "monday",
@@ -460,27 +427,42 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
       return 1400; // Default if not set
     };
 
-    // Today's stats
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Selected date's stats
+    const dayStart = startOfDay(selectedDate);
+    const dayEnd = addDays(dayStart, 1);
 
-    const todaySessions = sessions.filter(
-      (session) => new Date(session.created_at) >= today
-    );
+    const daySessions = sessions.filter((session) => {
+      const sessionDate = new Date(session.created_at);
+      return sessionDate >= dayStart && sessionDate < dayEnd;
+    });
 
-    const hoursToday = todaySessions.reduce(
+    const hoursOnDay = daySessions.reduce(
       (acc, session) => acc + session.minutes / 60,
       0
     );
 
-    // Get activities for today
-    const activities = todaySessions
+    // Calculate weighted average focus for the day
+    const totalMinutesOnDay = daySessions.reduce(
+      (acc, session) => acc + session.minutes,
+      0
+    );
+    const weightedFocusSum = daySessions.reduce(
+      (acc, session) => acc + session.focus * session.minutes,
+      0
+    );
+    const averageFocus =
+      totalMinutesOnDay > 0
+        ? Number((weightedFocusSum / totalMinutesOnDay).toFixed(1))
+        : 0;
+
+    // Get activities for the selected day
+    const activities = daySessions
       .map((session) => session.task || session.project || "Focus session")
       .filter((activity, index, self) => self.indexOf(activity) === index)
       .slice(0, 3); // Limit to 3 recent activities
 
     // Better activity tracking based on actual project names to match the screenshot
-    const projectMinutes = todaySessions.reduce(
+    const projectMinutes = daySessions.reduce(
       (acc: Record<string, number>, session) => {
         const projectName = session.project || session.task || "Flow";
         if (!acc[projectName]) {
@@ -498,30 +480,34 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
       .map(([name]) => name);
 
     // Calculate expected progress based on time of day (9 AM - 4 PM workday)
-    const now = new Date();
-    const workdayStart = new Date(now);
-    workdayStart.setHours(9, 0, 0, 0); // 9 AM
-    const workdayEnd = new Date(now);
-    workdayEnd.setHours(16, 0, 0, 0); // 4 PM
+    // Only apply expected progress if viewing today, otherwise show 100% expected
+    const isViewingToday = isToday(selectedDate);
+    let expectedDailyProgress = 100; // Default to 100% if not viewing today or after workday end
 
-    let expectedDailyProgress = 100; // Default to 100% if after workday end
+    if (isViewingToday) {
+      const now = new Date();
+      const workdayStart = new Date(now);
+      workdayStart.setHours(9, 0, 0, 0); // 9 AM
+      const workdayEnd = new Date(now);
+      workdayEnd.setHours(16, 0, 0, 0); // 4 PM
 
-    if (now < workdayStart) {
-      expectedDailyProgress = 0;
-    } else if (now < workdayEnd) {
-      const totalWorkMinutes = 7 * 60; // 7 hours in minutes
-      const minutesSinceStart =
-        (now.getTime() - workdayStart.getTime()) / (1000 * 60);
-      expectedDailyProgress = Math.min(
-        100,
-        Math.round((minutesSinceStart / totalWorkMinutes) * 100)
-      );
+      if (now < workdayStart) {
+        expectedDailyProgress = 0;
+      } else if (now < workdayEnd) {
+        const totalWorkMinutes = 7 * 60; // 7 hours in minutes
+        const minutesSinceStart =
+          (now.getTime() - workdayStart.getTime()) / (1000 * 60);
+        expectedDailyProgress = Math.min(
+          100,
+          Math.round((minutesSinceStart / totalWorkMinutes) * 100)
+        );
+      }
     }
 
-    const dailyTarget = getDailyTarget();
+    const dailyTarget = getDailyTarget(selectedDate);
     const expectedDailyHours = (dailyTarget * expectedDailyProgress) / 100;
-    const todayHoursOffset = hoursToday - expectedDailyHours;
-    const todayProgressPercent = Math.round((hoursToday / dailyTarget) * 100);
+    const dayHoursOffset = hoursOnDay - expectedDailyHours;
+    const dayProgressPercent = Math.round((hoursOnDay / dailyTarget) * 100);
 
     // Weekly stats
     const weekStart = new Date();
@@ -614,146 +600,112 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
     // Set the user's stats
     setStatsData({
       [user?._id || "you"]: {
-        todayHours: hoursToday,
+        todayHours: hoursOnDay,
         weekHours: hoursThisWeek,
         yearHours: yearlyHours,
         todayTarget: dailyTarget,
         weeklyTarget,
         yearlyTarget,
-        todayOffset: todayHoursOffset,
+        todayOffset: dayHoursOffset,
         weeklyOffset: weeklyHoursOffset,
         yearlyOffset: yearlyHoursOffset,
-        todayProgress: todayProgressPercent,
+        todayProgress: dayProgressPercent,
         weeklyProgress: weeklyProgressPercent,
         yearlyProgress: yearlyProgressPercent,
         todayExpectedProgress: expectedDailyProgress,
         weeklyExpectedProgress: weeklyExpectedPercent,
         yearlyExpectedProgress: yearlyExpectedPercent,
         activities: sortedProjects.length > 0 ? sortedProjects : activities,
-        todaySessions: todaySessions, // Add actual session data for detailed visualization
+        todaySessions: daySessions, // Add actual session data for detailed visualization
+        averageFocus,
       },
     });
 
-    // Now fetch friend stats
-    fetchFriendsStats();
+    setIsLoading(false);
   };
 
-  // Fetch stats for friends
-  const fetchFriendsStats = async () => {
-    // In a real implementation, you would call the API for each friend
-    // For now, we'll create some mock data based on the screenshot
-
-    const mockFriendStats: Record<string, FriendStats> = {};
-
-    // Create some mock data for friends
-    for (const friend of friends) {
-      // Generate realistic stats similar to what's shown in the screenshot
-      const randomHoursToday = 2 + Math.random() * 3; // 2-5 hours
-      const randomHoursWeek = 10 + Math.random() * 20; // 10-30 hours
-      const randomHoursYear = 200 + Math.random() * 300; // 200-500 hours
-
-      const dailyTarget = 4; // Assume default
-      const weeklyTarget = 28; // Assume default
-      const yearlyTarget = 1400; // Assume default
-
-      // Calculate time-based expected progress (same as user)
-      const now = new Date();
-      const workdayStart = new Date(now);
-      workdayStart.setHours(9, 0, 0, 0);
-      const workdayEnd = new Date(now);
-      workdayEnd.setHours(16, 0, 0, 0);
-
-      let expectedDailyProgress = 100;
-      if (now < workdayStart) {
-        expectedDailyProgress = 0;
-      } else if (now < workdayEnd) {
-        const totalWorkMinutes = 7 * 60;
-        const minutesSinceStart =
-          (now.getTime() - workdayStart.getTime()) / (1000 * 60);
-        expectedDailyProgress = Math.min(
-          100,
-          Math.round((minutesSinceStart / totalWorkMinutes) * 100)
-        );
-      }
-
-      const expectedDailyHours = (dailyTarget * expectedDailyProgress) / 100;
-      const todayOffset = randomHoursToday - expectedDailyHours;
-
-      // Projects matching the screenshot
-      const projectsFromScreenshot = ["Flow", "Flowmatic", "Locked-in"];
-
-      // Randomly select 1-2 activities from the screenshot projects
-      const numActivities = 1 + Math.floor(Math.random() * 2);
-      const activities = Array.from(
-        { length: numActivities },
-        () =>
-          projectsFromScreenshot[
-            Math.floor(Math.random() * projectsFromScreenshot.length)
-          ]
-      );
-
-      // Create mock session data for detailed visualization
-      const mockSessions: Session[] = [];
-      const totalMinutes = randomHoursToday * 60;
-      let remainingMinutes = totalMinutes;
-
-      // Create 1-4 mock sessions that add up to the total time
-      const sessionCount = 1 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < sessionCount; i++) {
-        const isLast = i === sessionCount - 1;
-        const sessionMinutes = isLast
-          ? remainingMinutes
-          : Math.floor(
-              (remainingMinutes / (sessionCount - i)) * (0.5 + Math.random())
-            );
-
-        remainingMinutes -= sessionMinutes;
-
-        // Create a mock session with realistic data
-        const mockSession: Session = {
-          _id: `mock-${friend}-${i}`,
-          user_id: friend,
-          minutes: sessionMinutes,
-          focus: 1 + Math.floor(Math.random() * 5), // Random focus 1-5
-          created_at: new Date().toISOString(),
-          project: activities[i % activities.length],
-          task: "",
-          notes: "",
-        };
-
-        mockSessions.push(mockSession);
-      }
-
-      mockFriendStats[friend] = {
-        todayHours: randomHoursToday,
-        weekHours: randomHoursWeek,
-        yearHours: randomHoursYear,
-        todayTarget: dailyTarget,
-        weeklyTarget,
-        yearlyTarget,
-        todayOffset,
-        weeklyOffset:
-          randomHoursWeek - (expectedDailyProgress / 100) * weeklyTarget,
-        yearlyOffset:
-          randomHoursYear - (expectedDailyProgress / 100) * yearlyTarget,
-        todayProgress: Math.round((randomHoursToday / dailyTarget) * 100),
-        weeklyProgress: Math.round((randomHoursWeek / weeklyTarget) * 100),
-        yearlyProgress: Math.round((randomHoursYear / yearlyTarget) * 100),
-        todayExpectedProgress: expectedDailyProgress,
-        weeklyExpectedProgress: expectedDailyProgress, // Simplified for mock
-        yearlyExpectedProgress: expectedDailyProgress, // Simplified for mock
-        activities,
-        todaySessions: mockSessions,
+  // Color functions for pills (matching SessionsOverview style)
+  const getFocusColor = (focus: number) => {
+    if (focus < 2)
+      return {
+        bg: "bg-red-100 dark:bg-red-900",
+        text: "text-red-700 dark:text-red-200",
       };
-    }
+    if (focus < 3)
+      return {
+        bg: "bg-orange-100 dark:bg-orange-900",
+        text: "text-orange-700 dark:text-orange-200",
+      };
+    if (focus < 4)
+      return {
+        bg: "bg-yellow-100 dark:bg-yellow-900",
+        text: "text-yellow-700 dark:text-yellow-200",
+      };
+    if (focus < 4.5)
+      return {
+        bg: "bg-green-100 dark:bg-green-900",
+        text: "text-green-700 dark:text-green-200",
+      };
+    return {
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
+    };
+  };
 
-    // Merge with user stats
-    setStatsData((prevStats) => ({
-      ...prevStats,
-      ...mockFriendStats,
-    }));
+  const getHoursColor = (hours: number, date: Date) => {
+    // Get the daily goal for this specific day
+    const getDailyGoalForDate = (date: Date) => {
+      const day = date.getDay();
+      const dayNames = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+      ];
+      const dayName = dayNames[day];
 
-    setIsLoading(false);
+      if (
+        user?.preferences?.dailyHoursGoals &&
+        dayName in user.preferences.dailyHoursGoals
+      ) {
+        return user.preferences.dailyHoursGoals[dayName];
+      }
+      return 4; // Default if not set
+    };
+
+    const dailyGoal = getDailyGoalForDate(date);
+
+    // Calculate percentage of goal achieved
+    const percentage = (hours / dailyGoal) * 100;
+
+    // Color based on percentage of goal
+    if (percentage < 25)
+      return {
+        bg: "bg-red-100 dark:bg-red-900",
+        text: "text-red-700 dark:text-red-200",
+      };
+    if (percentage < 50)
+      return {
+        bg: "bg-orange-100 dark:bg-orange-900",
+        text: "text-orange-700 dark:text-orange-200",
+      };
+    if (percentage < 75)
+      return {
+        bg: "bg-yellow-100 dark:bg-yellow-900",
+        text: "text-yellow-700 dark:text-yellow-200",
+      };
+    if (percentage < 100)
+      return {
+        bg: "bg-green-100 dark:bg-green-900",
+        text: "text-green-700 dark:text-green-200",
+      };
+    return {
+      bg: "bg-indigo-100 dark:bg-indigo-900",
+      text: "text-indigo-700 dark:text-indigo-200",
+    };
   };
 
   const WeekYearProgress = ({ stats }: { stats: FriendStats }) => {
@@ -866,39 +818,272 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
     );
   };
 
+  // Render GitHub-like history visualization for the last 7 days
+  const renderSessionsHistory = () => {
+    // Create an array of the past 7 days
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - 6 + i);
+      return date;
+    });
+
+    // Get daily goal helper
+    const getDailyGoalForDate = (date: Date) => {
+      const day = date.getDay();
+      const dayNames = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+      ];
+      const dayName = dayNames[day];
+
+      if (
+        user?.preferences?.dailyHoursGoals &&
+        dayName in user.preferences.dailyHoursGoals
+      ) {
+        return user.preferences.dailyHoursGoals[dayName];
+      }
+      return 4; // Default if not set
+    };
+
+    // Calculate hours for each day
+    const dayData = last7Days.map((date) => {
+      const dayStart = startOfDay(date);
+      const dayEnd = addDays(dayStart, 1);
+
+      const daySessions = sessions.filter((session) => {
+        const sessionDate = new Date(session.created_at);
+        return sessionDate >= dayStart && sessionDate < dayEnd;
+      });
+
+      const hours = daySessions.reduce(
+        (acc, session) => acc + session.minutes / 60,
+        0
+      );
+
+      const goal = getDailyGoalForDate(date);
+      const percentage = goal > 0 ? (hours / goal) * 100 : 0;
+
+      return {
+        date,
+        hours,
+        goal,
+        percentage,
+        dayLetter: date
+          .toLocaleDateString("en-US", { weekday: "short" })
+          .charAt(0),
+      };
+    });
+
+    return (
+      <div className="flex">
+        {dayData.map((day, index) => {
+          let bgColor = "bg-gray-200 dark:bg-gray-800";
+
+          if (day.hours > 0) {
+            if (day.percentage >= 100) {
+              // At or above goal - fully green
+              bgColor = "bg-green-500 dark:bg-green-900";
+            } else if (day.percentage >= 80) {
+              // Close to goal - lighter green
+              bgColor = "bg-green-400 dark:bg-green-800";
+            } else if (day.percentage >= 60) {
+              // Getting there - yellow
+              bgColor = "bg-yellow-400 dark:bg-yellow-900";
+            } else if (day.percentage >= 40) {
+              // Some progress - orange
+              bgColor = "bg-orange-400 dark:bg-orange-900";
+            } else if (day.percentage >= 20) {
+              // Little progress - light red
+              bgColor = "bg-red-400 dark:bg-red-800";
+            } else {
+              // Very little - darker red
+              bgColor = "bg-red-500 dark:bg-red-900";
+            }
+          } else {
+            // No hours recorded - completely red
+            bgColor = "bg-red-500 dark:bg-red-900";
+          }
+
+          return (
+            <div
+              key={index}
+              className={`w-4 h-4 mx-0.5 ${bgColor} rounded-sm flex items-center justify-center text-xs font-medium`}
+              title={`${format(day.date, "MMM d")}: ${day.hours.toFixed(
+                1
+              )}h / ${day.goal}h (${Math.round(day.percentage)}%)`}
+            >
+              {/* No text in the small squares to keep it clean */}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Date navigation handlers
+  const goToPreviousDay = () => {
+    setSelectedDate((prev) => subDays(prev, 1));
+  };
+
+  const goToNextDay = () => {
+    const nextDay = addDays(selectedDate, 1);
+    // Don't allow navigating to future dates
+    if (nextDay <= startOfDay(new Date())) {
+      setSelectedDate(nextDay);
+    }
+  };
+
+  const goToToday = () => {
+    setSelectedDate(startOfDay(new Date()));
+  };
+
+  // Session edit handlers
+  const handleSessionClick = (session: Session) => {
+    setSelectedSession(session);
+  };
+
+  const handleSaveSession = async (updatedSession: Session) => {
+    try {
+      await api.updateSession(updatedSession._id, updatedSession);
+      if (onSessionsUpdate) {
+        await onSessionsUpdate();
+      }
+    } catch (error) {
+      console.error("Failed to update session:", error);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!selectedSession) return;
+    try {
+      await api.deleteSession(selectedSession._id);
+      if (onSessionsUpdate) {
+        await onSessionsUpdate();
+      }
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+    }
+  };
+
+  const isViewingToday = isToday(selectedDate);
+  const canGoForward = !isViewingToday;
+
   return (
     <div className="space-y-6">
       {/* User's card */}
       {statsData[user?._id || "you"] && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-              {displayName}
-            </h2>
-            {!isLoading && (
-              <div className="flex items-baseline gap-1">
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
-                  {typeof statsData[user?._id || "you"].todayHours === "number"
-                    ? statsData[user?._id || "you"].todayHours
-                        .toFixed(1)
-                        .replace(/\.0$/, "")
-                    : statsData[user?._id || "you"].todayHours}
-                </span>
+          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+                Sessions
+              </h2>
+              {!isViewingToday && (
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  / {statsData[user?._id || "you"].todayTarget}
+                  {format(selectedDate, "MMM d, yyyy")}
                 </span>
-                <span
-                  className={`text-xs font-medium ${
-                    statsData[user?._id || "you"].todayOffset >= 0
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
+              )}
+              {/* Hours and Focus pills */}
+              {!isLoading && (
+                <div className="flex gap-1.5 text-xs">
+                  <div
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
+                      getHoursColor(
+                        statsData[user?._id || "you"].todayHours,
+                        selectedDate
+                      ).bg
+                    }`}
+                  >
+                    <Clock
+                      className={`w-3 h-3 ${
+                        getHoursColor(
+                          statsData[user?._id || "you"].todayHours,
+                          selectedDate
+                        ).text
+                      }`}
+                    />
+                    <span
+                      className={`font-medium ${
+                        getHoursColor(
+                          statsData[user?._id || "you"].todayHours,
+                          selectedDate
+                        ).text
+                      }`}
+                    >
+                      {statsData[user?._id || "you"].todayHours
+                        .toFixed(1)
+                        .replace(".0", "")}
+                      h
+                    </span>
+                  </div>
+                  {statsData[user?._id || "you"].averageFocus > 0 && (
+                    <div
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
+                        getFocusColor(
+                          statsData[user?._id || "you"].averageFocus
+                        ).bg
+                      }`}
+                    >
+                      <Brain
+                        className={`w-3 h-3 ${
+                          getFocusColor(
+                            statsData[user?._id || "you"].averageFocus
+                          ).text
+                        }`}
+                      />
+                      <span
+                        className={`font-medium ${
+                          getFocusColor(
+                            statsData[user?._id || "you"].averageFocus
+                          ).text
+                        }`}
+                      >
+                        {statsData[user?._id || "you"].averageFocus}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {!isLoading && (
+                <div className="flex">{renderSessionsHistory()}</div>
+              )}
+              {/* Date navigation buttons */}
+              <div className="flex items-center gap-1">
+                {canGoForward && (
+                  <>
+                    <button
+                      onClick={goToNextDay}
+                      className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+                      title="Next day"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={goToToday}
+                      className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+                      title="Go to today"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={goToPreviousDay}
+                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+                  title="Previous day"
                 >
-                  ({statsData[user?._id || "you"].todayOffset >= 0 ? "+" : ""}
-                  {Math.round(statsData[user?._id || "you"].todayOffset)}h)
-                </span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-            )}
+            </div>
           </div>
           <div className="p-5 bg-white dark:bg-gray-900">
             {isLoading ? (
@@ -911,7 +1096,10 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
               <div className="space-y-4">
                 {/* Daily progress always on top */}
                 <div className="h-auto">
-                  <DayProgress stats={statsData[user?._id || "you"]} />
+                  <DayProgress
+                    stats={statsData[user?._id || "you"]}
+                    onSessionClick={handleSessionClick}
+                  />
                 </div>
 
                 {/* Custom divider with time information */}
@@ -998,20 +1186,14 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
         </div>
       )}
 
-      {/* Friend cards - use a more compact layout when there are multiple friends */}
-      {friends.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {friends.map(
-            (friend) =>
-              statsData[friend] && (
-                <FriendsProgressCard
-                  key={friend}
-                  friend={friend}
-                  stats={statsData[friend]}
-                />
-              )
-          )}
-        </div>
+      {/* Session Edit Modal */}
+      {selectedSession && (
+        <SessionEditModal
+          session={selectedSession}
+          onClose={() => setSelectedSession(null)}
+          onSave={handleSaveSession}
+          onDelete={handleDeleteSession}
+        />
       )}
     </div>
   );

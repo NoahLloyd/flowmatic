@@ -3,12 +3,39 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 import { api } from "../utils/api";
 import { useAuth } from "./AuthContext";
 import { useTimezone } from "./TimezoneContext";
 import { AVAILABLE_SIGNALS as ImportedAvailableSignals } from "../pages/settings/components/SignalSettings";
+import { MorningEntry } from "../types/Morning";
+import { Session } from "../types/Session";
+
+// Helper function to check if a morning entry has journaling content
+const hasJournalingContent = (entry: MorningEntry | undefined): boolean => {
+  if (!entry) return false;
+
+  // Check for new activityContent format
+  if (entry.activityContent) {
+    const { writing, gratitude, affirmations } = entry.activityContent;
+    if (
+      (writing && writing.trim().length > 0) ||
+      (gratitude && gratitude.trim().length > 0) ||
+      (affirmations && affirmations.trim().length > 0)
+    ) {
+      return true;
+    }
+  }
+
+  // Check for legacy content format
+  if (entry.content && entry.content.trim().length > 0) {
+    return true;
+  }
+
+  return false;
+};
 
 // Declare global interface for TypeScript
 declare global {
@@ -114,6 +141,38 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  // Helper function to get the daily focus goal from user preferences
+  const getDailyGoal = useCallback(
+    (date: Date = new Date()) => {
+      // Get the day of week in user's timezone
+      const day = new Date(
+        date.toLocaleString("en-US", { timeZone: timezone })
+      ).getDay();
+
+      // Convert to our day format (monday, tuesday, etc.)
+      const dayNames = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+      ];
+      const dayName = dayNames[day];
+
+      // Check if user has preferences set
+      if (
+        user?.preferences?.dailyHoursGoals &&
+        dayName in user.preferences.dailyHoursGoals
+      ) {
+        return user.preferences.dailyHoursGoals[dayName];
+      }
+      return 4; // Default if not set
+    },
+    [user, timezone]
+  );
+
   // Function to refresh signals and recalculate scores
   const refreshSignals = async () => {
     if (!user) return;
@@ -126,7 +185,90 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
       // Fetch today's signals
       const todaySignals = await api.getDailySignals(today);
-      setSignals(todaySignals);
+
+      // Fetch morning entries for journaling signal
+      let journalingValue = false;
+      try {
+        const morningData = await api.getAllEntries();
+        const todayEntry = morningData.entries?.find(
+          (entry: MorningEntry) => entry.date === today
+        );
+        journalingValue = hasJournalingContent(todayEntry);
+      } catch (error) {
+        console.error(
+          "Failed to fetch morning entries for journaling signal:",
+          error
+        );
+      }
+
+      // Fetch sessions and compute focusHours signal
+      let focusHoursValue = false;
+      let hoursToday = 0;
+      try {
+        const sessions = (await api.getUserSessions()) as Session[];
+
+        // Filter sessions for today (using timezone-aware filtering)
+        const todaySessions = sessions.filter((session) => {
+          try {
+            // Convert the session date to the user's timezone
+            const rawDate = new Date(session.created_at);
+
+            // Create a date string in the user's timezone format
+            const sessionDateStr = rawDate.toLocaleString("en-US", {
+              timeZone: timezone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            });
+
+            // Create today's date string in the same format
+            const now = new Date();
+            const todayDateStr = now.toLocaleString("en-US", {
+              timeZone: timezone,
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+            });
+
+            // Compare the date strings directly
+            return sessionDateStr === todayDateStr;
+          } catch (error) {
+            console.error("Error filtering session date:", error);
+            return false;
+          }
+        });
+
+        // Calculate hours using same reducer logic as elsewhere
+        hoursToday = todaySessions.reduce(
+          (acc, session) => acc + session.minutes / 60,
+          0
+        );
+
+        // Get the daily goal for today
+        const dailyGoal = getDailyGoal();
+
+        // Focus hours signal is complete if we've met or exceeded the goal
+        focusHoursValue = hoursToday >= dailyGoal;
+
+        console.log(
+          `[SignalsContext] Focus Hours: ${hoursToday.toFixed(
+            1
+          )}h / ${dailyGoal}h goal = ${
+            focusHoursValue ? "COMPLETE" : "incomplete"
+          }`
+        );
+      } catch (error) {
+        console.error("Failed to fetch sessions for focusHours signal:", error);
+      }
+
+      // Add computed signals (journaling and focusHours) to signals (overriding any manual values)
+      const signalsWithComputed: Record<string, number | boolean> = {
+        ...todaySignals,
+        journaling: journalingValue,
+        focusHours: focusHoursValue,
+      };
+
+      setSignals(signalsWithComputed);
 
       // Get signal history for the past 3 days for shower
       let showerHistory: any[] = [];
@@ -162,14 +304,16 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
       // Check if user has showered in the past 3 days
       // First check today's shower status
-      const todayShowerValue = todaySignals.shower;
+      const todayShowerValue = signalsWithComputed.shower;
 
       // Check all possible truthy values for shower
+      // Cast to unknown first to handle potential string values from API
+      const showerVal = todayShowerValue as unknown;
       if (
-        todayShowerValue === true ||
-        todayShowerValue === "true" ||
-        todayShowerValue === 1 ||
-        todayShowerValue === "1"
+        showerVal === true ||
+        showerVal === "true" ||
+        showerVal === 1 ||
+        showerVal === "1"
       ) {
         hasShoweredIn3Days = true;
       } else {
@@ -212,7 +356,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         if (key === "shower") return;
 
         totalActiveSignals++;
-        const value = todaySignals[key];
+        const value = signalsWithComputed[key];
 
         // Calculate completion score for this signal (0-100%)
         let completionScore = 0;
@@ -222,7 +366,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         if (config.type === "binary") {
           // Binary signals: 100% if true, 0% if false
           // Ensure we're checking for any truthy representation of true
-          if (value === true || value === "true" || value === 1) {
+          // Cast to unknown to handle potential string values from API
+          const binaryVal = value as unknown;
+          if (binaryVal === true || binaryVal === "true" || binaryVal === 1) {
             completionScore = 100;
             completionValue = 1;
             // Count as completed if 100%
@@ -387,6 +533,22 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
   // Function to update a signal
   const updateSignal = async (metric: string, value: number | boolean) => {
+    // Journaling signal is read-only - it's determined by the Morning page
+    if (metric === "journaling") {
+      console.log(
+        "Journaling signal is read-only. It's automatically tracked from the Morning page."
+      );
+      return;
+    }
+
+    // Focus hours signal is read-only - it's determined by sessions
+    if (metric === "focusHours") {
+      console.log(
+        "Focus Hours signal is read-only. It's automatically tracked from your focus sessions."
+      );
+      return;
+    }
+
     try {
       const today = getTodayInUserTimezone();
 
@@ -425,16 +587,42 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
     // Set up an event listener for signal updates from elsewhere in the app
     const handleSignalUpdate = () => {
-      console.log("Signal update detected, refreshing signals data");
+      console.log(
+        "[SignalsContext] Signal update detected, refreshing signals data"
+      );
       refreshSignals();
     };
 
-    // Listen for custom event that will be triggered when signals are updated anywhere
+    // Listen for session updates (new sessions, deleted sessions, etc.)
+    const handleSessionUpdate = () => {
+      console.log(
+        "[SignalsContext] Session update detected, refreshing focusHours signal"
+      );
+      refreshSignals();
+    };
+
+    // Listen for morning entry updates (journaling)
+    const handleMorningUpdate = () => {
+      console.log(
+        "[SignalsContext] Morning entry update detected, refreshing journaling signal"
+      );
+      refreshSignals();
+    };
+
+    // Listen for custom events that will be triggered when updates happen anywhere
     window.addEventListener("signalUpdated", handleSignalUpdate);
+    window.addEventListener("sessionCreated", handleSessionUpdate);
+    window.addEventListener("sessionDeleted", handleSessionUpdate);
+    window.addEventListener("sessionUpdated", handleSessionUpdate);
+    window.addEventListener("morningEntryUpdated", handleMorningUpdate);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("signalUpdated", handleSignalUpdate);
+      window.removeEventListener("sessionCreated", handleSessionUpdate);
+      window.removeEventListener("sessionDeleted", handleSessionUpdate);
+      window.removeEventListener("sessionUpdated", handleSessionUpdate);
+      window.removeEventListener("morningEntryUpdated", handleMorningUpdate);
     };
   }, [user]);
 

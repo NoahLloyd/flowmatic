@@ -4,6 +4,12 @@ import { AlertCircle } from "lucide-react";
 
 // All available signals with their configurations
 export const AVAILABLE_SIGNALS = {
+  focusHours: {
+    label: "Focus Hours",
+    type: "binary",
+    hasGoal: false,
+    isComputed: true, // This signal is automatically computed from sessions
+  },
   minutesToOffice: {
     label: "Minutes to Office",
     type: "number",
@@ -12,7 +18,7 @@ export const AVAILABLE_SIGNALS = {
   },
   waterIntake: { label: "Water", type: "water", max: 5000, hasGoal: true },
   energy: { label: "Energy", type: "scale", hasGoal: false },
-  mood: { label: "Mood", type: "scale", hasGoal: false },
+  mood: { label: "Routine", type: "scale", hasGoal: false },
   exercise: { label: "Exercise", type: "binary", hasGoal: false },
   breakfast: { label: "Breakfast", type: "binary", hasGoal: false },
   lunch: { label: "Lunch", type: "binary", hasGoal: false },
