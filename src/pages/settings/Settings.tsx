@@ -99,6 +99,9 @@ const Settings = () => {
   const [defaultMinutes, setDefaultMinutes] = useState<number>(
     user?.preferences?.defaultMinutes || 60
   );
+  const [autoDoNotDisturb, setAutoDoNotDisturb] = useState<boolean>(
+    user?.preferences?.autoDoNotDisturb || false
+  );
   const [lightModeFromColor, setLightModeFromColor] = useState<string>(
     user?.preferences?.lightModeFromColor || defaultLightFromColor
   );
@@ -125,6 +128,7 @@ const Settings = () => {
     if (user?.preferences) {
       setDefaultProject(user.preferences.defaultProject || "");
       setDefaultMinutes(user.preferences.defaultMinutes || 60);
+      setAutoDoNotDisturb(user.preferences.autoDoNotDisturb || false);
       setLightModeFromColor(
         user.preferences.lightModeFromColor || defaultLightFromColor
       );
@@ -216,6 +220,7 @@ const Settings = () => {
         // Parent component settings
         defaultProject,
         defaultMinutes,
+        autoDoNotDisturb,
         lightModeFromColor,
         lightModeToColor,
         darkModeFromColor,
@@ -416,6 +421,35 @@ const Settings = () => {
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Default timer duration (1-180 minutes)
               </p>
+            </div>
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Auto Do Not Disturb
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Enable DND while timer is running (macOS only)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoDoNotDisturb(!autoDoNotDisturb)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
+                    autoDoNotDisturb
+                      ? "bg-gray-900 dark:bg-white"
+                      : "bg-gray-200 dark:bg-gray-700"
+                  }`}
+                  role="switch"
+                  aria-checked={autoDoNotDisturb}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${
+                      autoDoNotDisturb ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>

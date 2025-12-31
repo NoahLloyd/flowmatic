@@ -23,6 +23,7 @@ export interface IElectronAPI {
   ) => Promise<any>;
   getShortcuts: () => Promise<ShortcutsConfig>;
   updateShortcuts: (shortcuts: ShortcutsConfig) => Promise<ShortcutsConfig>;
+  setDoNotDisturb: (enabled: boolean) => Promise<boolean>;
 }
 
 declare global {

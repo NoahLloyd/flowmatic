@@ -121,3 +121,6 @@ const GlobalQuickAddNote: React.FC<GlobalQuickAddNoteProps> = ({
 
 export default GlobalQuickAddNote;
 
+
+
+

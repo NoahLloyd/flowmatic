@@ -11,6 +11,7 @@ import {
 import axios from "axios";
 import path from "path";
 import * as fs from "fs";
+import { exec } from "child_process";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -57,8 +58,19 @@ const saveShortcuts = (shortcuts: typeof DEFAULT_SHORTCUTS) => {
   }
 };
 
-// Create overlay window
+// Create overlay window or use in-app modal if main window is fullscreen
 const createOverlayWindow = (type: "task" | "note") => {
+  // Check if main window is in fullscreen mode
+  // If so, use in-app modal instead of separate overlay to avoid space switching
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFullScreen()) {
+    // Send event to main window to open in-app modal
+    const channel =
+      type === "task" ? "global-quick-add-task" : "global-quick-add-note";
+    mainWindow.webContents.send(channel);
+    mainWindow.focus();
+    return;
+  }
+
   // If overlay already exists, just focus it
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.focus();
@@ -98,7 +110,9 @@ const createOverlayWindow = (type: "task" | "note") => {
 
   // Hide from dock on macOS
   if (process.platform === "darwin") {
-    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    overlayWindow.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true,
+    });
   }
 
   // Focus the window
@@ -284,11 +298,14 @@ ipcMain.handle("get-shortcuts", () => {
 });
 
 // Update shortcuts
-ipcMain.handle("update-shortcuts", (_event, newShortcuts: typeof DEFAULT_SHORTCUTS) => {
-  saveShortcuts(newShortcuts);
-  registerGlobalShortcuts();
-  return loadShortcuts();
-});
+ipcMain.handle(
+  "update-shortcuts",
+  (_event, newShortcuts: typeof DEFAULT_SHORTCUTS) => {
+    saveShortcuts(newShortcuts);
+    registerGlobalShortcuts();
+    return loadShortcuts();
+  }
+);
 
 // Overlay window IPC handlers
 ipcMain.handle("get-overlay-type", () => {
@@ -373,6 +390,46 @@ ipcMain.on("overlay-close", () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.close();
   }
+});
+
+// Do Not Disturb control for macOS
+// Uses Shortcuts app via AppleScript for reliable Focus mode control
+// Requires user to have shortcuts named "Focus On" and "Focus Off" set up
+const setDoNotDisturb = (enabled: boolean): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (process.platform !== "darwin") {
+      console.log("Do Not Disturb is only supported on macOS");
+      resolve(false);
+      return;
+    }
+
+    const shortcutName = enabled ? "Focus On" : "Focus Off";
+
+    // Use AppleScript to run the shortcut - better permission handling
+    const command = `osascript -e 'tell application "Shortcuts Events" to run shortcut "${shortcutName}"'`;
+
+    console.log(`Running DND shortcut: ${shortcutName}`);
+
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(
+          `Failed to run shortcut "${shortcutName}":`,
+          error.message
+        );
+        if (stderr) console.error("stderr:", stderr);
+        resolve(false);
+        return;
+      }
+
+      console.log(`Do Not Disturb ${enabled ? "enabled" : "disabled"}`);
+      resolve(true);
+    });
+  });
+};
+
+// IPC handler for Do Not Disturb
+ipcMain.handle("set-do-not-disturb", async (_event, enabled: boolean) => {
+  return await setDoNotDisturb(enabled);
 });
 
 app.whenReady().then(() => {

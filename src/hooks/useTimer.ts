@@ -40,6 +40,18 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const defaultMinutes = user?.preferences?.defaultMinutes || 60;
   const defaultSeconds = defaultMinutes * 60;
 
+  // Get auto Do Not Disturb preference
+  const autoDoNotDisturb = user?.preferences?.autoDoNotDisturb || false;
+
+  // Helper function to set Do Not Disturb
+  const setDoNotDisturb = (enabled: boolean) => {
+    if (autoDoNotDisturb && window.electron?.setDoNotDisturb) {
+      window.electron.setDoNotDisturb(enabled).catch((error: Error) => {
+        console.error("Failed to set Do Not Disturb:", error);
+      });
+    }
+  };
+
   // Main timer states
   const [duration, setDuration] = useState(defaultSeconds);
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -299,6 +311,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setTimeRemaining(defaultSeconds);
     setDuration(defaultSeconds);
 
+    // Disable DND when timer completes
+    setDoNotDisturb(false);
+
     // Show notification
     showNotification("Work session completed!");
     window.electron.send("show-window");
@@ -337,6 +352,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Exit break mode
     setIsBreakMode(false);
 
+    // Disable DND when break completes
+    setDoNotDisturb(false);
+
     // Close modal and sidebar
     setIsModalOpen(false);
     setShowInSidebar(false);
@@ -365,12 +383,16 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         setBreakIsRunning(false);
         setBreakDuration(breakTimeRemaining);
         setBreakStartTime(null);
+        // Disable DND when pausing break
+        setDoNotDisturb(false);
       } else {
         // Start break timer
         const newBreakStartTime =
           Date.now() - (breakDuration - breakTimeRemaining) * 1000;
         setBreakStartTime(newBreakStartTime);
         setBreakIsRunning(true);
+        // Enable DND when starting break
+        setDoNotDisturb(true);
       }
     } else {
       // Toggle main timer
@@ -385,11 +407,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           timeRemaining / 60
         ).toString()}m`;
         window.electron.send("update-tray", trayString);
+
+        // Disable DND when pausing
+        setDoNotDisturb(false);
       } else {
         // Start main timer
         const newStartTime = Date.now() - (duration - timeRemaining) * 1000;
         setStartTime(newStartTime);
         setIsRunning(true);
+
+        // Enable DND when starting
+        setDoNotDisturb(true);
       }
     }
   };
@@ -459,6 +487,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setIsRunning(false);
     setShowInSidebar(false);
 
+    // Disable DND when timer is reset
+    setDoNotDisturb(false);
+
     // Clear from localStorage
     localStorage.removeItem("timerState");
   };
@@ -477,6 +508,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     const now = Date.now();
     setBreakStartTime(now);
     setBreakIsRunning(true);
+
+    // Enable DND when starting break
+    setDoNotDisturb(true);
 
     // Save state
     saveTimerState({
@@ -508,6 +542,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setStartTime(now);
     setIsRunning(true);
     setShowInSidebar(false);
+
+    // Enable DND when restarting timer
+    setDoNotDisturb(true);
 
     // Save state
     saveTimerState({
@@ -644,6 +681,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Exit break mode
     setIsBreakMode(false);
     setShowInSidebar(false);
+
+    // Disable DND when break timer is reset
+    setDoNotDisturb(false);
 
     // Update localStorage
     saveTimerState({

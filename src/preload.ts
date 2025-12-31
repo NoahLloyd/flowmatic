@@ -68,7 +68,14 @@ contextBridge.exposeInMainWorld("electron", {
     return ipcRenderer.invoke("get-shortcuts");
   },
 
-  updateShortcuts: (shortcuts: { quickAddTask: string; quickAddNote: string }) => {
+  updateShortcuts: (shortcuts: {
+    quickAddTask: string;
+    quickAddNote: string;
+  }) => {
     return ipcRenderer.invoke("update-shortcuts", shortcuts);
+  },
+
+  setDoNotDisturb: (enabled: boolean) => {
+    return ipcRenderer.invoke("set-do-not-disturb", enabled);
   },
 });

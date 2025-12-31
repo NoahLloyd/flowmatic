@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Timer, ChevronUp, ChevronDown } from "lucide-react";
 
 const SIDEBAR_TIMER_HIDDEN_KEY = "sidebarTimerHidden";
+const TIMER_SIMPLE_MODE_KEY = "timerSimpleMode";
 
 interface SidebarTimerProps {
   isVisible: boolean;
@@ -22,16 +23,48 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
     return stored === "true";
   });
 
+  const [isSimpleMode, setIsSimpleMode] = useState(() => {
+    const saved = localStorage.getItem(TIMER_SIMPLE_MODE_KEY);
+    return saved === "true";
+  });
+
   // Persist hidden state to localStorage
   useEffect(() => {
     localStorage.setItem(SIDEBAR_TIMER_HIDDEN_KEY, isHidden.toString());
   }, [isHidden]);
+
+  // Listen for changes to simple mode from other components (like TimerDisplay)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem(TIMER_SIMPLE_MODE_KEY);
+      setIsSimpleMode(saved === "true");
+    };
+
+    // Check on interval since storage events don't fire in same window
+    const interval = setInterval(handleStorageChange, 1000);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  // Format time as minutes only (or 0:SS when < 1 minute)
+  const formatTimeMinutesOnly = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (minutes >= 1) {
+      return `${minutes}m`;
+    }
+    return `0:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   if (!isVisible) return null;
@@ -55,7 +88,7 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
         >
           <Timer className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-            {formatTime(time)}
+            {formatTimeMinutesOnly(time)}
           </span>
           <ChevronDown className="w-3 h-3 text-slate-500 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
@@ -89,7 +122,7 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
           {isBreakTimer ? "Break" : "Focus"}
         </div>
         <span className="text-3xl font-bold text-slate-700 dark:text-slate-200">
-          {formatTime(time)}
+          {isSimpleMode ? formatTimeMinutesOnly(time) : formatTime(time)}
         </span>
       </div>
     </motion.div>

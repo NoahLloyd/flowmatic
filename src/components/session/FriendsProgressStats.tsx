@@ -1057,15 +1057,15 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
               )}
               {/* Date navigation buttons */}
               <div className="flex items-center gap-1">
+                <button
+                  onClick={goToPreviousDay}
+                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+                  title="Previous day"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
                 {canGoForward && (
                   <>
-                    <button
-                      onClick={goToNextDay}
-                      className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
-                      title="Next day"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
                     <button
                       onClick={goToToday}
                       className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
@@ -1073,15 +1073,15 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                     >
                       <Calendar className="w-4 h-4" />
                     </button>
+                    <button
+                      onClick={goToNextDay}
+                      className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+                      title="Next day"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </>
                 )}
-                <button
-                  onClick={goToPreviousDay}
-                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
-                  title="Previous day"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
               </div>
             </div>
           </div>

@@ -16,10 +16,17 @@ interface Window {
   electron: {
     send: (channel: string, data?: any) => void;
     on: (channel: string, func: (...args: any[]) => void) => void;
+    removeListener: (channel: string, func: (...args: any[]) => void) => void;
     apiRequest: (
       method: string,
       endpoint: string,
       options?: ApiRequestOptions
     ) => Promise<any>;
+    getShortcuts: () => Promise<{ quickAddTask: string; quickAddNote: string }>;
+    updateShortcuts: (shortcuts: {
+      quickAddTask: string;
+      quickAddNote: string;
+    }) => Promise<{ quickAddTask: string; quickAddNote: string }>;
+    setDoNotDisturb: (enabled: boolean) => Promise<boolean>;
   };
 }

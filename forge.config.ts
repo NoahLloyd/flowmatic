@@ -15,7 +15,7 @@ import { MakerDMG } from "@electron-forge/maker-dmg";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    icon: "./src/assets/icon",
+    icon: "./src/assets/icons/mac/icon",
     name: "Flowmatic",
   },
   rebuildConfig: {},

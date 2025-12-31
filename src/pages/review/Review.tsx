@@ -39,7 +39,11 @@ const parseInboxItem = (raw: string, fallbackId: string): InboxItem => {
   // New format is JSON string: {"id": "...", "text": "...", "checked": true/false}
   try {
     const parsed = JSON.parse(raw) as Partial<InboxItem> | null;
-    if (parsed && typeof parsed === "object" && typeof parsed.text === "string") {
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.text === "string"
+    ) {
       return {
         id: typeof parsed.id === "string" ? parsed.id : fallbackId,
         text: parsed.text,
@@ -57,16 +61,43 @@ const serializeInboxItems = (items: InboxItem[]): string[] =>
     JSON.stringify({ id: item.id, text: item.text, checked: item.checked })
   );
 
+// Helper to format a date as YYYY-MM-DD in a specific timezone
+const formatDateInTimezone = (date: Date, timezone: string): string => {
+  // Use Intl.DateTimeFormat with 'en-CA' locale which gives YYYY-MM-DD format
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date);
+};
+
+// Helper to get the day of week (0=Sun, 6=Sat) in a specific timezone
+const getDayOfWeekInTimezone = (date: Date, timezone: string): number => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+  });
+  const dayStr = formatter.format(date);
+  const dayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return dayMap[dayStr] ?? 0;
+};
+
 // Helper to get the Wednesday of the current review week
 // Week runs Wed-Tue, so Mon/Tue belong to the previous week
 const getWeekStart = (date: Date, timezone: string): string => {
   try {
-    // Get the date in user's timezone
-    const dateInTZ = new Date(
-      date.toLocaleString("en-US", { timeZone: timezone })
-    );
-    const day = dateInTZ.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, etc.
-    
+    const day = getDayOfWeekInTimezone(date, timezone);
+
     // Calculate days to subtract to get to Wednesday
     // If Wed(3), Thu(4), Fri(5), Sat(6) -> subtract (day - 3)
     // If Sun(0) -> subtract 4 (to get to previous Wed)
@@ -78,10 +109,11 @@ const getWeekStart = (date: Date, timezone: string): string => {
     } else {
       daysToSubtract = day + 4; // Sun=4, Mon=5, Tue=6
     }
-    
-    const wednesday = new Date(dateInTZ);
-    wednesday.setDate(dateInTZ.getDate() - daysToSubtract);
-    return wednesday.toISOString().split("T")[0];
+
+    const wednesday = new Date(
+      date.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
+    );
+    return formatDateInTimezone(wednesday, timezone);
   } catch (error) {
     console.error("Error getting week start:", error);
     const day = date.getDay();
@@ -91,8 +123,9 @@ const getWeekStart = (date: Date, timezone: string): string => {
     } else {
       daysToSubtract = day + 4;
     }
-    const wednesday = new Date(date);
-    wednesday.setDate(date.getDate() - daysToSubtract);
+    const wednesday = new Date(
+      date.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
+    );
     return wednesday.toISOString().split("T")[0];
   }
 };
@@ -109,8 +142,14 @@ const getWeekEnd = (weekStart: string): string => {
 const formatWeekRange = (weekStart: string, weekEnd: string): string => {
   const start = new Date(weekStart);
   const end = new Date(weekEnd);
-  const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  return `${start.toLocaleDateString("en-US", options)} - ${end.toLocaleDateString("en-US", options)}`;
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+  };
+  return `${start.toLocaleDateString(
+    "en-US",
+    options
+  )} - ${end.toLocaleDateString("en-US", options)}`;
 };
 
 const Review: React.FC = () => {
@@ -276,7 +315,15 @@ const Review: React.FC = () => {
     if (!isLoading && (checklist.length > 0 || questions.length > 0)) {
       debouncedSave(weekStart, checklist, questions, isCompleted, inboxItems);
     }
-  }, [checklist, questions, isCompleted, weekStart, isLoading, debouncedSave, inboxItems]);
+  }, [
+    checklist,
+    questions,
+    isCompleted,
+    weekStart,
+    isLoading,
+    debouncedSave,
+    inboxItems,
+  ]);
 
   // Handle checklist item toggle
   const handleChecklistToggle = (id: string) => {
@@ -333,7 +380,10 @@ const Review: React.FC = () => {
   // Handle complete review
   const handleCompleteReview = async () => {
     if (!isReviewReadyToComplete) {
-      showToast("Finish all checklist items and questions before completing.", "error");
+      showToast(
+        "Finish all checklist items and questions before completing.",
+        "error"
+      );
       return;
     }
     setIsCompleting(true);
@@ -390,7 +440,9 @@ const Review: React.FC = () => {
         )
       : 0;
 
-  const overallProgress = Math.round((checklistProgress + questionsProgress) / 2);
+  const overallProgress = Math.round(
+    (checklistProgress + questionsProgress) / 2
+  );
 
   if (isLoading) {
     return (
@@ -441,13 +493,15 @@ const Review: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-            {isSaving && (
-              <span className="flex items-center">
-                <Loader className="w-4 h-4 animate-spin mr-1" />
-                Saving...
-              </span>
-            )}
+          <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400 min-w-[80px] justify-end">
+            <span
+              className={`flex items-center transition-opacity duration-200 ${
+                isSaving ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              <Loader className="w-4 h-4 animate-spin mr-1" />
+              Saving...
+            </span>
           </div>
         </div>
       </div>
@@ -508,7 +562,9 @@ const Review: React.FC = () => {
                         }
                       `}
                     >
-                      {item.checked && <Check className="w-3.5 h-3.5 text-white" />}
+                      {item.checked && (
+                        <Check className="w-3.5 h-3.5 text-white" />
+                      )}
                     </div>
                     <span
                       className={`
@@ -579,8 +635,8 @@ const Review: React.FC = () => {
                 isCompleted
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-default"
                   : isReviewReadyToComplete
-                    ? "bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900"
-                    : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                  ? "bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900"
+                  : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
               }
             `}
           >

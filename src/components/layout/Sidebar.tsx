@@ -85,18 +85,45 @@ const Sidebar: React.FC<SidebarProps> = ({
     Settings: "s",
   };
 
+  // Helper to format a date as YYYY-MM-DD in a specific timezone
+  const formatDateInTimezone = (date: Date, tz: string): string => {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return formatter.format(date);
+  };
+
+  // Helper to get the day of week (0=Sun, 6=Sat) in a specific timezone
+  const getDayOfWeekInTimezone = (date: Date, tz: string): number => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      weekday: "short",
+    });
+    const dayStr = formatter.format(date);
+    const dayMap: Record<string, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    };
+    return dayMap[dayStr] ?? 0;
+  };
+
   // Fetch weekly review status and update day of week for indicator
   useEffect(() => {
     const checkReviewStatus = async () => {
       if (!user) return;
 
       try {
-        // Get current day of week in user's timezone
+        // Get current day of week in user's timezone using proper timezone-aware formatting
         const now = new Date();
-        const dateInTZ = new Date(
-          now.toLocaleString("en-US", { timeZone: timezone })
-        );
-        const day = dateInTZ.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, etc.
+        const day = getDayOfWeekInTimezone(now, timezone);
         setCurrentDayOfWeek(day);
 
         // Calculate current review week start (Wednesday).
@@ -110,9 +137,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           daysToSubtract = day + 4;
         }
 
-        const weekWednesday = new Date(dateInTZ);
-        weekWednesday.setDate(dateInTZ.getDate() - daysToSubtract);
-        const weekStart = weekWednesday.toISOString().split("T")[0];
+        // Subtract days using milliseconds to avoid date rollover issues
+        const weekWednesday = new Date(
+          now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
+        );
+        // Format the date in the user's timezone to get consistent YYYY-MM-DD
+        const weekStart = formatDateInTimezone(weekWednesday, timezone);
 
         // Review is considered "done" only if it exists AND is marked completed.
         const review = await api.getWeeklyReview(weekStart);
