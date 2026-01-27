@@ -139,16 +139,17 @@ const Tasks: React.FC<TasksProps> = ({
       const taskOrderWeek = getTaskOrderFromStorage("week");
       const taskOrderFuture = getTaskOrderFromStorage("future");
       const taskOrderBlocked = getTaskOrderFromStorage("blocked");
+      const taskOrderShopping = getTaskOrderFromStorage("shopping");
 
-      const applyOrder = (type: TaskType, order: string[] | null) => {
+      const applyOrder = (currentTasks: Task[], type: TaskType, order: string[] | null) => {
         if (order) {
-          const activeTasksOfType = orderedTasks.filter(
+          const activeTasksOfType = currentTasks.filter(
             (t) => !t.completed && t.type === type
           );
-          const completedTasks = orderedTasks.filter(
+          const otherTasks = currentTasks.filter(
             (t) => t.completed || t.type !== type
           );
-          const sortedActive = activeTasksOfType.sort((a, b) => {
+          const sortedActive = [...activeTasksOfType].sort((a, b) => {
             const indexA = order.indexOf(a._id);
             const indexB = order.indexOf(b._id);
             // Handle tasks not in the stored order (e.g., newly added)
@@ -157,19 +158,16 @@ const Tasks: React.FC<TasksProps> = ({
             if (indexB === -1) return -1; // Place tasks not in order at the end
             return indexA - indexB;
           });
-          // Replace the original active tasks of this type with the sorted ones
-          const nonActiveOfType = orderedTasks.filter(
-            (t) => t.completed || t.type !== type
-          );
-          return [...sortedActive, ...nonActiveOfType];
+          return [...sortedActive, ...otherTasks];
         }
-        return orderedTasks; // Return original if no order stored
+        return currentTasks;
       };
 
-      let tempTasks = applyOrder("day", taskOrderDay);
-      tempTasks = applyOrder("week", taskOrderWeek);
-      tempTasks = applyOrder("future", taskOrderFuture);
-      tempTasks = applyOrder("blocked", taskOrderBlocked);
+      let tempTasks = applyOrder(orderedTasks, "day", taskOrderDay);
+      tempTasks = applyOrder(tempTasks, "week", taskOrderWeek);
+      tempTasks = applyOrder(tempTasks, "future", taskOrderFuture);
+      tempTasks = applyOrder(tempTasks, "blocked", taskOrderBlocked);
+      tempTasks = applyOrder(tempTasks, "shopping", taskOrderShopping);
 
       setTasks(tempTasks);
       setTasksLoaded(true);
@@ -616,6 +614,8 @@ const Tasks: React.FC<TasksProps> = ({
                 ? "This Week's Tasks"
                 : selectedType === "blocked"
                 ? "Blocked Tasks"
+                : selectedType === "shopping"
+                ? "Shopping List"
                 : "Future Tasks"}
             </h2>
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -639,6 +639,8 @@ const Tasks: React.FC<TasksProps> = ({
                     ? "this week's"
                     : selectedType === "blocked"
                     ? "blocked"
+                    : selectedType === "shopping"
+                    ? "shopping"
                     : "future"
                 } tasks...`}
                 value={activeSearchQuery}
@@ -830,6 +832,18 @@ const Tasks: React.FC<TasksProps> = ({
                     }`}
                   >
                     Blocked
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCompletedFilter("shopping");
+                    }}
+                    className={`px-3 py-2 rounded-md font-medium transition-colors ${
+                      completedFilter === "shopping"
+                        ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/70 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    Shopping
                   </button>
                 </div>
               </div>
