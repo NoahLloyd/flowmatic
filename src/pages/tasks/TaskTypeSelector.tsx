@@ -10,7 +10,7 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
   selectedType,
   onTypeSelect,
 }) => {
-  const types: TaskType[] = ["day", "week", "future", "blocked"];
+  const types: TaskType[] = ["day", "week", "future", "blocked", "shopping"];
 
   // Keyboard shortcut mapping
   const shortcuts: Record<TaskType, string> = {
@@ -18,6 +18,7 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
     week: "2",
     future: "3",
     blocked: "4",
+    shopping: "5",
   };
 
   // Add keyboard event listeners for simple number keys
@@ -45,6 +46,9 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
           break;
         case "4":
           onTypeSelect("blocked");
+          break;
+        case "5":
+          onTypeSelect("shopping");
           break;
       }
     };

@@ -21,7 +21,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
-  const types: TaskType[] = ["day", "week", "future"];
+  const types: TaskType[] = ["day", "week", "future", "blocked", "shopping"];
 
   const handleSaveTitle = () => {
     if (editedTitle.trim() && editedTitle !== task.title) {

@@ -1,5 +1,5 @@
 import React from "react";
-import { Task } from "../../types/Task";
+import { Task, TaskType } from "../../types/Task";
 import TaskItem from "./TaskItem";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 
@@ -7,7 +7,7 @@ interface TaskListProps {
   tasks: Task[];
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
-  onChangeTaskType: (id: string, type: "day" | "week" | "future") => void;
+  onChangeTaskType: (id: string, type: TaskType) => void;
   onUpdateTitle: (id: string, title: string) => void;
   droppableId: string;
 }

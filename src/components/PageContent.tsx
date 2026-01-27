@@ -312,7 +312,7 @@ const PageContent = () => {
   // Handle adding a task from the quick add modal
   const handleQuickAddTask = async (
     title: string,
-    type: "day" | "week" | "future" | "blocked"
+    type: "day" | "week" | "future" | "blocked" | "shopping"
   ) => {
     const createdTask = await handleAddTask(title, type);
     if (createdTask) {
