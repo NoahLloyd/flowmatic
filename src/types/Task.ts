@@ -1,4 +1,4 @@
-export type TaskType = "day" | "week" | "future" | "blocked";
+export type TaskType = "day" | "week" | "future" | "blocked" | "shopping";
 
 export interface Task {
   id: string;
