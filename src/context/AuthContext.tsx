@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { api } from "../utils/api";
+import { supabase } from "../utils/supabase";
 
 interface User {
-  _id: string;
+  id: string;
   name: string;
   email: string;
   picture_url?: string;
   preferences: Record<string, any>;
   created_at: string;
-  last_updated: string;
+  updated_at: string;
 }
 
 interface AuthError {
@@ -37,18 +37,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<AuthError | null>(null);
 
   useEffect(() => {
+    // Check initial session
     checkAuthStatus();
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: any, session: any) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        // Defer fetchProfile to avoid deadlock: during client initialization,
+        // _notifyAllSubscribers awaits this callback, but fetchProfile calls
+        // supabase methods that await initializePromise (which can't resolve
+        // until _notifyAllSubscribers finishes). setTimeout breaks the cycle.
+        setTimeout(() => {
+          fetchProfile(session.user.id, session.user.email);
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      await fetchUser();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchProfile(session.user.id, session.user.email);
+      }
     } catch (err) {
       console.error("Auth check failed:", err);
       logout();
@@ -57,10 +79,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const fetchUser = async () => {
+  const fetchProfile = async (userId: string, email?: string) => {
     try {
-      const userData = await api.getCurrentUser();
-      setUser(userData);
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      setUser({
+        id: userId,
+        name: profile?.name || "",
+        email: email || "",
+        picture_url: profile?.picture_url,
+        preferences: profile?.preferences || {},
+        created_at: profile?.created_at,
+        updated_at: profile?.updated_at,
+      });
       setIsAuthenticated(true);
       setError(null);
     } catch (err) {
@@ -74,19 +111,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       setError(null);
 
-      const response = await api.login(email, password);
+      const { data, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      // Check for both token_type and access_token
-      if (!response.access_token || response.token_type !== "bearer") {
-        throw new Error("Invalid authentication response");
-      }
+      if (authError) throw authError;
+      if (!data.session) throw new Error("No session returned");
 
-      localStorage.setItem("token", response.access_token);
-      setUser(response.user);
-      setIsAuthenticated(true);
+      await fetchProfile(data.user.id, data.user.email);
     } catch (err: any) {
       setError({
-        message: err.response?.detail || err.message || "Login failed",
+        message: err.message || "Login failed",
         code: err.code,
       });
       throw err;
@@ -100,15 +137,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       setError(null);
 
-      const response = await api.register(name, email, password);
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      });
 
-      if (!response.access_token) {
-        throw new Error("No access token received");
-      }
+      if (authError) throw authError;
+      if (!data.session) throw new Error("No session returned");
 
-      localStorage.setItem("token", response.access_token);
-      setUser(response.user);
-      setIsAuthenticated(true);
+      await fetchProfile(data.user!.id, data.user!.email);
     } catch (err: any) {
       setError({
         message: err.message || "Registration failed",
@@ -123,13 +161,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const updateUserPreferences = async (preferences: Record<string, any>) => {
     try {
       setError(null);
-      if (!user?._id) throw new Error("No user found");
+      if (!user?.id) throw new Error("No user found");
 
-      const updatedUser = await api.updateUserPreferences(
-        user._id,
-        preferences
-      );
-      setUser(updatedUser);
+      // Merge with existing preferences
+      const existingPrefs = user.preferences || {};
+      const mergedPrefs = { ...existingPrefs, ...preferences };
+
+      const { data, error: updateError } = await supabase
+        .from("profiles")
+        .update({ preferences: mergedPrefs })
+        .eq("id", user.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      setUser((prev: User) => ({
+        ...prev,
+        preferences: data.preferences,
+        updated_at: data.updated_at,
+      }));
     } catch (err: any) {
       setError({
         message: err.message || "Failed to update preferences",
@@ -139,8 +190,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
     setError(null);

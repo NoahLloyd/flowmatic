@@ -10,7 +10,7 @@ interface UserStats {
 
 const Friends = () => {
   const { user } = useAuth();
-  const userName = user?._id || "You";
+  const userName = user?.id || "You";
 
   const [friends, setFriends] = useState<string[]>([]);
   const [newFriend, setNewFriend] = useState("");

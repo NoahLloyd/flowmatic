@@ -1,5 +1,5 @@
 export interface Document {
-  _id: string;
+  id: string;
   user_id: string;
   title: string;
   content: string;

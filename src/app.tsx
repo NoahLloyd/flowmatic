@@ -7,13 +7,19 @@ import { SignalsProvider } from "./context/SignalsContext";
 import { TimezoneProvider } from "./context/TimezoneContext";
 import { ToastProvider } from "./context/ToastContext";
 import { AVAILABLE_SIGNALS } from "./pages/settings/components/SignalSettings";
+import { api } from "./utils/api";
 
 // Add global declaration for TypeScript
 declare global {
   interface Window {
     AVAILABLE_SIGNALS: typeof AVAILABLE_SIGNALS;
+    __flowApi: typeof api;
   }
 }
+
+// Expose the api on window so the main process can call it via executeJavaScript
+// (used by overlay quick-add task/note)
+(window as any).__flowApi = api;
 
 const AppWrapper = () => {
   // Initialize global values

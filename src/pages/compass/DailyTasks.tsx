@@ -52,21 +52,21 @@ const DailyTasks: React.FC = () => {
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const allTasks = await api.getUserTasks();
+      const allTasks = await api.getTasksByType("day");
 
-      console.log("All tasks loaded:", allTasks.length);
+      console.log("Daily tasks loaded:", allTasks.length);
 
-      // Filter active daily tasks
+      // Filter active daily tasks (already filtered by type server-side)
       let active = allTasks.filter(
-        (task) => task.type === "day" && !task.completed
+        (task) => !task.completed
       );
 
       // Apply stored order
       const taskOrderDay = getTaskOrderFromStorage("day");
       if (taskOrderDay) {
         active = active.sort((a, b) => {
-          const indexA = taskOrderDay.indexOf(a._id);
-          const indexB = taskOrderDay.indexOf(b._id);
+          const indexA = taskOrderDay.indexOf(a.id);
+          const indexB = taskOrderDay.indexOf(b.id);
           if (indexA === -1 && indexB === -1) return 0;
           if (indexA === -1) return 1;
           if (indexB === -1) return -1;
@@ -79,9 +79,9 @@ const DailyTasks: React.FC = () => {
       // Filter completed tasks from today - with improved handling
       const completed = allTasks.filter((task) => {
         const isCompletedToday =
-          task.type === "day" && task.completed && isToday(task.completedAt);
+          task.completed && isToday(task.completedAt);
 
-        if (task.completed && task.type === "day") {
+        if (task.completed) {
           console.log(
             "Completed task:",
             task.title,
@@ -125,15 +125,15 @@ const DailyTasks: React.FC = () => {
       if (newTask.type === "day" && !newTask.completed) {
         setActiveTasks((prev) => {
           // Check if task already exists (avoid duplicates)
-          if (prev.some((t) => t._id === newTask._id)) {
+          if (prev.some((t) => t.id === newTask.id)) {
             return prev;
           }
           return [newTask, ...prev];
         });
         // Add to stored order
         const currentOrder = getTaskOrderFromStorage("day") || [];
-        if (!currentOrder.includes(newTask._id)) {
-          saveTaskOrderToStorage("day", [newTask._id, ...currentOrder]);
+        if (!currentOrder.includes(newTask.id)) {
+          saveTaskOrderToStorage("day", [newTask.id, ...currentOrder]);
         }
       }
     });
@@ -145,7 +145,7 @@ const DailyTasks: React.FC = () => {
     try {
       // Find the task in either active or completed arrays
       const task = [...activeTasks, ...completedTasks].find(
-        (t) => t._id === id
+        (t) => t.id === id
       );
       if (!task) return;
 
@@ -157,9 +157,9 @@ const DailyTasks: React.FC = () => {
       // Optimistically update the UI first
       if (updates.completed) {
         // Task was marked complete
-        const taskToMove = activeTasks.find((t) => t._id === id);
+        const taskToMove = activeTasks.find((t) => t.id === id);
         if (taskToMove) {
-          setActiveTasks((prev) => prev.filter((t) => t._id !== id));
+          setActiveTasks((prev) => prev.filter((t) => t.id !== id));
           setCompletedTasks((prev) => [...prev, { ...taskToMove, ...updates }]);
           // Remove from stored order
           const currentOrder = getTaskOrderFromStorage("day") || [];
@@ -170,9 +170,9 @@ const DailyTasks: React.FC = () => {
         }
       } else {
         // Task was unmarked (moved back to active)
-        const taskToMove = completedTasks.find((t) => t._id === id);
+        const taskToMove = completedTasks.find((t) => t.id === id);
         if (taskToMove) {
-          setCompletedTasks((prev) => prev.filter((t) => t._id !== id));
+          setCompletedTasks((prev) => prev.filter((t) => t.id !== id));
           const updatedTask = { ...taskToMove, ...updates };
           setActiveTasks((prev) => [...prev, updatedTask]); // Add to end for now, order applied on next fetch or drag
           // Add back to the beginning of the stored order
@@ -197,9 +197,9 @@ const DailyTasks: React.FC = () => {
           // If the API call fails, revert the optimistic update
           if (updates.completed) {
             // Revert completed task back to active
-            const taskToRevert = completedTasks.find((t) => t._id === id);
+            const taskToRevert = completedTasks.find((t) => t.id === id);
             if (taskToRevert) {
-              setCompletedTasks((prev) => prev.filter((t) => t._id !== id));
+              setCompletedTasks((prev) => prev.filter((t) => t.id !== id));
               setActiveTasks((prev) => [
                 ...prev,
                 { ...taskToRevert, completed: false, completedAt: null },
@@ -207,9 +207,9 @@ const DailyTasks: React.FC = () => {
             }
           } else {
             // Revert active task back to completed
-            const taskToRevert = activeTasks.find((t) => t._id === id);
+            const taskToRevert = activeTasks.find((t) => t.id === id);
             if (taskToRevert) {
-              setActiveTasks((prev) => prev.filter((t) => t._id !== id));
+              setActiveTasks((prev) => prev.filter((t) => t.id !== id));
               setCompletedTasks((prev) => [
                 ...prev,
                 {
@@ -237,15 +237,15 @@ const DailyTasks: React.FC = () => {
       return;
     }
 
-    const originalTask = [...activeTasks, ...completedTasks].find(t => t._id === id);
+    const originalTask = [...activeTasks, ...completedTasks].find(t => t.id === id);
     if (!originalTask || originalTask.title === newTitle) {
       setEditingTaskId(null);
       return;
     }
 
     // Optimistic update
-    setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: newTitle } : t));
-    setCompletedTasks(prev => prev.map(t => t._id === id ? { ...t, title: newTitle } : t));
+    setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
+    setCompletedTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
     setEditingTaskId(null);
 
     try {
@@ -253,13 +253,13 @@ const DailyTasks: React.FC = () => {
     } catch (error) {
       console.error("Failed to update task title:", error);
       // Rollback on failure
-      setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: originalTask.title } : t));
-      setCompletedTasks(prev => prev.map(t => t._id === id ? { ...t, title: originalTask.title } : t));
+      setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: originalTask.title } : t));
+      setCompletedTasks(prev => prev.map(t => t.id === id ? { ...t, title: originalTask.title } : t));
     }
   };
 
   const startEditing = (task: Task) => {
-    setEditingTaskId(task._id);
+    setEditingTaskId(task.id);
     setEditedTitle(task.title);
   };
 
@@ -291,7 +291,7 @@ const DailyTasks: React.FC = () => {
     setActiveTasks(items);
 
     // Save the new order to localStorage
-    const newOrder = items.map((task) => task._id);
+    const newOrder = items.map((task) => task.id);
     saveTaskOrderToStorage("day", newOrder);
   };
 
@@ -382,8 +382,8 @@ const DailyTasks: React.FC = () => {
                 >
                   {activeTasks.map((task, index) => (
                     <Draggable
-                      key={task._id}
-                      draggableId={task._id}
+                      key={task.id}
+                      draggableId={task.id}
                       index={index}
                     >
                       {(provided, snapshot) => (
@@ -398,22 +398,22 @@ const DailyTasks: React.FC = () => {
                           }`}
                         >
                           <div
-                            onClick={() => handleToggleComplete(task._id)}
+                            onClick={() => handleToggleComplete(task.id)}
                             className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
                           />
-                          {editingTaskId === task._id ? (
+                          {editingTaskId === task.id ? (
                             <input
                               type="text"
                               value={editedTitle}
                               onChange={(e) => setEditedTitle(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  handleUpdateTitle(task._id, editedTitle);
+                                  handleUpdateTitle(task.id, editedTitle);
                                 } else if (e.key === "Escape") {
                                   setEditingTaskId(null);
                                 }
                               }}
-                              onBlur={() => handleUpdateTitle(task._id, editedTitle)}
+                              onBlur={() => handleUpdateTitle(task.id, editedTitle)}
                               className="flex-1 text-sm text-gray-800 dark:text-gray-200 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
                               autoFocus
                             />
@@ -438,23 +438,23 @@ const DailyTasks: React.FC = () => {
               <hr className="border-gray-200 dark:border-gray-700 my-2" />
             )}
             {completedTasks.map((task) => (
-              <div key={task._id} className="flex items-center gap-3 py-1">
-                <div onClick={() => handleToggleComplete(task._id)}>
+              <div key={task.id} className="flex items-center gap-3 py-1">
+                <div onClick={() => handleToggleComplete(task.id)}>
                   <CompletedCheckbox />
                 </div>
-                {editingTaskId === task._id ? (
+                {editingTaskId === task.id ? (
                   <input
                     type="text"
                     value={editedTitle}
                     onChange={(e) => setEditedTitle(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        handleUpdateTitle(task._id, editedTitle);
+                        handleUpdateTitle(task.id, editedTitle);
                       } else if (e.key === "Escape") {
                         setEditingTaskId(null);
                       }
                     }}
-                    onBlur={() => handleUpdateTitle(task._id, editedTitle)}
+                    onBlur={() => handleUpdateTitle(task.id, editedTitle)}
                     className="flex-1 text-sm text-gray-500 dark:text-gray-400 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
                     autoFocus
                   />

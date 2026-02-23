@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
 import Tasks from "../pages/tasks/Tasks";
-import Insights from "../pages/insights/Insights";
+import Insights from "../pages/insights/insights";
 import Settings from "../pages/settings/Settings";
 import Morning from "../pages/morning/Morning";
 import Notes from "../pages/notes/Notes";
@@ -13,7 +13,6 @@ import { useTasks } from "../hooks/useTasks";
 import { useNavigation } from "../hooks/useNavigation";
 import { useToast } from "../context/ToastContext";
 import { api } from "../utils/api";
-import { Session } from "../types/Session";
 import Auth from "../pages/auth/Auth";
 import { useAuth } from "../context/AuthContext";
 import Documents from "../pages/documents/Documents";
@@ -229,47 +228,7 @@ const PageContent = () => {
     handleUpdateTitle,
   } = useTasks();
 
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const { isAuthenticated, isLoading } = useAuth();
-
-  const fetchSessions = async () => {
-    try {
-      setIsLoadingSessions(true);
-      const response = await api.getUserSessions();
-      setSessions(response);
-
-      // Dispatch event to notify other components (like SignalsContext) that sessions have been updated
-      window.dispatchEvent(new CustomEvent("sessionCreated"));
-    } catch (error) {
-      console.error("Failed to fetch sessions:", error);
-      if (error.response?.status === 401) {
-        setSelected("Compass");
-      }
-    } finally {
-      setIsLoadingSessions(false);
-    }
-  };
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        await api.getCurrentUser();
-      } catch (error) {
-        setSelected("Compass");
-      } finally {
-        setIsAuthChecking(false);
-      }
-    };
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthChecking) {
-      fetchSessions();
-    }
-  }, [isAuthChecking]);
 
   // Force synchronize timer state when selected page changes to Compass
   useEffect(() => {
@@ -380,7 +339,7 @@ const PageContent = () => {
     }
   };
 
-  if (isAuthChecking) {
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
@@ -407,10 +366,6 @@ const PageContent = () => {
             onBreakTimerStartPause={handleBreakTimerStartPause}
             onBreakTimerReset={handleBreakTimerReset}
             onBreakTimerAdjust={handleBreakTimerAdjust}
-            sessions={sessions}
-            isLoadingSessions={isLoadingSessions}
-            onSessionCreated={fetchSessions}
-            onSessionsUpdate={fetchSessions}
           />
         );
         break;
@@ -449,10 +404,6 @@ const PageContent = () => {
       default:
         content = <div>Select a page from the sidebar</div>;
     }
-  }
-
-  if (isLoading) {
-    return <div>Loading...</div>;
   }
 
   return (

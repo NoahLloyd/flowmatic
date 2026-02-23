@@ -186,26 +186,34 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       // Fetch today's signals
       const todaySignals = await api.getDailySignals(today);
 
-      // Fetch morning entries for journaling signal
+      // Fetch today's morning entry for journaling signal (only today, not all entries)
       let journalingValue = false;
       try {
-        const morningData = await api.getAllEntries();
-        const todayEntry = morningData.entries?.find(
-          (entry: MorningEntry) => entry.date === today
-        );
+        const todayEntryData = await api.getEntry(today);
+        // getEntry returns { date, ...fields } or the entry object directly
+        const todayEntry = todayEntryData as MorningEntry | null;
         journalingValue = hasJournalingContent(todayEntry);
       } catch (error) {
         console.error(
-          "Failed to fetch morning entries for journaling signal:",
+          "Failed to fetch morning entry for journaling signal:",
           error
         );
       }
 
-      // Fetch sessions and compute focusHours signal
+      // Fetch sessions near today and compute focusHours signal
+      // Use ±1 day UTC padding to account for timezone differences
       let focusHoursValue = false;
       let hoursToday = 0;
       try {
-        const sessions = (await api.getUserSessions()) as Session[];
+        const todayDate = new Date(today + "T12:00:00Z");
+        const startUTC = new Date(todayDate);
+        startUTC.setUTCDate(startUTC.getUTCDate() - 1);
+        const endUTC = new Date(todayDate);
+        endUTC.setUTCDate(endUTC.getUTCDate() + 1);
+        const startISO = startUTC.toISOString();
+        const endISO = endUTC.toISOString();
+
+        const sessions = (await api.getSessionsByDateRange(startISO, endISO)) as Session[];
 
         // Filter sessions for today (using timezone-aware filtering)
         const todaySessions = sessions.filter((session) => {

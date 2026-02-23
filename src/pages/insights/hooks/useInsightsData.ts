@@ -433,8 +433,11 @@ export const useInsightsData = (
       try {
         const { startDate, endDate, days } = getDateRange();
 
-        // Fetch sessions
-        const sessions: Session[] = await api.getUserSessions();
+        // Fetch sessions within the date range (server-side filtering)
+        const sessions: Session[] = await api.getSessionsByDateRange(
+          startDate + "T00:00:00Z",
+          endDate + "T23:59:59Z"
+        );
 
         // Fetch signal history
         let signalHistory: any[] = [];
@@ -467,11 +470,10 @@ export const useInsightsData = (
           });
         }
 
-        // Filter sessions within date range
+        // Sessions already filtered server-side; use directly
         const filteredSessions = sessions.filter((session) => {
           if (!session.created_at) return false;
-          const sessionDate = session.created_at.split("T")[0];
-          return sessionDate >= startDate && sessionDate <= endDate;
+          return true;
         });
 
         // Group sessions by date

@@ -25,7 +25,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
 
   const handleSaveTitle = () => {
     if (editedTitle.trim() && editedTitle !== task.title) {
-      onUpdateTitle(task._id, editedTitle);
+      onUpdateTitle(task.id, editedTitle);
     } else {
       setEditedTitle(task.title); // Reset to original if empty
     }
@@ -44,7 +44,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
   // Custom checkbox for better dark mode appearance
   const CustomCheckbox = () => (
     <div
-      onClick={() => onToggleComplete(task._id)}
+      onClick={() => onToggleComplete(task.id)}
       className={`w-4 h-4 shrink-0 rounded flex items-center justify-center cursor-pointer border ${
         task.completed
           ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white"
@@ -69,7 +69,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
   );
 
   return (
-    <Draggable key={task._id} draggableId={task._id} index={index}>
+    <Draggable key={task.id} draggableId={task.id} index={index}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
@@ -115,14 +115,14 @@ const TaskItem: React.FC<TaskItemProps> = ({
               .map((type) => (
                 <button
                   key={type}
-                  onClick={() => onChangeTaskType(task._id, type)}
+                  onClick={() => onChangeTaskType(task.id, type)}
                   className="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
             <button
-              onClick={() => onDelete(task._id)}
+              onClick={() => onDelete(task.id)}
               className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-500 dark:hover:text-red-400 transition-colors"
               aria-label="Delete task"
             >

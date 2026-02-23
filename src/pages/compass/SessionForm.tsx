@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../utils/api";
-import { useTasks } from "../../hooks/useTasks";
+import { Task } from "../../types/Task";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
 import { useTimezone } from "../../context/TimezoneContext";
@@ -12,7 +12,7 @@ interface SessionFormProps {
 }
 
 interface SessionFormData {
-  _id: string;
+  id: string;
   user_id: string;
   notes: string;
   task: string;
@@ -27,9 +27,22 @@ const SessionForm: React.FC<SessionFormProps> = ({
   todaysHours = 0,
   todaysGoal,
 }) => {
-  const { tasks } = useTasks();
   const { user } = useAuth();
   const { timezone } = useTimezone();
+  const [dayTasks, setDayTasks] = useState<Task[]>([]);
+
+  // Fetch active day tasks
+  useEffect(() => {
+    const fetchDayTasks = async () => {
+      try {
+        const tasks = await api.getTasksByType("day");
+        setDayTasks(tasks.filter((t) => !t.completed));
+      } catch (error) {
+        console.error("Failed to fetch day tasks:", error);
+      }
+    };
+    fetchDayTasks();
+  }, []);
 
   // Get user's preferred settings from preferences
   const defaultProject = user?.preferences?.defaultProject || "";
@@ -65,8 +78,8 @@ const SessionForm: React.FC<SessionFormProps> = ({
   const dailyGoal = getDailyGoal();
 
   const [formData, setFormData] = useState<SessionFormData>({
-    _id: "",
-    user_id: user?._id || "",
+    id: "",
+    user_id: user?.id || "",
     notes: "",
     task: "",
     project: defaultProject,
@@ -79,7 +92,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
   useEffect(() => {
     setFormData((prev: SessionFormData) => ({
       ...prev,
-      user_id: user?._id || "",
+      user_id: user?.id || "",
       project: defaultProject,
       time: defaultMinutes,
     }));
@@ -134,8 +147,8 @@ const SessionForm: React.FC<SessionFormProps> = ({
       console.log("Session submitted successfully:", response);
       await onSessionCreated();
       setFormData({
-        _id: "",
-        user_id: user?._id || "",
+        id: "",
+        user_id: user?.id || "",
         notes: "",
         task: "",
         project: defaultProject,
@@ -181,10 +194,6 @@ const SessionForm: React.FC<SessionFormProps> = ({
     },
   ];
 
-  const dayTasks = tasks.filter(
-    (task) => task.type === "day" && !task.completed
-  );
-
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
@@ -204,7 +213,7 @@ const SessionForm: React.FC<SessionFormProps> = ({
               >
                 <option value="">Select a task</option>
                 {dayTasks.map((task) => (
-                  <option key={task._id} value={task.title}>
+                  <option key={task.id} value={task.title}>
                     {task.title}
                   </option>
                 ))}

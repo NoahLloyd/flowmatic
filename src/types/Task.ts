@@ -1,7 +1,7 @@
 export type TaskType = "day" | "week" | "future" | "blocked";
 
 export interface Task {
-  _id: string;
+  id: string;
   title: string;
   completed: boolean;
   completedAt: Date | null;

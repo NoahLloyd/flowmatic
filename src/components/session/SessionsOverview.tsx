@@ -275,7 +275,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
 
   const handleSaveSession = async (updatedSession: Session) => {
     try {
-      await api.updateSession(updatedSession._id, updatedSession);
+      await api.updateSession(updatedSession.id, updatedSession);
       if (onSessionsUpdate) {
         await onSessionsUpdate();
       } else {
@@ -289,7 +289,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
   const handleDeleteSession = async () => {
     if (!selectedSession) return;
     try {
-      await api.deleteSession(selectedSession._id);
+      await api.deleteSession(selectedSession.id);
       if (onSessionsUpdate) {
         await onSessionsUpdate();
       } else {
@@ -385,7 +385,7 @@ const SessionsOverview: React.FC<SessionsOverviewProps> = ({
                       return (
                         <div
                           key={`session-${
-                            session._id || session.created_at
+                            session.id || session.created_at
                           }-${sessionIndex}`}
                           onClick={
                             deleteItems

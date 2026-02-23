@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import TimerDisplay from "./TimerDisplay";
-import SessionForm from "./SessionForm";
-import { Session } from "../../types/Session";
 import FriendsProgressStats from "../../components/session/FriendsProgressStats";
 import Signals from "./signal/Signals";
 import TimerCompleteModal from "../../components/session/TimerCompleteModal";
@@ -13,7 +11,7 @@ import BlockedTasks from "./BlockedTasks";
 
 // Define the session form data interface
 interface SessionFormData {
-  _id: string;
+  id: string;
   user_id: string;
   notes: string;
   task: string;
@@ -40,10 +38,6 @@ interface CompassProps {
   onBreakTimerStartPause?: () => void;
   onBreakTimerReset?: () => void;
   onBreakTimerAdjust?: (amount: number) => void;
-  sessions: Session[];
-  isLoadingSessions: boolean;
-  onSessionCreated: () => Promise<void>;
-  onSessionsUpdate: () => Promise<void>;
 }
 
 const Compass: React.FC<CompassProps> = ({
@@ -63,10 +57,6 @@ const Compass: React.FC<CompassProps> = ({
   onBreakTimerStartPause = () => {},
   onBreakTimerReset = () => {},
   onBreakTimerAdjust = () => {},
-  sessions,
-  isLoadingSessions,
-  onSessionCreated,
-  onSessionsUpdate,
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
   const { user } = useAuth();
@@ -113,8 +103,8 @@ const Compass: React.FC<CompassProps> = ({
       // The sessionData now contains all form fields, so we use it directly
       await api.submitSession(sessionData);
 
-      // Refresh sessions
-      await onSessionCreated();
+      // Notify all listeners (FriendsProgressStats, SignalsContext, etc.)
+      window.dispatchEvent(new CustomEvent("sessionCreated"));
     } catch (error) {
       console.error("Error submitting session:", error);
     } finally {
@@ -434,10 +424,7 @@ const Compass: React.FC<CompassProps> = ({
 
         {/* Progress Stats with date navigation */}
         <div className="lg:col-span-2">
-          <FriendsProgressStats
-            sessions={sessions}
-            onSessionsUpdate={onSessionsUpdate}
-          />
+          <FriendsProgressStats />
         </div>
       </div>
 

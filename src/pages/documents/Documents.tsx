@@ -172,7 +172,7 @@ const Documents = () => {
             const bDate = new Date(b.updated_at);
             return bDate.getTime() - aDate.getTime();
           });
-          setCurrentDocId(sortedDocs[0]._id);
+          setCurrentDocId(sortedDocs[0].id);
         }
       } catch (err) {
         console.error("Error fetching documents:", err);
@@ -200,7 +200,7 @@ const Documents = () => {
       });
 
       setDocuments((prev) => [...prev, newDoc]);
-      setCurrentDocId(newDoc._id);
+      setCurrentDocId(newDoc.id);
       setNewDocTitle("");
     } catch (err) {
       console.error("Error creating document:", err);
@@ -221,7 +221,7 @@ const Documents = () => {
         // Update local state
         setDocuments((prev) =>
           prev.map((doc) =>
-            doc._id === currentDocId
+            doc.id === currentDocId
               ? { ...doc, content, updated_at: new Date() }
               : doc
           )
@@ -244,13 +244,13 @@ const Documents = () => {
         await api.deleteDocument(id);
 
         // Update local state
-        setDocuments((prev) => prev.filter((doc) => doc._id !== id));
+        setDocuments((prev) => prev.filter((doc) => doc.id !== id));
 
         // If we're deleting the current document, switch to another one
         if (currentDocId === id) {
-          const remainingDocs = documents.filter((doc) => doc._id !== id);
+          const remainingDocs = documents.filter((doc) => doc.id !== id);
           if (remainingDocs.length > 0) {
-            setCurrentDocId(remainingDocs[0]._id);
+            setCurrentDocId(remainingDocs[0].id);
           } else {
             setCurrentDocId(null);
           }
@@ -283,7 +283,7 @@ const Documents = () => {
         // Update local state
         setDocuments((prev) =>
           prev.map((doc) =>
-            doc._id === editingTitleId
+            doc.id === editingTitleId
               ? { ...doc, title: editedTitle.trim(), updated_at: new Date() }
               : doc
           )
@@ -355,7 +355,7 @@ const Documents = () => {
   }, [documents, searchQuery, sortBy, getSortFunction]);
 
   // Get the current document
-  const currentDocument = documents.find((doc) => doc._id === currentDocId);
+  const currentDocument = documents.find((doc) => doc.id === currentDocId);
 
   // Update document publication status
   const updatePublicationStatus = useCallback(
@@ -371,7 +371,7 @@ const Documents = () => {
         // Update local state
         setDocuments((prev) =>
           prev.map((doc) =>
-            doc._id === currentDocId
+            doc.id === currentDocId
               ? { ...doc, publication_status: status, updated_at: new Date() }
               : doc
           )
@@ -419,7 +419,7 @@ const Documents = () => {
 
         const currentIndex = currentDocId
           ? filteredAndSortedDocuments.findIndex(
-              (doc) => doc._id === currentDocId
+              (doc) => doc.id === currentDocId
             )
           : -1;
 
@@ -438,7 +438,7 @@ const Documents = () => {
               : filteredAndSortedDocuments.length - 1; // Wrap to end
         }
 
-        setCurrentDocId(filteredAndSortedDocuments[newIndex]._id);
+        setCurrentDocId(filteredAndSortedDocuments[newIndex].id);
       }
 
       // Number keys (1-9, 0) to select documents by position
@@ -448,7 +448,7 @@ const Documents = () => {
         const index = e.key === "0" ? 9 : parseInt(e.key) - 1;
 
         if (index < filteredAndSortedDocuments.length) {
-          setCurrentDocId(filteredAndSortedDocuments[index]._id);
+          setCurrentDocId(filteredAndSortedDocuments[index].id);
         }
       }
     };
@@ -665,16 +665,16 @@ const Documents = () => {
             ) : filteredAndSortedDocuments.length > 0 ? (
               <ul className="divide-y divide-gray-200 dark:divide-gray-800">
                 {filteredAndSortedDocuments.map((doc, index) => (
-                  <li key={doc._id} className="relative">
+                  <li key={doc.id} className="relative">
                     <div
                       className={`p-4 cursor-pointer flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 group ${
-                        currentDocId === doc._id
+                        currentDocId === doc.id
                           ? "bg-gray-100 dark:bg-gray-800"
                           : ""
                       }`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCurrentDocId(doc._id);
+                        setCurrentDocId(doc.id);
                       }}
                     >
                       <div className="flex-1 min-w-0 pr-2">
@@ -709,7 +709,7 @@ const Documents = () => {
                               "Are you sure you want to delete this document?"
                             )
                           ) {
-                            deleteDocument(doc._id);
+                            deleteDocument(doc.id);
                           }
                         }}
                         className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -771,7 +771,7 @@ const Documents = () => {
               <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4 bg-white dark:bg-gray-900 flex items-center justify-between">
                 {/* Left side - document title */}
                 <div className="flex items-center">
-                  {editingTitleId === currentDocument._id ? (
+                  {editingTitleId === currentDocument.id ? (
                     <input
                       type="text"
                       value={editedTitle}
@@ -794,7 +794,7 @@ const Documents = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         startEditingTitle(
-                          currentDocument._id,
+                          currentDocument.id,
                           currentDocument.title
                         );
                       }}
@@ -812,7 +812,7 @@ const Documents = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const url = `https://noahlr.com/post/${currentDocument._id}`;
+                          const url = `https://noahlr.com/post/${currentDocument.id}`;
                           navigator.clipboard.writeText(url);
 
                           // Show temporary success message
@@ -929,7 +929,7 @@ const Documents = () => {
                 <Editor
                   initialContent={currentDocument.content}
                   onUpdate={updateDocumentContent}
-                  documentId={currentDocument._id}
+                  documentId={currentDocument.id}
                 />
               </div>
             </div>

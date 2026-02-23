@@ -37,7 +37,7 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
   };
 
   const handleStartEdit = (task: Task) => {
-    setEditingId(task._id);
+    setEditingId(task.id);
     setEditingTitle(task.title);
   };
 
@@ -71,21 +71,21 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
     <div className="space-y-3">
       {tasks.map((task) => (
         <div
-          key={task._id}
+          key={task.id}
           className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-800 transition-all"
         >
-          <div className="shrink-0" onClick={() => onToggleComplete(task._id)}>
+          <div className="shrink-0" onClick={() => onToggleComplete(task.id)}>
             <CustomCheckbox />
           </div>
           <div className="flex-grow min-w-0">
-            {editingId === task._id ? (
+            {editingId === task.id ? (
               <input
                 type="text"
                 value={editingTitle}
                 onChange={(e) => setEditingTitle(e.target.value)}
-                onBlur={() => handleSaveEdit(task._id)}
+                onBlur={() => handleSaveEdit(task.id)}
                 onKeyPress={(e) =>
-                  e.key === "Enter" && handleSaveEdit(task._id)
+                  e.key === "Enter" && handleSaveEdit(task.id)
                 }
                 className="p-2 border border-gray-200 dark:border-gray-800 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm"
                 autoFocus
@@ -105,7 +105,7 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
               {formatDate(task.completedAt)}
             </span>
             <button
-              onClick={() => onDelete(task._id)}
+              onClick={() => onDelete(task.id)}
               className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-500 dark:hover:text-red-400 transition-colors"
               aria-label="Delete task"
             >

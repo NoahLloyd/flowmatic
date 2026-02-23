@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/api";
@@ -31,11 +31,6 @@ interface FriendStats {
   activities: string[];
   todaySessions?: Session[]; // Add sessions for detailed visualization
   averageFocus: number;
-}
-
-interface FriendsProgressStatsProps {
-  sessions: Session[];
-  onSessionsUpdate?: () => Promise<void>;
 }
 
 // Create a separate component for daily session visualization
@@ -354,10 +349,7 @@ const DayProgress = ({
   );
 };
 
-const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
-  sessions,
-  onSessionsUpdate,
-}) => {
+const FriendsProgressStats: React.FC = () => {
   const { user } = useAuth();
   const [statsData, setStatsData] = useState<Record<string, FriendStats>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -366,15 +358,80 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
   );
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
-  // Calculate the user's own stats based on sessions
+  // Internal session data (self-sufficient — no longer depends on parent)
+  const [recentSessions, setRecentSessions] = useState<Session[]>([]);
+  const [yearHours, setYearHours] = useState<number>(0);
+
+  // Get year start date from user preferences
+  const getYearStartDate = useCallback(() => {
+    if (user?.preferences?.yearlyHoursGoal?.startDate) {
+      return new Date(user.preferences.yearlyHoursGoal.startDate);
+    }
+    return new Date(new Date().getFullYear(), 0, 1);
+  }, [user?.preferences?.yearlyHoursGoal?.startDate]);
+
+  // Fetch session data (targeted queries instead of loading everything)
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const now = new Date();
+
+      // Calculate how far back we need full session objects
+      // Need at least 7 days for history dots, and potentially further for selectedDate
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+
+      const selectedDayStart = startOfDay(selectedDate);
+      const fetchFrom =
+        selectedDayStart < sevenDaysAgo ? selectedDayStart : sevenDaysAgo;
+
+      const yearStart = getYearStartDate();
+
+      // Fetch recent sessions (full objects) and year hours (lightweight) in parallel
+      const [sessions, yearHrs] = await Promise.all([
+        api.getSessionsByDateRange(fetchFrom.toISOString(), now.toISOString()),
+        api.getSessionHoursSince(yearStart.toISOString()),
+      ]);
+
+      setRecentSessions(sessions);
+      setYearHours(yearHrs);
+    } catch (error) {
+      console.error("Failed to fetch progress data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDate, getYearStartDate]);
+
+  // Fetch data on mount and when dependencies change
   useEffect(() => {
-    calculateUserStats();
-  }, [sessions, selectedDate]);
+    if (user) {
+      fetchData();
+    }
+  }, [fetchData, user]);
 
-  // Calculate user stats
+  // Listen for session created/updated/deleted events to refresh
+  useEffect(() => {
+    const handler = () => fetchData();
+    window.addEventListener("sessionCreated", handler);
+    window.addEventListener("sessionUpdated", handler);
+    window.addEventListener("sessionDeleted", handler);
+    return () => {
+      window.removeEventListener("sessionCreated", handler);
+      window.removeEventListener("sessionUpdated", handler);
+      window.removeEventListener("sessionDeleted", handler);
+    };
+  }, [fetchData]);
+
+  // Calculate stats when data changes
+  useEffect(() => {
+    if (recentSessions !== undefined) {
+      calculateUserStats();
+    }
+  }, [recentSessions, yearHours, selectedDate]);
+
+  // Calculate user stats from fetched data
   const calculateUserStats = () => {
-    setIsLoading(true);
-
     // Get daily target (match SessionStats implementation)
     const getDailyTarget = (date: Date) => {
       const day = date.getDay();
@@ -431,7 +488,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
     const dayStart = startOfDay(selectedDate);
     const dayEnd = addDays(dayStart, 1);
 
-    const daySessions = sessions.filter((session) => {
+    const daySessions = recentSessions.filter((session) => {
       const sessionDate = new Date(session.created_at);
       return sessionDate >= dayStart && sessionDate < dayEnd;
     });
@@ -516,7 +573,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
     const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1; // Convert to Monday-based
     weekStart.setDate(weekStart.getDate() - daysFromMonday); // Go back to Monday
 
-    const weekSessions = sessions.filter(
+    const weekSessions = recentSessions.filter(
       (session) => new Date(session.created_at) >= weekStart
     );
 
@@ -560,23 +617,9 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
       Math.round((expectedWeeklyHours / weeklyTarget) * 100)
     );
 
-    // Yearly stats
-    const getYearStartDate = () => {
-      if (user?.preferences?.yearlyHoursGoal?.startDate) {
-        return new Date(user.preferences.yearlyHoursGoal.startDate);
-      }
-      return new Date(new Date().getFullYear(), 0, 1); // Default to Jan 1
-    };
-
+    // Yearly stats — yearHours is fetched server-side (lightweight, only minutes column)
     const yearStart = getYearStartDate();
-    const yearSessions = sessions.filter(
-      (session) => new Date(session.created_at) >= yearStart
-    );
-
-    const yearlyHours = yearSessions.reduce(
-      (acc, session) => acc + session.minutes / 60,
-      0
-    );
+    const yearlyHours = yearHours;
 
     const yearlyTarget = getYearlyTarget();
     const dayOfYear = Math.floor(
@@ -599,7 +642,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
 
     // Set the user's stats
     setStatsData({
-      [user?._id || "you"]: {
+      [user?.id || "you"]: {
         todayHours: hoursOnDay,
         weekHours: hoursThisWeek,
         yearHours: yearlyHours,
@@ -620,8 +663,6 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
         averageFocus,
       },
     });
-
-    setIsLoading(false);
   };
 
   // Color functions for pills (matching SessionsOverview style)
@@ -856,7 +897,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
       const dayStart = startOfDay(date);
       const dayEnd = addDays(dayStart, 1);
 
-      const daySessions = sessions.filter((session) => {
+      const daySessions = recentSessions.filter((session) => {
         const sessionDate = new Date(session.created_at);
         return sessionDate >= dayStart && sessionDate < dayEnd;
       });
@@ -950,10 +991,8 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
 
   const handleSaveSession = async (updatedSession: Session) => {
     try {
-      await api.updateSession(updatedSession._id, updatedSession);
-      if (onSessionsUpdate) {
-        await onSessionsUpdate();
-      }
+      await api.updateSession(updatedSession.id, updatedSession);
+      window.dispatchEvent(new CustomEvent("sessionUpdated"));
     } catch (error) {
       console.error("Failed to update session:", error);
     }
@@ -962,10 +1001,8 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
   const handleDeleteSession = async () => {
     if (!selectedSession) return;
     try {
-      await api.deleteSession(selectedSession._id);
-      if (onSessionsUpdate) {
-        await onSessionsUpdate();
-      }
+      await api.deleteSession(selectedSession.id);
+      window.dispatchEvent(new CustomEvent("sessionDeleted"));
     } catch (error) {
       console.error("Failed to delete session:", error);
     }
@@ -977,7 +1014,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
   return (
     <div className="space-y-6">
       {/* User's card */}
-      {statsData[user?._id || "you"] && (
+      {statsData[user?.id || "you"] && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
           <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -995,7 +1032,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                   <div
                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
                       getHoursColor(
-                        statsData[user?._id || "you"].todayHours,
+                        statsData[user?.id || "you"].todayHours,
                         selectedDate
                       ).bg
                     }`}
@@ -1003,7 +1040,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                     <Clock
                       className={`w-3 h-3 ${
                         getHoursColor(
-                          statsData[user?._id || "you"].todayHours,
+                          statsData[user?.id || "you"].todayHours,
                           selectedDate
                         ).text
                       }`}
@@ -1011,40 +1048,40 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                     <span
                       className={`font-medium ${
                         getHoursColor(
-                          statsData[user?._id || "you"].todayHours,
+                          statsData[user?.id || "you"].todayHours,
                           selectedDate
                         ).text
                       }`}
                     >
-                      {statsData[user?._id || "you"].todayHours
+                      {statsData[user?.id || "you"].todayHours
                         .toFixed(1)
                         .replace(".0", "")}
                       h
                     </span>
                   </div>
-                  {statsData[user?._id || "you"].averageFocus > 0 && (
+                  {statsData[user?.id || "you"].averageFocus > 0 && (
                     <div
                       className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
                         getFocusColor(
-                          statsData[user?._id || "you"].averageFocus
+                          statsData[user?.id || "you"].averageFocus
                         ).bg
                       }`}
                     >
                       <Brain
                         className={`w-3 h-3 ${
                           getFocusColor(
-                            statsData[user?._id || "you"].averageFocus
+                            statsData[user?.id || "you"].averageFocus
                           ).text
                         }`}
                       />
                       <span
                         className={`font-medium ${
                           getFocusColor(
-                            statsData[user?._id || "you"].averageFocus
+                            statsData[user?.id || "you"].averageFocus
                           ).text
                         }`}
                       >
-                        {statsData[user?._id || "you"].averageFocus}
+                        {statsData[user?.id || "you"].averageFocus}
                       </span>
                     </div>
                   )}
@@ -1097,7 +1134,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                 {/* Daily progress always on top */}
                 <div className="h-auto">
                   <DayProgress
-                    stats={statsData[user?._id || "you"]}
+                    stats={statsData[user?.id || "you"]}
                     onSessionClick={handleSessionClick}
                   />
                 </div>
@@ -1105,14 +1142,14 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                 {/* Custom divider with time information */}
                 <div className="relative py-0 -my-0.5">
                   {/* Start time */}
-                  {statsData[user?._id || "you"].todaySessions &&
-                    statsData[user?._id || "you"].todaySessions.length > 0 && (
+                  {statsData[user?.id || "you"].todaySessions &&
+                    statsData[user?.id || "you"].todaySessions.length > 0 && (
                       <>
                         <div className="flex items-center">
                           <div className="text-xs text-gray-500 dark:text-gray-400 pr-1">
                             {(() => {
                               const sessions =
-                                statsData[user?._id || "you"].todaySessions ||
+                                statsData[user?.id || "you"].todaySessions ||
                                 [];
                               if (sessions.length === 0) return "";
 
@@ -1144,7 +1181,7 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                           <div className="text-xs text-gray-500 dark:text-gray-400 pl-1">
                             {(() => {
                               const sessions =
-                                statsData[user?._id || "you"].todaySessions ||
+                                statsData[user?.id || "you"].todaySessions ||
                                 [];
                               if (sessions.length === 0) return "";
 
@@ -1171,15 +1208,15 @@ const FriendsProgressStats: React.FC<FriendsProgressStatsProps> = ({
                         </div>
                       </>
                     )}
-                  {(!statsData[user?._id || "you"].todaySessions ||
-                    statsData[user?._id || "you"].todaySessions.length ===
+                  {(!statsData[user?.id || "you"].todaySessions ||
+                    statsData[user?.id || "you"].todaySessions.length ===
                       0) && (
                     <div className="border-t border-gray-200 dark:border-gray-800"></div>
                   )}
                 </div>
 
                 {/* Week/Year progress below */}
-                <WeekYearProgress stats={statsData[user?._id || "you"]} />
+                <WeekYearProgress stats={statsData[user?.id || "you"]} />
               </div>
             )}
           </div>

@@ -6,7 +6,7 @@ export const generateId = (): string => {
 
 export const createTask = (title: string, type: TaskType): Task => {
   return {
-    _id: generateId(),
+    id: generateId(),
     title,
     completed: false,
     completedAt: null, // Initialize as null
