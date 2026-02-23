@@ -33,11 +33,11 @@ interface UserPreferences {
 }
 
 export interface User {
-  _id: string;
+  id: string;
   name: string;
   email: string;
   picture_url?: string; // Optional
   preferences?: UserPreferences;
   created_at?: string; // Optional
-  last_updated?: string; // Optional
+  updated_at?: string; // Optional
 }

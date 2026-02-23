@@ -44,9 +44,15 @@ import { subscribeToTaskAdded } from "../../utils/taskEvents";
 // Function to fetch tasks with optional limit for completed tasks
 const fetchTasks = async (fetchAll = false): Promise<Task[]> => {
   try {
-    // For now, we'll always fetch all tasks from the backend
-    // and handle filtering on the client side
-    const allTasks = await api.getUserTasks();
+    // Fetch all task types in parallel using server-side type filtering
+    const [dayTasks, weekTasks, futureTasks, blockedTasks] = await Promise.all([
+      api.getTasksByType("day"),
+      api.getTasksByType("week"),
+      api.getTasksByType("future"),
+      api.getTasksByType("blocked"),
+    ]);
+
+    const allTasks = [...dayTasks, ...weekTasks, ...futureTasks, ...blockedTasks];
 
     // If fetchAll is true, return all tasks
     if (fetchAll) {
@@ -198,15 +204,15 @@ const Tasks: React.FC<TasksProps> = ({
       // Add the task to local state
       setTasks((prev) => {
         // Check if task already exists (avoid duplicates)
-        if (prev.some((t) => t._id === newTask._id)) {
+        if (prev.some((t) => t.id === newTask.id)) {
           return prev;
         }
         return [newTask, ...prev];
       });
       // Add to stored order for the task's type
       const currentOrder = getTaskOrderFromStorage(newTask.type) || [];
-      if (!currentOrder.includes(newTask._id)) {
-        saveTaskOrderToStorage(newTask.type, [newTask._id, ...currentOrder]);
+      if (!currentOrder.includes(newTask.id)) {
+        saveTaskOrderToStorage(newTask.type, [newTask.id, ...currentOrder]);
       }
     });
 
@@ -251,7 +257,7 @@ const Tasks: React.FC<TasksProps> = ({
       // Simulate the server response by adding a temporary ID
       // This will be replaced once the API call completes
       const tempId = `temp-${Date.now()}`;
-      const tempTask = { ...newTask, _id: tempId } as Task;
+      const tempTask = { ...newTask, id: tempId } as Task;
 
     // Update local state immediately (optimistic update)
       setTasks((prev) => [tempTask, ...prev]);
@@ -264,18 +270,18 @@ const Tasks: React.FC<TasksProps> = ({
     const createdTask = await onAddTask(title, type);
 
     if (createdTask) {
-      // Replace the temp task with the real task (which has the real _id from the backend)
-      setTasks((prev) => prev.map((t) => t._id === tempId ? createdTask : t));
+      // Replace the temp task with the real task (which has the real id from the backend)
+      setTasks((prev) => prev.map((t) => t.id === tempId ? createdTask : t));
       // Update the stored order to use the real ID instead of the temp ID
       const updatedOrder = getTaskOrderFromStorage(type) || [];
       saveTaskOrderToStorage(
         type,
-        updatedOrder.map((id) => id === tempId ? createdTask._id : id)
+        updatedOrder.map((id) => id === tempId ? createdTask.id : id)
       );
       showToast("Task added", "success");
     } else {
       // Rollback on failure - remove the temp task
-      setTasks((prev) => prev.filter((t) => t._id !== tempId));
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
       saveTaskOrderToStorage(
         type,
         currentOrder.filter((id) => id !== tempId)
@@ -286,7 +292,7 @@ const Tasks: React.FC<TasksProps> = ({
 
   const handleToggleCompleteAndUpdateLocal = async (id: string) => {
     // Store the original state for potential rollback
-    const originalTask = tasks.find((t) => t._id === id);
+    const originalTask = tasks.find((t) => t.id === id);
     if (!originalTask) return;
 
     const wasCompleted = originalTask.completed;
@@ -295,7 +301,7 @@ const Tasks: React.FC<TasksProps> = ({
     // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
-        if (task._id === id) {
+        if (task.id === id) {
           return {
             ...task,
             completed: newCompletedStatus,
@@ -316,7 +322,7 @@ const Tasks: React.FC<TasksProps> = ({
       // Rollback on failure
       setTasks((prev) =>
         prev.map((task) => {
-          if (task._id === id) {
+          if (task.id === id) {
             return {
               ...task,
               completed: wasCompleted,
@@ -331,7 +337,7 @@ const Tasks: React.FC<TasksProps> = ({
   };
 
   const handleDeleteAndUpdateLocal = async (id: string) => {
-    const taskToDelete = tasks.find((t) => t._id === id);
+    const taskToDelete = tasks.find((t) => t.id === id);
     if (!taskToDelete) return;
 
     // Store original state for rollback
@@ -341,7 +347,7 @@ const Tasks: React.FC<TasksProps> = ({
       : null;
 
     // Update local state immediately (optimistic update)
-    setTasks((prev) => prev.filter((task) => task._id !== id));
+    setTasks((prev) => prev.filter((task) => task.id !== id));
 
     // Remove task ID from stored order
     if (!taskToDelete.completed && originalOrder) {
@@ -370,7 +376,7 @@ const Tasks: React.FC<TasksProps> = ({
     id: string,
     newType: TaskType
   ) => {
-    const taskToChange = tasks.find((t) => t._id === id);
+    const taskToChange = tasks.find((t) => t.id === id);
     if (!taskToChange || taskToChange.completed) return; // Only change type for active tasks
 
     const oldType = taskToChange.type;
@@ -382,7 +388,7 @@ const Tasks: React.FC<TasksProps> = ({
     // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
-        if (task._id === id) {
+        if (task.id === id) {
           return { ...task, type: newType };
         }
         return task;
@@ -407,7 +413,7 @@ const Tasks: React.FC<TasksProps> = ({
       // Rollback on failure
       setTasks((prev) =>
         prev.map((task) => {
-          if (task._id === id) {
+          if (task.id === id) {
             return { ...task, type: oldType };
           }
           return task;
@@ -420,7 +426,7 @@ const Tasks: React.FC<TasksProps> = ({
   };
 
   const handleUpdateTitleAndUpdateLocal = async (id: string, title: string) => {
-    const originalTask = tasks.find((t) => t._id === id);
+    const originalTask = tasks.find((t) => t.id === id);
     if (!originalTask) return;
 
     const originalTitle = originalTask.title;
@@ -428,7 +434,7 @@ const Tasks: React.FC<TasksProps> = ({
     // Update local state immediately (optimistic update)
     setTasks((prev) =>
       prev.map((task) => {
-        if (task._id === id) {
+        if (task.id === id) {
           return { ...task, title };
         }
         return task;
@@ -444,7 +450,7 @@ const Tasks: React.FC<TasksProps> = ({
       // Rollback on failure
       setTasks((prev) =>
         prev.map((task) => {
-          if (task._id === id) {
+          if (task.id === id) {
             return { ...task, title: originalTitle };
           }
           return task;
@@ -471,8 +477,8 @@ const Tasks: React.FC<TasksProps> = ({
   const orderedActiveTasks = currentTaskOrder
     ? [...activeTasks].sort((a, b) => {
         // Sort a copy
-        const indexA = currentTaskOrder.indexOf(a._id);
-        const indexB = currentTaskOrder.indexOf(b._id);
+        const indexA = currentTaskOrder.indexOf(a.id);
+        const indexB = currentTaskOrder.indexOf(b.id);
         if (indexA === -1 && indexB === -1) return 0;
         if (indexA === -1) return 1;
         if (indexB === -1) return -1;
@@ -573,7 +579,7 @@ const Tasks: React.FC<TasksProps> = ({
     setTasks([...items, ...otherActiveTasks, ...completedTasks]);
 
     // Save the new order to localStorage
-    const newOrder = items.map((task) => task._id);
+    const newOrder = items.map((task) => task.id);
     saveTaskOrderToStorage(selectedType, newOrder);
   };
 

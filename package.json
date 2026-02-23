@@ -57,6 +57,7 @@
     "@electron/remote": "^2.1.2",
     "@emotion/is-prop-valid": "^1.3.1",
     "@hocuspocus/provider": "^2.15.2",
+    "@supabase/supabase-js": "^2.97.0",
     "@tippy.js/react": "^3.1.1",
     "@tiptap/core": "^2.11.7",
     "@tiptap/extension-character-count": "^2.11.7",

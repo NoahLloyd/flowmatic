@@ -32,6 +32,8 @@ const config: ForgeConfig = {
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
       mainConfig,
+      devContentSecurityPolicy:
+        "default-src 'self' 'unsafe-inline' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-eval' 'unsafe-inline'; img-src 'self' data: https:",
       renderer: {
         config: rendererConfig,
         entryPoints: [

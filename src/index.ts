@@ -8,7 +8,6 @@ import {
   globalShortcut,
   screen,
 } from "electron";
-import axios from "axios";
 import path from "path";
 import * as fs from "fs";
 import { exec } from "child_process";
@@ -175,7 +174,7 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, "assets", "icon.jpg"), // Add this line for window icon
+    icon: path.join(__dirname, "assets", "icon.jpg"),
   });
 
   if (process.platform === "darwin") {
@@ -258,27 +257,6 @@ const createWindow = (): void => {
     });
   }
 };
-// const API_BASE_URL = "http://127.0.0.1:8000"; // local development server
-const API_BASE_URL = "https://flow-backend-9kgo.onrender.com"; // production server
-
-ipcMain.handle("api-request", async (_event, { method, endpoint, options }) => {
-  try {
-    const response = await axios({
-      method,
-      url: `${API_BASE_URL}${endpoint}`,
-      headers: options?.headers, // Pass headers directly
-      data: options?.body, // Use body for request data
-      // Remove params as we're not using query parameters for auth
-    });
-    return response.data;
-  } catch (error) {
-    console.error(`Error making ${method} request to ${endpoint}:`, error);
-    if (axios.isAxiosError(error) && error.response) {
-      throw error.response.data;
-    }
-    throw error;
-  }
-});
 
 ipcMain.on("update-tray", (_event, text: string) => {
   if (tray) {
@@ -312,41 +290,27 @@ ipcMain.handle("get-overlay-type", () => {
   return overlayType;
 });
 
+// Overlay task/note submission: forward to main window renderer which has Supabase session
+// The renderer exposes `window.__flowApi` (see app.tsx) so executeJavaScript can call it.
 ipcMain.handle("overlay-submit-task", async (_event, title: string) => {
   try {
-    // Get auth token from main window
-    const token = await mainWindow?.webContents.executeJavaScript(
-      'localStorage.getItem("token")'
-    );
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
 
-    if (!token) {
-      console.error("No auth token found");
-      return false;
-    }
+    const escapedTitle = JSON.stringify(title);
+    const result = await mainWindow.webContents.executeJavaScript(`
+      (async () => {
+        try {
+          const task = await window.__flowApi.createTask({ title: ${escapedTitle}, type: 'day', completed: false, completedAt: null, createdAt: new Date() });
+          window.dispatchEvent(new CustomEvent('task-added-from-overlay', { detail: task }));
+          return true;
+        } catch (e) {
+          console.error('Failed to create task from overlay:', e);
+          return false;
+        }
+      })()
+    `);
 
-    // Create the task via API
-    const response = await axios({
-      method: "POST",
-      url: `${API_BASE_URL}/tasks/new`,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      data: {
-        title,
-        type: "day",
-        completed: false,
-        completedAt: null,
-        createdAt: new Date(),
-      },
-    });
-
-    // Notify the main window to update its task list
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("task-added-from-overlay", response.data);
-    }
-
-    return true;
+    return result;
   } catch (error) {
     console.error("Failed to create task from overlay:", error);
     return false;
@@ -355,31 +319,22 @@ ipcMain.handle("overlay-submit-task", async (_event, title: string) => {
 
 ipcMain.handle("overlay-submit-note", async (_event, content: string) => {
   try {
-    // Get auth token from main window
-    const token = await mainWindow?.webContents.executeJavaScript(
-      'localStorage.getItem("token")'
-    );
+    if (!mainWindow || mainWindow.isDestroyed()) return false;
 
-    if (!token) {
-      console.error("No auth token found");
-      return false;
-    }
+    const escapedContent = JSON.stringify(content);
+    const result = await mainWindow.webContents.executeJavaScript(`
+      (async () => {
+        try {
+          await window.__flowApi.createNote({ content: ${escapedContent}, tags: [] });
+          return true;
+        } catch (e) {
+          console.error('Failed to create note from overlay:', e);
+          return false;
+        }
+      })()
+    `);
 
-    // Create the note via API
-    await axios({
-      method: "POST",
-      url: `${API_BASE_URL}/notes`,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      data: {
-        content,
-        tags: [],
-      },
-    });
-
-    return true;
+    return result;
   } catch (error) {
     console.error("Failed to create note from overlay:", error);
     return false;

@@ -34,19 +34,19 @@ const BlockedTasks: React.FC = () => {
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
-      const allTasks = await api.getUserTasks();
+      const allTasks = await api.getTasksByType("blocked");
 
-      // Filter active blocked tasks
+      // Filter active blocked tasks (already filtered by type server-side)
       let active = allTasks.filter(
-        (task) => task.type === "blocked" && !task.completed
+        (task) => !task.completed
       );
 
       // Apply stored order
       const taskOrderBlocked = getTaskOrderFromStorage("blocked");
       if (taskOrderBlocked) {
         active = active.sort((a, b) => {
-          const indexA = taskOrderBlocked.indexOf(a._id);
-          const indexB = taskOrderBlocked.indexOf(b._id);
+          const indexA = taskOrderBlocked.indexOf(a.id);
+          const indexB = taskOrderBlocked.indexOf(b.id);
           if (indexA === -1 && indexB === -1) return 0;
           if (indexA === -1) return 1;
           if (indexB === -1) return -1;
@@ -81,15 +81,15 @@ const BlockedTasks: React.FC = () => {
       if (newTask.type === "blocked" && !newTask.completed) {
         setActiveTasks((prev) => {
           // Check if task already exists (avoid duplicates)
-          if (prev.some((t) => t._id === newTask._id)) {
+          if (prev.some((t) => t.id === newTask.id)) {
             return prev;
           }
           return [newTask, ...prev];
         });
         // Add to stored order
         const currentOrder = getTaskOrderFromStorage("blocked") || [];
-        if (!currentOrder.includes(newTask._id)) {
-          saveTaskOrderToStorage("blocked", [newTask._id, ...currentOrder]);
+        if (!currentOrder.includes(newTask.id)) {
+          saveTaskOrderToStorage("blocked", [newTask.id, ...currentOrder]);
         }
       }
     });
@@ -99,7 +99,7 @@ const BlockedTasks: React.FC = () => {
 
   const handleToggleComplete = async (id: string) => {
     try {
-      const task = activeTasks.find((t) => t._id === id);
+      const task = activeTasks.find((t) => t.id === id);
       if (!task) return;
 
       const updates = {
@@ -108,7 +108,7 @@ const BlockedTasks: React.FC = () => {
       };
 
       // Optimistically update the UI
-      setActiveTasks((prev) => prev.filter((t) => t._id !== id));
+      setActiveTasks((prev) => prev.filter((t) => t.id !== id));
       
       // Remove from stored order
       const currentOrder = getTaskOrderFromStorage("blocked") || [];
@@ -135,14 +135,14 @@ const BlockedTasks: React.FC = () => {
       return;
     }
 
-    const originalTask = activeTasks.find(t => t._id === id);
+    const originalTask = activeTasks.find(t => t.id === id);
     if (!originalTask || originalTask.title === newTitle) {
       setEditingTaskId(null);
       return;
     }
 
     // Optimistic update
-    setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: newTitle } : t));
+    setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
     setEditingTaskId(null);
 
     try {
@@ -150,12 +150,12 @@ const BlockedTasks: React.FC = () => {
     } catch (error) {
       console.error("Failed to update task title:", error);
       // Rollback on failure
-      setActiveTasks(prev => prev.map(t => t._id === id ? { ...t, title: originalTask.title } : t));
+      setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: originalTask.title } : t));
     }
   };
 
   const startEditing = (task: Task) => {
-    setEditingTaskId(task._id);
+    setEditingTaskId(task.id);
     setEditedTitle(task.title);
   };
 
@@ -186,7 +186,7 @@ const BlockedTasks: React.FC = () => {
     setActiveTasks(items);
 
     // Save the new order to localStorage
-    const newOrder = items.map((task) => task._id);
+    const newOrder = items.map((task) => task.id);
     saveTaskOrderToStorage("blocked", newOrder);
   };
 
@@ -259,8 +259,8 @@ const BlockedTasks: React.FC = () => {
                 >
                   {activeTasks.map((task, index) => (
                     <Draggable
-                      key={task._id}
-                      draggableId={task._id}
+                      key={task.id}
+                      draggableId={task.id}
                       index={index}
                     >
                       {(provided, snapshot) => (
@@ -275,22 +275,22 @@ const BlockedTasks: React.FC = () => {
                           }`}
                         >
                           <div
-                            onClick={() => handleToggleComplete(task._id)}
+                            onClick={() => handleToggleComplete(task.id)}
                             className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
                           />
-                          {editingTaskId === task._id ? (
+                          {editingTaskId === task.id ? (
                             <input
                               type="text"
                               value={editedTitle}
                               onChange={(e) => setEditedTitle(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
-                                  handleUpdateTitle(task._id, editedTitle);
+                                  handleUpdateTitle(task.id, editedTitle);
                                 } else if (e.key === "Escape") {
                                   setEditingTaskId(null);
                                 }
                               }}
-                              onBlur={() => handleUpdateTitle(task._id, editedTitle)}
+                              onBlur={() => handleUpdateTitle(task.id, editedTitle)}
                               className="flex-1 text-sm text-gray-800 dark:text-gray-200 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
                               autoFocus
                             />

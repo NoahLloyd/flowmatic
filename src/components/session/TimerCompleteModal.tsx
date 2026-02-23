@@ -2,14 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Clock, Pause, Play, RefreshCw } from "lucide-react";
 import { Session } from "../../types/Session";
-import { useTasks } from "../../hooks/useTasks";
+import { Task } from "../../types/Task";
+import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 
 // Define the types for each step of the modal
 type ModalStep = "focus" | "break" | "breakTimer" | "closed";
 
 interface SessionFormData {
-  _id: string;
+  id: string;
   user_id: string;
   notes: string;
   task: string;
@@ -69,8 +70,8 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
   onBreakTimerReset = () => {},
   onBreakTimerAdjust = () => {},
 }) => {
-  const { tasks } = useTasks();
   const { user } = useAuth();
+  const [dayTasks, setDayTasks] = useState<Task[]>([]);
   const [currentStep, setCurrentStep] = useState<ModalStep>("focus");
   const [customBreakTime, setCustomBreakTime] = useState<number>(5);
 
@@ -85,8 +86,8 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
 
   // Form data state for session details
   const [formData, setFormData] = useState<SessionFormData>({
-    _id: "",
-    user_id: user?._id || "",
+    id: "",
+    user_id: user?.id || "",
     notes: "",
     task: "",
     project: defaultProject,
@@ -95,12 +96,12 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
     created_at: new Date().toISOString(),
   });
 
-  // Reset form data when modal opens
+  // Reset form data and fetch day tasks when modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        _id: "",
-        user_id: user?._id || "",
+        id: "",
+        user_id: user?.id || "",
         notes: "",
         task: "",
         project: defaultProject,
@@ -108,6 +109,10 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
         focus: 0,
         created_at: new Date().toISOString(),
       });
+      // Fetch fresh day tasks each time modal opens
+      api.getTasksByType("day").then((tasks) => {
+        setDayTasks(tasks.filter((t) => !t.completed));
+      }).catch((err) => console.error("Failed to fetch day tasks:", err));
     }
   }, [isOpen, user, defaultProject]);
 
@@ -218,11 +223,6 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
       shortcut: "5",
     },
   ];
-
-  // Filter for active day tasks
-  const dayTasks = tasks.filter(
-    (task) => task.type === "day" && !task.completed
-  );
 
   // Add keyboard event listener for shortcuts
   useEffect(() => {
@@ -396,7 +396,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                     >
                       <option value="">Select a task</option>
                       {dayTasks.map((task) => (
-                        <option key={task._id} value={task.title}>
+                        <option key={task.id} value={task.title}>
                           {task.title}
                         </option>
                       ))}

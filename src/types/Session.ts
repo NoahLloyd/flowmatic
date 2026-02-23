@@ -1,5 +1,5 @@
 export interface Session {
-  _id: string;
+  id: string;
   user_id: string;
   notes: string;
   task: string;
