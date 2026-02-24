@@ -3,7 +3,7 @@ import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
 import Tasks from "../pages/tasks/Tasks";
-import Insights from "../pages/insights/insights";
+import Insights from "../pages/insights/Insights";
 import Settings from "../pages/settings/Settings";
 import Morning from "../pages/morning/Morning";
 import Notes from "../pages/notes/Notes";
@@ -218,6 +218,10 @@ const PageContent = () => {
     // since they're accessed directly in Layout
     synchronizeTimerState,
     forceRefreshTimerDisplay,
+    // Stopwatch props
+    isStopwatchMode,
+    toggleStopwatchMode,
+    sessionMinutes,
   } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
@@ -366,6 +370,9 @@ const PageContent = () => {
             onBreakTimerStartPause={handleBreakTimerStartPause}
             onBreakTimerReset={handleBreakTimerReset}
             onBreakTimerAdjust={handleBreakTimerAdjust}
+            isStopwatchMode={isStopwatchMode}
+            onToggleStopwatchMode={toggleStopwatchMode}
+            sessionMinutes={sessionMinutes}
           />
         );
         break;

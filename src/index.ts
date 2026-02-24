@@ -174,11 +174,13 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, "assets", "icon.jpg"),
+    icon: path.join(__dirname, "assets", "icons", "png", "512x512.png"),
   });
 
   if (process.platform === "darwin") {
-    app.dock.setIcon(path.join(__dirname, "assets", "icon.jpg"));
+    app.dock.setIcon(
+      path.join(__dirname, "assets", "icons", "png", "512x512.png")
+    );
   }
 
   // Register all global shortcuts

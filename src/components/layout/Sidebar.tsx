@@ -33,6 +33,7 @@ type SidebarProps = {
     isVisible: boolean;
     time: number;
     isBreakTimer?: boolean;
+    isStopwatchMode?: boolean;
   };
 };
 

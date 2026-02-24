@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
 import { useNavigation } from "../../hooks/useNavigation";
@@ -14,22 +14,21 @@ const DailyTasks: React.FC = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { selected, setSelected } = useNavigation();
-  
+  const { selected } = useNavigation();
+
   // Editing state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
 
-  // Improved helper to check if a date is today (more robust)
+  // Task shortcut mode state
+  const [taskMode, setTaskMode] = useState(false);
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null);
+
   const isToday = (dateInput: Date | string | null) => {
     if (!dateInput) return false;
-
     const date = new Date(dateInput);
     const today = new Date();
-
-    // Check if date is valid
     if (isNaN(date.getTime())) return false;
-
     return (
       date.getDate() === today.getDate() &&
       date.getMonth() === today.getMonth() &&
@@ -37,31 +36,22 @@ const DailyTasks: React.FC = () => {
     );
   };
 
-  // Function to get task order from localStorage for a specific type
   const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
     const storedOrder = localStorage.getItem(`taskOrder_${type}`);
     return storedOrder ? JSON.parse(storedOrder) : null;
   };
 
-  // Function to save task order to localStorage for a specific type
   const saveTaskOrderToStorage = (type: TaskType, order: string[]): void => {
     localStorage.setItem(`taskOrder_${type}`, JSON.stringify(order));
   };
 
-  // Fetch daily tasks
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
       const allTasks = await api.getTasksByType("day");
 
-      console.log("Daily tasks loaded:", allTasks.length);
+      let active = allTasks.filter((task) => !task.completed);
 
-      // Filter active daily tasks (already filtered by type server-side)
-      let active = allTasks.filter(
-        (task) => !task.completed
-      );
-
-      // Apply stored order
       const taskOrderDay = getTaskOrderFromStorage("day");
       if (taskOrderDay) {
         active = active.sort((a, b) => {
@@ -74,28 +64,9 @@ const DailyTasks: React.FC = () => {
         });
       }
 
-      console.log("Active daily tasks (sorted):", active.length);
-
-      // Filter completed tasks from today - with improved handling
       const completed = allTasks.filter((task) => {
-        const isCompletedToday =
-          task.completed && isToday(task.completedAt);
-
-        if (task.completed) {
-          console.log(
-            "Completed task:",
-            task.title,
-            "completedAt:",
-            task.completedAt,
-            "isToday:",
-            isToday(task.completedAt)
-          );
-        }
-
-        return isCompletedToday;
+        return task.completed && isToday(task.completedAt);
       });
-
-      console.log("Completed today tasks:", completed.length);
 
       setActiveTasks(active);
       setCompletedTasks(completed);
@@ -106,44 +77,36 @@ const DailyTasks: React.FC = () => {
     }
   };
 
-  // Initial fetch on component mount
   useEffect(() => {
     fetchTasks();
   }, []);
 
-  // Refetch tasks when navigating back to the Compass page
   useEffect(() => {
     if (selected === "Compass") {
       fetchTasks();
     }
   }, [selected]);
 
-  // Listen for tasks added via quick add modals
   useEffect(() => {
     const unsubscribe = subscribeToTaskAdded((newTask) => {
-      // Only add if it's a daily task
       if (newTask.type === "day" && !newTask.completed) {
         setActiveTasks((prev) => {
-          // Check if task already exists (avoid duplicates)
           if (prev.some((t) => t.id === newTask.id)) {
             return prev;
           }
           return [newTask, ...prev];
         });
-        // Add to stored order
         const currentOrder = getTaskOrderFromStorage("day") || [];
         if (!currentOrder.includes(newTask.id)) {
           saveTaskOrderToStorage("day", [newTask.id, ...currentOrder]);
         }
       }
     });
-
     return unsubscribe;
   }, []);
 
-  const handleToggleComplete = async (id: string) => {
+  const handleToggleComplete = useCallback(async (id: string) => {
     try {
-      // Find the task in either active or completed arrays
       const task = [...activeTasks, ...completedTasks].find(
         (t) => t.id === id
       );
@@ -154,14 +117,11 @@ const DailyTasks: React.FC = () => {
         completedAt: !task.completed ? new Date() : null,
       };
 
-      // Optimistically update the UI first
       if (updates.completed) {
-        // Task was marked complete
         const taskToMove = activeTasks.find((t) => t.id === id);
         if (taskToMove) {
           setActiveTasks((prev) => prev.filter((t) => t.id !== id));
           setCompletedTasks((prev) => [...prev, { ...taskToMove, ...updates }]);
-          // Remove from stored order
           const currentOrder = getTaskOrderFromStorage("day") || [];
           saveTaskOrderToStorage(
             "day",
@@ -169,105 +129,180 @@ const DailyTasks: React.FC = () => {
           );
         }
       } else {
-        // Task was unmarked (moved back to active)
         const taskToMove = completedTasks.find((t) => t.id === id);
         if (taskToMove) {
           setCompletedTasks((prev) => prev.filter((t) => t.id !== id));
           const updatedTask = { ...taskToMove, ...updates };
-          setActiveTasks((prev) => [...prev, updatedTask]); // Add to end for now, order applied on next fetch or drag
-          // Add back to the beginning of the stored order
+          setActiveTasks((prev) => [...prev, updatedTask]);
           const currentOrder = getTaskOrderFromStorage("day") || [];
           saveTaskOrderToStorage("day", [
             id,
             ...currentOrder.filter((taskId) => taskId !== id),
-          ]); // Ensure no duplicates
+          ]);
         }
       }
 
-      // Then update in the database
-      api
-        .updateTask(id, updates)
-        .then(() => {
-          // After successful update, refresh tasks to ensure everything is in sync
-          // This helps capture other changes that might have happened
-          // fetchTasks(); // REMOVED: Rely on optimistic update
-        })
-        .catch((error) => {
-          console.error("Failed to update task in database:", error);
-          // If the API call fails, revert the optimistic update
-          if (updates.completed) {
-            // Revert completed task back to active
-            const taskToRevert = completedTasks.find((t) => t.id === id);
-            if (taskToRevert) {
-              setCompletedTasks((prev) => prev.filter((t) => t.id !== id));
-              setActiveTasks((prev) => [
-                ...prev,
-                { ...taskToRevert, completed: false, completedAt: null },
-              ]);
-            }
-          } else {
-            // Revert active task back to completed
-            const taskToRevert = activeTasks.find((t) => t.id === id);
-            if (taskToRevert) {
-              setActiveTasks((prev) => prev.filter((t) => t.id !== id));
-              setCompletedTasks((prev) => [
-                ...prev,
-                {
-                  ...taskToRevert,
-                  completed: true,
-                  completedAt: task.completedAt,
-                },
-              ]);
-            }
-          }
-        });
+      api.updateTask(id, updates).catch((error) => {
+        console.error("Failed to update task in database:", error);
+        // Simplified rollback: just refetch
+        fetchTasks();
+      });
     } catch (error) {
       console.error("Failed to toggle task:", error);
     }
-  };
+  }, [activeTasks, completedTasks]);
 
   const getTotalCount = () => {
     return activeTasks.length + completedTasks.length;
   };
 
-  // Handle updating task title
   const handleUpdateTitle = async (id: string, newTitle: string) => {
     if (!newTitle.trim()) {
       setEditingTaskId(null);
       return;
     }
 
-    const originalTask = [...activeTasks, ...completedTasks].find(t => t.id === id);
+    const originalTask = [...activeTasks, ...completedTasks].find(
+      (t) => t.id === id
+    );
     if (!originalTask || originalTask.title === newTitle) {
       setEditingTaskId(null);
       return;
     }
 
-    // Optimistic update
-    setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
-    setCompletedTasks(prev => prev.map(t => t.id === id ? { ...t, title: newTitle } : t));
+    setActiveTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: newTitle } : t))
+    );
+    setCompletedTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: newTitle } : t))
+    );
     setEditingTaskId(null);
 
     try {
       await api.updateTask(id, { title: newTitle });
     } catch (error) {
       console.error("Failed to update task title:", error);
-      // Rollback on failure
-      setActiveTasks(prev => prev.map(t => t.id === id ? { ...t, title: originalTask.title } : t));
-      setCompletedTasks(prev => prev.map(t => t.id === id ? { ...t, title: originalTask.title } : t));
+      setActiveTasks((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, title: originalTask.title } : t
+        )
+      );
+      setCompletedTasks((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, title: originalTask.title } : t
+        )
+      );
     }
   };
 
-  const startEditing = (task: Task) => {
+  const startEditing = useCallback((task: Task) => {
     setEditingTaskId(task.id);
     setEditedTitle(task.title);
-  };
+  }, []);
 
-  // Drag and Drop Handler
+  // Sync taskMode to DOM so Compass handler can check it
+  useEffect(() => {
+    if (taskMode) {
+      document.body.dataset.taskMode = "true";
+    } else {
+      delete document.body.dataset.taskMode;
+    }
+    return () => {
+      delete document.body.dataset.taskMode;
+    };
+  }, [taskMode]);
+
+  // Exit task mode when editing starts or tasks shrink
+  useEffect(() => {
+    if (editingTaskId) {
+      setTaskMode(false);
+      setSelectedTaskIndex(null);
+    }
+  }, [editingTaskId]);
+
+  useEffect(() => {
+    if (taskMode && selectedTaskIndex !== null && selectedTaskIndex >= activeTasks.length) {
+      setSelectedTaskIndex(null);
+    }
+  }, [activeTasks.length, taskMode, selectedTaskIndex]);
+
+  // Task mode keyboard handler — capture phase so it runs before Compass signal handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if in an input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // 'u' key enters task mode (update/select tasks)
+      if (e.key === "u" && !e.metaKey && !e.ctrlKey && !e.altKey && !taskMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        setTaskMode(true);
+        setSelectedTaskIndex(null);
+        return;
+      }
+
+      // Everything below only when task mode is active
+      if (!taskMode) return;
+
+      // Escape exits task mode
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setTaskMode(false);
+        setSelectedTaskIndex(null);
+        return;
+      }
+
+      // Number keys select a task (1-9, 0=10th)
+      const keyNum = parseInt(e.key);
+      if (!isNaN(keyNum) && keyNum >= 0 && keyNum <= 9) {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = keyNum === 0 ? 9 : keyNum - 1;
+        if (index < activeTasks.length) {
+          setSelectedTaskIndex(index);
+        }
+        return;
+      }
+
+      // Actions on selected task
+      if (selectedTaskIndex !== null && selectedTaskIndex < activeTasks.length) {
+        const task = activeTasks[selectedTaskIndex];
+
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          handleToggleComplete(task.id);
+          setSelectedTaskIndex(null);
+          // Stay in task mode for rapid checking
+          return;
+        }
+
+        if (e.key === "e" || e.key === "E") {
+          e.preventDefault();
+          e.stopPropagation();
+          startEditing(task);
+          // editingTaskId change will auto-exit task mode via the useEffect above
+          return;
+        }
+      }
+
+      // Stop propagation for any key in task mode so global shortcuts don't fire
+      e.stopPropagation();
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true); // capture phase
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [taskMode, selectedTaskIndex, activeTasks, handleToggleComplete, startEditing]);
+
+  // Drag and Drop
   const handleDragEnd = (result: DropResult) => {
     const { source, destination } = result;
-
-    // Dropped outside the list or no movement
     if (
       !destination ||
       (destination.droppableId === source.droppableId &&
@@ -275,24 +310,20 @@ const DailyTasks: React.FC = () => {
     ) {
       return;
     }
+    if (destination.droppableId !== "daily-active-tasks") return;
 
-    // Ensure drop happened within the active list
-    if (destination.droppableId !== "daily-active-tasks") {
-      console.warn("Drag and drop outside the active list is not supported.");
-      return;
-    }
-
-    // Reorder the activeTasks list
     const items = Array.from(activeTasks);
     const [reorderedItem] = items.splice(source.index, 1);
     items.splice(destination.index, 0, reorderedItem);
-
-    // Update the state
     setActiveTasks(items);
+    saveTaskOrderToStorage("day", items.map((task) => task.id));
+  };
 
-    // Save the new order to localStorage
-    const newOrder = items.map((task) => task.id);
-    saveTaskOrderToStorage("day", newOrder);
+  // Number label: 1-9, then 0 for 10th
+  const getNumberLabel = (index: number): string | null => {
+    if (index < 9) return String(index + 1);
+    if (index === 9) return "0";
+    return null;
   };
 
   if (isLoading) {
@@ -338,7 +369,6 @@ const DailyTasks: React.FC = () => {
     );
   }
 
-  // Custom checkbox for completed task
   const CompletedCheckbox = () => (
     <div className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-900 dark:border-white bg-gray-900 dark:bg-white">
       <svg
@@ -362,9 +392,16 @@ const DailyTasks: React.FC = () => {
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Tasks
         </h2>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          {getTotalCount()} task{getTotalCount() !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-2">
+          {taskMode && (
+            <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded">
+              SELECT
+            </span>
+          )}
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {getTotalCount()} task{getTotalCount() !== 1 ? "s" : ""}
+          </span>
+        </div>
       </div>
       <div className="p-4 bg-white dark:bg-gray-900 flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -380,55 +417,92 @@ const DailyTasks: React.FC = () => {
                       : ""
                   }`}
                 >
-                  {activeTasks.map((task, index) => (
-                    <Draggable
-                      key={task.id}
-                      draggableId={task.id}
-                      index={index}
-                    >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className={`flex items-center gap-3 py-1 ${
-                            snapshot.isDragging
-                              ? "bg-gray-200 dark:bg-gray-700 rounded shadow-md"
-                              : ""
-                          }`}
-                        >
+                  {activeTasks.map((task, index) => {
+                    const numLabel = getNumberLabel(index);
+                    const isSelected = taskMode && selectedTaskIndex === index;
+
+                    return (
+                      <Draggable
+                        key={task.id}
+                        draggableId={task.id}
+                        index={index}
+                      >
+                        {(provided, snapshot) => (
                           <div
-                            onClick={() => handleToggleComplete(task.id)}
-                            className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
-                          />
-                          {editingTaskId === task.id ? (
-                            <input
-                              type="text"
-                              value={editedTitle}
-                              onChange={(e) => setEditedTitle(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  handleUpdateTitle(task.id, editedTitle);
-                                } else if (e.key === "Escape") {
-                                  setEditingTaskId(null);
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={`flex items-center gap-3 py-1 rounded-sm px-1 -mx-1 transition-colors ${
+                              snapshot.isDragging
+                                ? "bg-gray-200 dark:bg-gray-700 rounded shadow-md"
+                                : isSelected
+                                ? "bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-300 dark:ring-indigo-700"
+                                : ""
+                            }`}
+                          >
+                            {/* Number badge in task mode, checkbox otherwise */}
+                            {taskMode && numLabel ? (
+                              <span
+                                className={`w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center text-[10px] font-bold leading-none ${
+                                  isSelected
+                                    ? "bg-indigo-500 text-white"
+                                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                                }`}
+                              >
+                                {numLabel}
+                              </span>
+                            ) : taskMode && !numLabel ? (
+                              <div className="w-3.5 h-3.5 shrink-0" />
+                            ) : (
+                              <div
+                                onClick={() => handleToggleComplete(task.id)}
+                                className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                              />
+                            )}
+
+                            {editingTaskId === task.id ? (
+                              <input
+                                type="text"
+                                value={editedTitle}
+                                onChange={(e) => setEditedTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleUpdateTitle(task.id, editedTitle);
+                                  } else if (e.key === "Escape") {
+                                    setEditingTaskId(null);
+                                  }
+                                }}
+                                onBlur={() =>
+                                  handleUpdateTitle(task.id, editedTitle)
                                 }
-                              }}
-                              onBlur={() => handleUpdateTitle(task.id, editedTitle)}
-                              className="flex-1 text-sm text-gray-800 dark:text-gray-200 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
-                              autoFocus
-                            />
-                          ) : (
-                            <span
-                              onClick={() => startEditing(task)}
-                              className="text-sm text-gray-800 dark:text-gray-200 truncate cursor-text"
-                            >
-                              {task.title}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
+                                className="flex-1 text-sm text-gray-800 dark:text-gray-200 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-gray-500 dark:focus:border-gray-400"
+                                autoFocus
+                              />
+                            ) : (
+                              <span
+                                onClick={() => startEditing(task)}
+                                className="text-sm text-gray-800 dark:text-gray-200 truncate cursor-text"
+                              >
+                                {task.title}
+                              </span>
+                            )}
+
+                            {/* Action hints when task is selected */}
+                            {isSelected && (
+                              <div className="flex items-center gap-1 shrink-0 ml-auto">
+                                <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
+                                  ↵
+                                </kbd>
+                                <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
+                                  e
+                                </kbd>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
                   {provided.placeholder}
                 </div>
               )}

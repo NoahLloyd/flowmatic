@@ -14,7 +14,6 @@ import {
   Eye,
   Heart,
   Wind,
-  CalendarDays,
   CheckSquare,
   EyeOff,
 } from "lucide-react";
@@ -26,24 +25,15 @@ import {
   MorningActivityContent,
 } from "../../types/Morning";
 import { useAuth } from "../../context/AuthContext";
-import { useNavigation } from "../../hooks/useNavigation";
 import { debounce } from "lodash";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTimezone } from "../../context/TimezoneContext";
+import MorningTasks from "./MorningTasks";
 
 const Morning = () => {
   const { user } = useAuth();
-  const { setSelected } = useNavigation();
   const { timezone, getUserTimezone } = useTimezone();
-
-  // Create a direct navigation function
-  const directNavigate = useCallback(
-    (page: string) => {
-      setSelected(page);
-    },
-    [setSelected]
-  );
 
   const [entries, setEntries] = useState<MorningEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState("");
@@ -631,6 +621,11 @@ const Morning = () => {
         return;
       }
 
+      // When the tasks activity is active, let MorningTasks handle all keyboard input
+      if (currentActivity?.type === "tasks") {
+        return;
+      }
+
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         if (currentActivityIndex < activities.length - 1) {
           nextActivity();
@@ -652,9 +647,6 @@ const Morning = () => {
           gratitudeTextareaRef.current?.focus();
         } else if (currentActivity?.type === "affirmations") {
           affirmationsTextareaRef.current?.focus();
-        } else if (currentActivity?.type === "tasks") {
-          // Navigate to tasks page using directNavigate
-          directNavigate("Tasks");
         }
       }
     };
@@ -669,7 +661,6 @@ const Morning = () => {
     nextActivity,
     prevActivity,
     currentActivity,
-    directNavigate,
   ]);
 
   // Start timer when changing to visualization or breathwork
@@ -685,17 +676,12 @@ const Morning = () => {
       startTimer();
     }
 
-    // Navigate automatically to Tasks page if current activity is tasks
-    if (currentActivity && currentActivity.type === "tasks") {
-      directNavigate("Tasks");
-    }
   }, [
     currentActivityIndex,
     currentActivity,
     timerActive,
     timerComplete,
     startTimer,
-    directNavigate,
   ]);
 
   const [isTextBlurred, setIsTextBlurred] = useState(false);
@@ -1030,26 +1016,7 @@ const Morning = () => {
         )}
 
         {/* Tasks */}
-        {currentActivity?.type === "tasks" && (
-          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
-            <div className="flex-grow flex flex-col justify-center items-center">
-              <div className="max-w-2xl text-center space-y-6">
-                <CheckSquare className="w-20 h-20 text-emerald-500 dark:text-emerald-400 mx-auto" />
-                <h2 className="text-2xl font-medium text-slate-700 dark:text-slate-200">
-                  Daily Tasks
-                </h2>
-                <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Take a moment to plan your day. What are the most important
-                  tasks you want to accomplish today?
-                </p>
-                <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Prioritize your tasks and focus on what brings you closer to
-                  your goals.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {currentActivity?.type === "tasks" && <MorningTasks />}
       </div>
     </div>
   );

@@ -45,14 +45,15 @@ import { subscribeToTaskAdded } from "../../utils/taskEvents";
 const fetchTasks = async (fetchAll = false): Promise<Task[]> => {
   try {
     // Fetch all task types in parallel using server-side type filtering
-    const [dayTasks, weekTasks, futureTasks, blockedTasks] = await Promise.all([
+    const [dayTasks, weekTasks, futureTasks, blockedTasks, shoppingTasks] = await Promise.all([
       api.getTasksByType("day"),
       api.getTasksByType("week"),
       api.getTasksByType("future"),
       api.getTasksByType("blocked"),
+      api.getTasksByType("shopping"),
     ]);
 
-    const allTasks = [...dayTasks, ...weekTasks, ...futureTasks, ...blockedTasks];
+    const allTasks = [...dayTasks, ...weekTasks, ...futureTasks, ...blockedTasks, ...shoppingTasks];
 
     // If fetchAll is true, return all tasks
     if (fetchAll) {
@@ -156,8 +157,8 @@ const Tasks: React.FC<TasksProps> = ({
             (t) => t.completed || t.type !== type
           );
           const sortedActive = [...activeTasksOfType].sort((a, b) => {
-            const indexA = order.indexOf(a._id);
-            const indexB = order.indexOf(b._id);
+            const indexA = order.indexOf(a.id);
+            const indexB = order.indexOf(b.id);
             // Handle tasks not in the stored order (e.g., newly added)
             if (indexA === -1 && indexB === -1) return 0; // Keep relative order or place at end
             if (indexA === -1) return 1; // Place tasks not in order at the end
