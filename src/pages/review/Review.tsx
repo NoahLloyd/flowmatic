@@ -24,6 +24,9 @@ import {
 } from "../../types/Review";
 import ChecklistSection from "./components/ChecklistSection";
 import QuestionsSection from "./components/QuestionsSection";
+import WeekInReview from "./components/WeekInReview";
+import QuestionHistory from "./components/QuestionHistory";
+import WeeklyTaskPlanner from "./components/WeeklyTaskPlanner";
 
 type ChecklistConfigItem = Omit<ChecklistItem, "checked">;
 type QuestionConfigItem = Omit<QuestionItem, "answer">;
@@ -506,6 +509,9 @@ const Review: React.FC = () => {
         </div>
       </div>
 
+      {/* Week in Review - Look Back */}
+      <WeekInReview weekStart={weekStart} weekEnd={weekEnd} />
+
       {/* Quick Capture Inbox */}
       <div className="mb-8">
         <div className="flex items-center space-x-2 mb-3">
@@ -613,6 +619,12 @@ const Review: React.FC = () => {
         progress={questionsProgress}
         disabled={!isEditing}
       />
+
+      {/* Question History - See past responses */}
+      <QuestionHistory />
+
+      {/* Plan Next Week - Task management */}
+      <WeeklyTaskPlanner disabled={!isEditing} />
 
       {/* Complete Button - minimal modern style */}
       <div className="mt-10 flex justify-center">

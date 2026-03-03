@@ -10,6 +10,7 @@ interface SidebarTimerProps {
   time: number; // Directly from timeRemaining or breakTimeRemaining
   isBreakTimer?: boolean; // Whether this is a break timer or main timer
   onNavigateToTimer?: () => void; // Optional callback to navigate to timer
+  isStopwatchMode?: boolean; // Whether the timer is in stopwatch (count-up) mode
 }
 
 const SidebarTimer: React.FC<SidebarTimerProps> = ({
@@ -17,6 +18,7 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
   time,
   isBreakTimer = false,
   onNavigateToTimer,
+  isStopwatchMode = false,
 }) => {
   const [isHidden, setIsHidden] = useState(() => {
     const stored = localStorage.getItem(SIDEBAR_TIMER_HIDDEN_KEY);
@@ -57,14 +59,10 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
     return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  // Format time as minutes only (or 0:SS when < 1 minute)
+  // Format time as minutes only
   const formatTimeMinutesOnly = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    if (minutes >= 1) {
-      return `${minutes}m`;
-    }
-    return `0:${secs < 10 ? "0" : ""}${secs}`;
+    return `${minutes}m`;
   };
 
   if (!isVisible) return null;
@@ -119,7 +117,7 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
 
       <div className="flex flex-col items-center">
         <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 opacity-70">
-          {isBreakTimer ? "Break" : "Focus"}
+          {isBreakTimer ? "Break" : isStopwatchMode ? "Stopwatch" : "Focus"}
         </div>
         <span className="text-3xl font-bold text-slate-700 dark:text-slate-200">
           {isSimpleMode ? formatTimeMinutesOnly(time) : formatTime(time)}

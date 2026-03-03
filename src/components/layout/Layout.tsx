@@ -48,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     breakIsRunning,
     showInSidebar,
     synchronizeTimerState,
+    isStopwatchMode,
   } = useTimer();
 
   // Force sync timer state when Layout mounts/updates
@@ -116,8 +117,10 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     (isRunning || (isBreakMode && breakIsRunning)) && // Only show when timer is actively running
     (showInSidebar ||
       (selected !== "Compass" &&
-        // For normal timer: either it's running or has remaining time
-        (timeRemaining > 0 ||
+        // For stopwatch: always show when running (timeRemaining starts at 0)
+        (isStopwatchMode ||
+          // For normal timer: either it's running or has remaining time
+          timeRemaining > 0 ||
           // For break timer: either it's running or has remaining time
           (isBreakMode && breakTimeRemaining > 0))));
 
@@ -156,6 +159,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
                   isVisible: true,
                   time: isBreakMode ? breakTimeRemaining : timeRemaining,
                   isBreakTimer: isBreakMode,
+                  isStopwatchMode: isStopwatchMode,
                 }
               : undefined
           }

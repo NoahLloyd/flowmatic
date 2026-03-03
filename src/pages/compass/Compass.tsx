@@ -38,6 +38,10 @@ interface CompassProps {
   onBreakTimerStartPause?: () => void;
   onBreakTimerReset?: () => void;
   onBreakTimerAdjust?: (amount: number) => void;
+  // Stopwatch props
+  isStopwatchMode?: boolean;
+  onToggleStopwatchMode?: () => void;
+  sessionMinutes?: number;
 }
 
 const Compass: React.FC<CompassProps> = ({
@@ -57,6 +61,10 @@ const Compass: React.FC<CompassProps> = ({
   onBreakTimerStartPause = () => {},
   onBreakTimerReset = () => {},
   onBreakTimerAdjust = () => {},
+  // Stopwatch props
+  isStopwatchMode = false,
+  onToggleStopwatchMode = () => {},
+  sessionMinutes = 60,
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
   const { user } = useAuth();
@@ -148,6 +156,11 @@ const Compass: React.FC<CompassProps> = ({
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
+        return;
+      }
+
+      // Skip all shortcuts when DailyTasks task mode is active
+      if (document.body.dataset.taskMode === "true") {
         return;
       }
 
@@ -401,6 +414,7 @@ const Compass: React.FC<CompassProps> = ({
         onBreakTimerStartPause={onBreakTimerStartPause}
         onBreakTimerReset={onBreakTimerReset}
         onBreakTimerAdjust={onBreakTimerAdjust}
+        initialMinutes={sessionMinutes}
       />
 
       {/* Signals Section - Added ref for keyboard shortcuts */}
@@ -419,6 +433,8 @@ const Compass: React.FC<CompassProps> = ({
             onReset={onReset}
             onAdjustTime={onAdjustTime}
             onOpenRecordModal={onCloseModal}
+            isStopwatchMode={isStopwatchMode}
+            onToggleStopwatchMode={onToggleStopwatchMode}
           />
         </div>
 

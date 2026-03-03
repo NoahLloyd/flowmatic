@@ -11,6 +11,8 @@ interface TimerDisplayProps {
   onReset: () => void;
   onAdjustTime: (amount: number) => void;
   onOpenRecordModal?: () => void;
+  isStopwatchMode?: boolean;
+  onToggleStopwatchMode?: () => void;
 }
 
 const WaveComponent = ({
@@ -78,6 +80,8 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onReset,
   onAdjustTime,
   onOpenRecordModal = () => {},
+  isStopwatchMode = false,
+  onToggleStopwatchMode = () => {},
 }) => {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -125,10 +129,14 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
   // Calculate progress based on standard 60 minute session
   const progressPercentage = useMemo(() => {
-    // Calculate how much time has passed from the standard 60 minutes
+    if (isStopwatchMode) {
+      // Stopwatch: time represents elapsed seconds, fill up over 60 minutes
+      return Math.min((time / standardInitialTime) * 100, 100);
+    }
+    // Countdown: calculate how much time has passed from the standard 60 minutes
     const timeElapsed = standardInitialTime - time;
     return (timeElapsed / standardInitialTime) * 100;
-  }, [time]);
+  }, [time, isStopwatchMode]);
 
   // Memoize random values for waves and particles to keep them stable across renders
   const waveDurations = useMemo(() => [0, 1, 2, 3].map(() => 4 + Math.random()), []);
@@ -143,17 +151,17 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
 
-  // Simple mode display: show only minutes, or 0:XX when < 1 minute
-  const simpleTimeDisplay = minutes >= 1 ? `${minutes}` : `0:${seconds < 10 ? "0" : ""}${seconds}`;
+  // Simple mode display: always show just the minutes number
+  const simpleTimeDisplay = `${minutes}`;
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
       <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center">
-        <h2 
+        <h2
           className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
-          onClick={() => setIsSimpleMode(!isSimpleMode)}
+          onClick={onToggleStopwatchMode}
         >
-          Timer
+          {isStopwatchMode ? "Stopwatch" : "Timer"}
         </h2>
       </div>
       <div 
@@ -214,9 +222,10 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
         <div className="relative z-10 p-5 flex flex-col items-center justify-center">
           <motion.div
-            className="text-5xl font-bold mb-8 text-center text-gray-900 dark:text-white"
+            className="text-5xl font-bold mb-8 text-center text-gray-900 dark:text-white cursor-pointer select-none"
             animate={{ scale: isRunning ? [1, 1.02, 1] : 1 }}
             transition={{ repeat: Infinity, duration: 2 }}
+            onClick={() => setIsSimpleMode(!isSimpleMode)}
           >
             {isSimpleMode ? simpleTimeDisplay : `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`}
           </motion.div>

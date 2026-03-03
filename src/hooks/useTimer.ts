@@ -70,6 +70,11 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const [showInSidebar, setShowInSidebar] = useState(false);
   const [timerJustCompleted, setTimerJustCompleted] = useState(false);
 
+  // Stopwatch (count-up) mode
+  const [isStopwatchMode, setIsStopwatchMode] = useState(() => {
+    return localStorage.getItem('timerStopwatchMode') === 'true';
+  });
+
   // Refs for interval management
   const timerIntervalRef = useRef<number | null>(null);
   const breakTimerIntervalRef = useRef<number | null>(null);
@@ -101,13 +106,20 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         setStartTime(parsedState.startTime);
         setIsRunning(parsedState.isRunning);
 
+        // Check stopwatch mode from separate localStorage key
+        const stopwatchMode = localStorage.getItem('timerStopwatchMode') === 'true';
+
         // Calculate time remaining for main timer
         if (parsedState.startTime && parsedState.isRunning) {
           const elapsed = Math.floor(
             (Date.now() - parsedState.startTime) / 1000
           );
-          const remaining = Math.max(0, parsedState.duration - elapsed);
-          setTimeRemaining(remaining);
+          if (stopwatchMode) {
+            setTimeRemaining(elapsed);
+          } else {
+            const remaining = Math.max(0, parsedState.duration - elapsed);
+            setTimeRemaining(remaining);
+          }
         } else {
           setTimeRemaining(parsedState.duration);
         }
@@ -157,29 +169,51 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
       const now = Date.now();
       const elapsed = Math.floor((now - startTime) / 1000);
-      const remaining = Math.max(0, duration - elapsed);
 
-      setTimeRemaining(remaining);
+      if (isStopwatchMode) {
+        // Stopwatch: count up
+        setTimeRemaining(elapsed);
 
-      // Update tray
-      const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
-      window.electron.send("update-tray", minutesLeft);
+        // Update tray with elapsed time
+        const minutesElapsed = " " + Math.floor(elapsed / 60).toString() + "m";
+        window.electron.send("update-tray", minutesElapsed);
 
-      // Save state
-      saveTimerState({
-        duration,
-        startTime,
-        isRunning: true,
-        isBreakMode,
-        breakDuration,
-        breakStartTime,
-        breakIsRunning,
-        minimized: showInSidebar,
-      });
+        // Save state (no completion check for stopwatch)
+        saveTimerState({
+          duration,
+          startTime,
+          isRunning: true,
+          isBreakMode,
+          breakDuration,
+          breakStartTime,
+          breakIsRunning,
+          minimized: showInSidebar,
+        });
+      } else {
+        // Countdown: count down
+        const remaining = Math.max(0, duration - elapsed);
+        setTimeRemaining(remaining);
 
-      // Check if timer completed
-      if (remaining <= 0) {
-        handleTimerComplete();
+        // Update tray
+        const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
+        window.electron.send("update-tray", minutesLeft);
+
+        // Save state
+        saveTimerState({
+          duration,
+          startTime,
+          isRunning: true,
+          isBreakMode,
+          breakDuration,
+          breakStartTime,
+          breakIsRunning,
+          minimized: showInSidebar,
+        });
+
+        // Check if timer completed
+        if (remaining <= 0) {
+          handleTimerComplete();
+        }
       }
     };
 
@@ -216,7 +250,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         minimized: showInSidebar,
       });
     }
-  }, [isRunning, startTime, duration, isBreakMode]);
+  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode]);
 
   // Break timer effect
   useEffect(() => {
@@ -412,7 +446,14 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         setDoNotDisturb(false);
       } else {
         // Start main timer
-        const newStartTime = Date.now() - (duration - timeRemaining) * 1000;
+        let newStartTime: number;
+        if (isStopwatchMode) {
+          // Stopwatch: resume from elapsed time (timeRemaining = elapsed so far)
+          newStartTime = Date.now() - timeRemaining * 1000;
+        } else {
+          // Countdown: resume from remaining time
+          newStartTime = Date.now() - (duration - timeRemaining) * 1000;
+        }
         setStartTime(newStartTime);
         setIsRunning(true);
 
@@ -432,26 +473,47 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     lastAdjustmentTimeRef.current = now;
 
     if (isRunning && startTime) {
-      // Adjust running timer
-      const newDuration = Math.max(duration + amount, 0);
-      setDuration(newDuration);
+      if (isStopwatchMode) {
+        // Adjust running stopwatch: shift startTime to change displayed elapsed time
+        const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+        const newElapsed = Math.max(0, currentElapsed + amount);
+        const newStartTime = Date.now() - newElapsed * 1000;
+        setStartTime(newStartTime);
+        setTimeRemaining(newElapsed);
 
-      // Calculate new time remaining
-      const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const newRemaining = Math.max(0, newDuration - elapsed);
-      setTimeRemaining(newRemaining);
+        // Save to localStorage
+        saveTimerState({
+          duration,
+          startTime: newStartTime,
+          isRunning,
+          isBreakMode,
+          breakDuration,
+          breakStartTime,
+          breakIsRunning,
+          minimized: showInSidebar,
+        });
+      } else {
+        // Adjust running countdown timer
+        const newDuration = Math.max(duration + amount, 0);
+        setDuration(newDuration);
 
-      // Save to localStorage
-      saveTimerState({
-        duration: newDuration,
-        startTime,
-        isRunning,
-        isBreakMode,
-        breakDuration,
-        breakStartTime,
-        breakIsRunning,
-        minimized: showInSidebar,
-      });
+        // Calculate new time remaining
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const newRemaining = Math.max(0, newDuration - elapsed);
+        setTimeRemaining(newRemaining);
+
+        // Save to localStorage
+        saveTimerState({
+          duration: newDuration,
+          startTime,
+          isRunning,
+          isBreakMode,
+          breakDuration,
+          breakStartTime,
+          breakIsRunning,
+          minimized: showInSidebar,
+        });
+      }
     } else {
       // Adjust paused timer (change both duration and timeRemaining)
       const newTime = Math.max(timeRemaining + amount, 0);
@@ -481,8 +543,13 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
 
     // Reset timer state
-    setDuration(defaultSeconds);
-    setTimeRemaining(defaultSeconds);
+    if (isStopwatchMode) {
+      setDuration(0);
+      setTimeRemaining(0);
+    } else {
+      setDuration(defaultSeconds);
+      setTimeRemaining(defaultSeconds);
+    }
     setStartTime(null);
     setIsRunning(false);
     setShowInSidebar(false);
@@ -719,6 +786,10 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       try {
         const parsedState = JSON.parse(storedState) as TimerState;
 
+        // Sync stopwatch mode
+        const stopwatchMode = localStorage.getItem('timerStopwatchMode') === 'true';
+        setIsStopwatchMode(stopwatchMode);
+
         // Set main timer state
         setDuration(parsedState.duration);
         setIsRunning(parsedState.isRunning);
@@ -730,8 +801,12 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           const elapsed = Math.floor(
             (Date.now() - parsedState.startTime) / 1000
           );
-          const remaining = Math.max(0, parsedState.duration - elapsed);
-          setTimeRemaining(remaining);
+          if (stopwatchMode) {
+            setTimeRemaining(elapsed);
+          } else {
+            const remaining = Math.max(0, parsedState.duration - elapsed);
+            setTimeRemaining(remaining);
+          }
         } else {
           setTimeRemaining(parsedState.duration);
         }
@@ -790,14 +865,53 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Recalculate time remaining for displayed timer
     if (isRunning && startTime) {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const remaining = Math.max(0, duration - elapsed);
-      setTimeRemaining(remaining);
+      if (isStopwatchMode) {
+        setTimeRemaining(elapsed);
+      } else {
+        const remaining = Math.max(0, duration - elapsed);
+        setTimeRemaining(remaining);
+      }
     } else if (breakIsRunning && breakStartTime) {
       const elapsed = Math.floor((Date.now() - breakStartTime) / 1000);
       const remaining = Math.max(0, breakDuration - elapsed);
       setBreakTimeRemaining(remaining);
     }
   };
+
+  // Toggle between countdown and stopwatch modes
+  const toggleStopwatchMode = () => {
+    const newMode = !isStopwatchMode;
+    setIsStopwatchMode(newMode);
+    localStorage.setItem('timerStopwatchMode', String(newMode));
+
+    // Reset timer when switching modes
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    setIsRunning(false);
+    setStartTime(null);
+    setShowInSidebar(false);
+    setDoNotDisturb(false);
+
+    if (newMode) {
+      // Switching to stopwatch: start at 0
+      setDuration(0);
+      setTimeRemaining(0);
+    } else {
+      // Switching to countdown: reset to default
+      setDuration(defaultSeconds);
+      setTimeRemaining(defaultSeconds);
+    }
+
+    localStorage.removeItem("timerState");
+  };
+
+  // Compute session minutes for the modal pre-fill
+  const sessionMinutes = isStopwatchMode
+    ? Math.round(timeRemaining / 60)
+    : defaultMinutes;
 
   return {
     timeRemaining,
@@ -825,5 +939,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Sync functions for components that need to force refresh
     synchronizeTimerState,
     forceRefreshTimerDisplay,
+    // Stopwatch mode
+    isStopwatchMode,
+    toggleStopwatchMode,
+    sessionMinutes,
   };
 };

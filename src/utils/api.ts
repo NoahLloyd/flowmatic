@@ -783,6 +783,47 @@ export const api = {
     }
   },
 
+  /** Fetch tasks completed within a date range */
+  getCompletedTasksByDateRange: async (
+    startISO: string,
+    endISO: string
+  ): Promise<Task[]> => {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .gte("completed_at", startISO)
+      .lte("completed_at", endISO)
+      .order("completed_at", { ascending: false })
+      .limit(10000);
+    if (error) throw error;
+    return (data || []).map((t: any) => ({
+      ...t,
+      completedAt: t.completed_at,
+      createdAt: t.created_at,
+    }));
+  },
+
+  /** Fetch all active (non-completed) tasks */
+  getActiveTasks: async (): Promise<Task[]> => {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("completed", false)
+      .order("created_at", { ascending: false })
+      .limit(10000);
+    if (error) throw error;
+    return (data || []).map((t: any) => ({
+      ...t,
+      completedAt: t.completed_at,
+      createdAt: t.created_at,
+    }));
+  },
+
   // ─── Review Inbox (helper – stays client-side) ──────────
 
   addToReviewInbox: async (
