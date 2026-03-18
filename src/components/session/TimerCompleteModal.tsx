@@ -314,9 +314,8 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
           const option = breakOptions[parseInt(e.key) - 1];
           handleBreakSelection(option.minutes);
         } else if (e.key === "4") {
-          // Restart timer (shortcut 4)
+          // Restart timer (shortcut 4) — onRestartTimer closes the modal itself
           onRestartTimer();
-          handleClose();
         } else if (e.key === "5") {
           // End session (shortcut 5)
           handleClose();
@@ -549,7 +548,6 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
                 <button
                   onClick={() => {
                     onRestartTimer();
-                    handleClose();
                   }}
                   className="w-full flex items-center bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-md p-2.5 transition-colors"
                 >

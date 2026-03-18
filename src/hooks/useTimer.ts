@@ -616,6 +616,10 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setIsRunning(true);
     setShowInSidebar(false);
 
+    // Close the modal directly — avoids handleCloseModal overwriting
+    // the new timer state with stale closure values
+    setIsModalOpen(false);
+
     // Enable DND when restarting timer
     setDoNotDisturb(true);
 
