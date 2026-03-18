@@ -2,13 +2,11 @@ import React, { useEffect, useState } from "react";
 import SignalCard from "./SignalCard";
 import { api } from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
-import { AVAILABLE_SIGNALS } from "../../../pages/settings/components/SignalSettings";
+import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../../../pages/settings/components/SignalSettings";
 import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
 import { useSignals } from "../../../context/SignalsContext";
 import { useTimezone } from "../../../context/TimezoneContext";
 import { MorningEntry } from "../../../types/Morning";
-
-type SignalKey = keyof typeof AVAILABLE_SIGNALS;
 
 // Define units for different signals
 const SIGNAL_UNITS: Record<string, string> = {
@@ -224,13 +222,18 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
     }
   };
 
+  // Get all signals (built-in + custom)
+  const allSignals = getAllSignals(
+    user?.preferences?.customSignals as Record<string, SignalConfig> | undefined
+  );
+
   // Get active signals from user preferences or use defaults
-  const getActiveSignals = (): SignalKey[] => {
+  const getActiveSignals = (): string[] => {
     if (
       user?.preferences?.activeSignals &&
       user.preferences.activeSignals.length > 0
     ) {
-      return user.preferences.activeSignals as SignalKey[];
+      return user.preferences.activeSignals as string[];
     }
 
     // Default active signals
@@ -268,8 +271,8 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
       </div>
       <div className="p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(AVAILABLE_SIGNALS)
-            .filter(([key]) => activeSignals.includes(key as SignalKey))
+          {Object.entries(allSignals)
+            .filter(([key]) => activeSignals.includes(key))
             .map(([key, config]) => {
               // Special handling for journaling signal - use morning entries data
               if (key === "journaling") {
@@ -325,7 +328,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
                   label={SIGNAL_DISPLAY_LABELS[key] || config.label}
                   format="" // Add empty string as format is required but not used
                   value={signals[key] ?? (config.type === "binary" ? false : 0)}
-                  unit={SIGNAL_UNITS[key] || ""} // Add unit based on signal type
+                  unit={SIGNAL_UNITS[key] || (config as SignalConfig).unit || ""}
                   type={config.type}
                   status={"active"} // Default to active status
                   timestamp={new Date()} // Use current date as default

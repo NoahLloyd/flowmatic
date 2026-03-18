@@ -2,7 +2,6 @@ import { Session } from "src/types/Session";
 import { MorningEntries, MorningEntry } from "src/types/Morning";
 import { Task } from "src/types/Task";
 import { User } from "src/types/User";
-import { Document } from "src/types/Document";
 import { WeeklyReview, ReviewStreak } from "src/types/Review";
 import { supabase, getCurrentUserId } from "./supabase";
 
@@ -608,88 +607,6 @@ export const api = {
       .eq("id", noteId);
     if (error) throw error;
     return { message: "Note deleted successfully" };
-  },
-
-  // ─── Documents ───────────────────────────────────────────
-
-  getUserDocuments: async (): Promise<Document[]> => {
-    const userId = await getCurrentUserId();
-    const { data, error } = await supabase
-      .from("documents")
-      .select("*")
-      .eq("user_id", userId);
-    if (error) throw error;
-    return (data || []) as Document[];
-  },
-
-  getDocumentById: async (documentId: string): Promise<Document> => {
-    const { data, error } = await supabase
-      .from("documents")
-      .select("*")
-      .eq("id", documentId)
-      .single();
-    if (error) throw error;
-    return data as Document;
-  },
-
-  createDocument: async (documentData: {
-    title: string;
-    content: string;
-    publication_status?: "unpublished" | "hidden" | "live";
-  }): Promise<Document> => {
-    const userId = await getCurrentUserId();
-    const { data, error } = await supabase
-      .from("documents")
-      .insert({
-        user_id: userId,
-        title: documentData.title,
-        content: documentData.content,
-        publication_status: documentData.publication_status || "unpublished",
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Document;
-  },
-
-  updateDocument: async (
-    documentId: string,
-    updates: {
-      title?: string;
-      content?: string;
-      publication_status?: "unpublished" | "hidden" | "live";
-    }
-  ): Promise<Document> => {
-    const { data, error } = await supabase
-      .from("documents")
-      .update(updates)
-      .eq("id", documentId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Document;
-  },
-
-  updateDocumentPublicationStatus: async (
-    documentId: string,
-    publication_status: "unpublished" | "hidden" | "live"
-  ): Promise<Document> => {
-    const { data, error } = await supabase
-      .from("documents")
-      .update({ publication_status })
-      .eq("id", documentId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Document;
-  },
-
-  deleteDocument: async (documentId: string): Promise<void> => {
-    const { error } = await supabase
-      .from("documents")
-      .delete()
-      .eq("id", documentId);
-    if (error) throw error;
   },
 
   // ─── Weekly Reviews ──────────────────────────────────────

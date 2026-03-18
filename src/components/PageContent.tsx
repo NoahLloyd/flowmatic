@@ -15,7 +15,6 @@ import { useToast } from "../context/ToastContext";
 import { api } from "../utils/api";
 import Auth from "../pages/auth/Auth";
 import { useAuth } from "../context/AuthContext";
-import Documents from "../pages/documents/Documents";
 import QuickAddTaskModal from "./task/QuickAddTaskModal";
 import QuickAddNoteModal from "./note/QuickAddNoteModal";
 import GlobalQuickAddTask from "./global/GlobalQuickAddTask";
@@ -375,9 +374,6 @@ const PageContent = () => {
             sessionMinutes={sessionMinutes}
           />
         );
-        break;
-      case "Documents":
-        content = <Documents />;
         break;
       case "Tasks":
         content = (

@@ -9,7 +9,7 @@ import React, {
 import { api } from "../utils/api";
 import { useAuth } from "./AuthContext";
 import { useTimezone } from "./TimezoneContext";
-import { AVAILABLE_SIGNALS as ImportedAvailableSignals } from "../pages/settings/components/SignalSettings";
+import { AVAILABLE_SIGNALS as ImportedAvailableSignals, getAllSignals, SignalConfig } from "../pages/settings/components/SignalSettings";
 import { MorningEntry } from "../types/Morning";
 import { Session } from "../types/Session";
 
@@ -64,10 +64,10 @@ const SignalsContext = createContext<SignalsContextType>({
   refreshSignals: async () => {},
 });
 
-// Helper function to get the current signals configuration
-const getAvailableSignals = () => {
-  // Prefer the global instance if it exists (for consistency across components)
-  return window.AVAILABLE_SIGNALS || ImportedAvailableSignals;
+// Helper function to get the current signals configuration (including custom signals)
+const getAvailableSignals = (user: any) => {
+  const customSignals = user?.preferences?.customSignals as Record<string, SignalConfig> | undefined;
+  return getAllSignals(customSignals);
 };
 
 // Provider component to wrap application
@@ -353,7 +353,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       const completionTracker: Record<string, number> = {}; // Track individual signal completion
 
       // Get the current signals configuration
-      const availableSignals = getAvailableSignals();
+      const availableSignals = getAvailableSignals(user);
 
       // Loop through all available signals
       Object.entries(availableSignals).forEach(([key, config]) => {

@@ -52,11 +52,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   };
 
-  // Main timer states
-  const [duration, setDuration] = useState(defaultSeconds);
+  // Main timer states - start at 0 in stopwatch mode, defaultSeconds in countdown
+  const [duration, setDuration] = useState(() => {
+    const stopwatch = localStorage.getItem('timerStopwatchMode') === 'true';
+    return stopwatch ? 0 : defaultSeconds;
+  });
   const [startTime, setStartTime] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(defaultSeconds);
+  const [timeRemaining, setTimeRemaining] = useState(() => {
+    const stopwatch = localStorage.getItem('timerStopwatchMode') === 'true';
+    return stopwatch ? 0 : defaultSeconds;
+  });
 
   // Break timer states
   const [isBreakMode, setIsBreakMode] = useState(false);
@@ -648,6 +654,12 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning,
           minimized: true,
         });
+      } else if (!isRunning && isStopwatchMode) {
+        // In stopwatch mode, reset to 0 after session is done
+        setDuration(0);
+        setTimeRemaining(0);
+        setStartTime(null);
+        localStorage.removeItem("timerState");
       }
     }
   };
