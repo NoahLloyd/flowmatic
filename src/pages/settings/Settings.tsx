@@ -123,6 +123,10 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState({ type: "", text: "" });
 
+  // DND test state
+  const [dndTestStatus, setDndTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [dndTestMessage, setDndTestMessage] = useState("");
+
   // Update state when user data changes
   useEffect(() => {
     if (user?.preferences) {
@@ -244,6 +248,9 @@ const Settings = () => {
           : {}),
         ...(signalSettings.signalGoals
           ? { signalGoals: signalSettings.signalGoals }
+          : {}),
+        ...(signalSettings.customSignals
+          ? { customSignals: signalSettings.customSignals }
           : {}),
 
         // Morning settings
@@ -450,6 +457,102 @@ const Settings = () => {
                   />
                 </button>
               </div>
+
+              {autoDoNotDisturb && (
+                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/40 rounded-md border border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      DND Status
+                    </span>
+                    <button
+                      onClick={async () => {
+                        setDndTestStatus("testing");
+                        setDndTestMessage("Testing Focus On...");
+                        try {
+                          const onResult = await window.electron.setDoNotDisturb(true);
+                          if (onResult) {
+                            setDndTestMessage("Focus On worked! Testing Focus Off...");
+                            await new Promise((r) => setTimeout(r, 1500));
+                            const offResult = await window.electron.setDoNotDisturb(false);
+                            if (offResult) {
+                              setDndTestStatus("success");
+                              setDndTestMessage("DND is working correctly.");
+                            } else {
+                              setDndTestStatus("error");
+                              setDndTestMessage("\"Focus Off\" shortcut failed. See setup guide below.");
+                            }
+                          } else {
+                            setDndTestStatus("error");
+                            setDndTestMessage("\"Focus On\" shortcut failed. See setup guide below.");
+                          }
+                        } catch (err) {
+                          setDndTestStatus("error");
+                          setDndTestMessage("Could not run shortcuts. See setup guide below.");
+                        }
+                      }}
+                      disabled={dndTestStatus === "testing"}
+                      className="text-xs px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      {dndTestStatus === "testing" ? "Testing..." : "Test DND"}
+                    </button>
+                  </div>
+
+                  {dndTestStatus !== "idle" && (
+                    <div
+                      className={`text-xs px-2 py-1.5 rounded-md mb-2 ${
+                        dndTestStatus === "success"
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                          : dndTestStatus === "error"
+                          ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
+                          : "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                      }`}
+                    >
+                      {dndTestMessage}
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+                    <p className="font-medium text-gray-700 dark:text-gray-300">
+                      Setup Guide
+                    </p>
+                    <p>
+                      This feature requires two shortcuts in the macOS Shortcuts
+                      app:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 ml-1">
+                      <li>
+                        Open the <strong>Shortcuts</strong> app on your Mac
+                      </li>
+                      <li>
+                        Create a shortcut named{" "}
+                        <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
+                          Focus On
+                        </code>{" "}
+                        that turns on your preferred Focus mode
+                      </li>
+                      <li>
+                        Create a shortcut named{" "}
+                        <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
+                          Focus Off
+                        </code>{" "}
+                        that turns off Focus mode
+                      </li>
+                      <li>
+                        When prompted, allow Flowmatic to control Shortcuts
+                      </li>
+                    </ol>
+                    <p className="mt-1.5 text-gray-500 dark:text-gray-500">
+                      If you don't see a permission prompt, go to{" "}
+                      <strong>
+                        System Settings &rarr; Privacy & Security &rarr;
+                        Automation
+                      </strong>{" "}
+                      and enable <strong>Shortcuts Events</strong> for
+                      Flowmatic.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

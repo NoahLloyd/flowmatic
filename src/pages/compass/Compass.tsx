@@ -207,15 +207,22 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
+      // '0' key resets the timer
+      if (e.key === "0") {
+        e.preventDefault();
+        onReset();
+        return;
+      }
+
       // Signal selection and interaction with number keys
       const keyNum = parseInt(e.key);
-      if (!isNaN(keyNum) && keyNum >= 0 && keyNum <= 9) {
+      if (!isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
         e.preventDefault();
 
         // Signal index - numpad keys directly map to indices (subtract 1)
         // Key 1 = index 0, Key 2 = index 1, etc.
         // Key 0 = index 9 (10th element)
-        const index = keyNum === 0 ? 9 : keyNum - 1;
+        const index = keyNum - 1;
 
         // Get all actual signal cards using direct children of the grid
         const signalCardContainer = signalsRef.current?.querySelector(".grid");

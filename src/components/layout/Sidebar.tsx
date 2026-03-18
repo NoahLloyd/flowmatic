@@ -13,7 +13,6 @@ import {
   Sun,
   Monitor,
   StickyNote,
-  BookOpen,
   ClipboardList,
 } from "lucide-react";
 import logoImage from "../../assets/logo-black-Template.png";
@@ -69,7 +68,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     { label: "Morning", icon: Sunrise },
     { label: "Review", icon: ClipboardList },
     { label: "Notes", icon: StickyNote },
-    { label: "Documents", icon: BookOpen },
     { label: "Insights", icon: BarChart2 },
     { label: "Settings", icon: Settings },
   ];
@@ -81,7 +79,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     Morning: "m",
     Review: "r",
     Notes: "n",
-    Documents: "d",
     Insights: "i",
     Settings: "s",
   };
