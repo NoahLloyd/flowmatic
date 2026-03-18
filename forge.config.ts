@@ -17,11 +17,6 @@ const config: ForgeConfig = {
     asar: true,
     icon: "./src/assets/icons/mac/icon",
     name: "Flowmatic",
-    osxSign: {
-      optionsForFile: () => ({
-        entitlements: "./entitlements.plist",
-      }),
-    },
     extendInfo: {
       NSAppleEventsUsageDescription:
         "Flowmatic needs permission to control Focus mode (Do Not Disturb) via Shortcuts.",
