@@ -14,6 +14,7 @@ import {
   Monitor,
   StickyNote,
   ClipboardList,
+  Flame,
 } from "lucide-react";
 import logoImage from "../../assets/logo-black-Template.png";
 import logoDarkImage from "../../assets/logo-white-Template.png";
@@ -54,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [currentDayOfWeek, setCurrentDayOfWeek] = useState(-1); // -1 = not loaded yet
 
   // Use the SignalsContext instead of local state for signals
-  const { signals, signalScore, totalSignals, completedSignals, updateSignal } =
+  const { signals, signalScore, totalSignals, completedSignals, signalStreak, signalStreakDanger, updateSignal } =
     useSignals();
 
   // Get the timezone context
@@ -317,6 +318,32 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
 
+      {/* Signal Streak */}
+      {(signalStreak > 0 || signalStreakDanger) && (
+        <div
+          onClick={() => onSelect("Compass")}
+          className={`px-4 py-2.5 cursor-pointer rounded-xl border flex items-center gap-2.5 transition-colors ${
+            signalStreakDanger
+              ? "bg-red-50/50 dark:bg-red-950/20 border-red-200/60 dark:border-red-800/30 hover:bg-red-100/50 dark:hover:bg-red-950/40"
+              : "bg-white/10 dark:bg-slate-800/30 border-white/20 dark:border-slate-700/60 hover:bg-white/15 dark:hover:bg-slate-700/40"
+          }`}
+        >
+          <Flame className={`w-4 h-4 flex-shrink-0 ${
+            signalStreakDanger ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300"
+          }`} />
+          <span className={`text-sm font-bold tabular-nums ${
+            signalStreakDanger ? "text-red-600 dark:text-red-300" : "text-slate-700 dark:text-slate-200"
+          }`}>
+            {signalStreak}
+          </span>
+          <span className={`text-xs font-medium ${
+            signalStreakDanger ? "text-red-500/70 dark:text-red-400/60" : "text-slate-500 dark:text-slate-400"
+          }`}>
+            day{signalStreak !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+
       {/* Signal Score Visualization */}
       <SidebarScoreCard
         title="Signals"
@@ -325,8 +352,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         percentage={signalScore}
         total={totalSignals > 0 ? totalSignals : undefined}
         completed={completedSignals}
-        exceededGoal={signalScore >= 80}
-        showTrophy={signalScore >= 80}
+        exceededGoal={signalScore >= (user?.preferences?.signalPercentageGoal || 75)}
+        showTrophy={signalScore >= (user?.preferences?.signalPercentageGoal || 75)}
         onClick={() => onSelect("Compass")}
       />
 

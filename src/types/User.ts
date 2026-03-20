@@ -30,6 +30,11 @@ interface UserPreferences {
   yearlyHoursGoal?: YearlyGoal;
   signalGoals?: Record<string, number>;
   activeSignals?: string[];
+  stopwatchAlertMinutes?: number;
+  signalPercentageGoal?: number;
+  signalStreakCount?: number;
+  signalStreakDate?: string; // YYYY-MM-DD of last day fully processed
+  signalStreakDanger?: boolean; // true if last processed day was a miss
 }
 
 export interface User {

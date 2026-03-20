@@ -5,6 +5,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../../../pages/settings/components/SignalSettings";
 import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
 import { useSignals } from "../../../context/SignalsContext";
+import { Flame } from "lucide-react";
 import { useTimezone } from "../../../context/TimezoneContext";
 import { MorningEntry } from "../../../types/Morning";
 
@@ -51,7 +52,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
   const { timezone } = useTimezone();
   // Use the Signals context instead of local state
-  const { signals, updateSignal, refreshSignals } = useSignals();
+  const { signals, updateSignal, refreshSignals, signalStreak, signalStreakDanger } = useSignals();
 
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -264,10 +265,20 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-2.5">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
         </h2>
+        {(signalStreak > 0 || signalStreakDanger) && (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+            signalStreakDanger
+              ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+          }`}>
+            <Flame className="w-3 h-3" />
+            {signalStreak} day{signalStreak !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
       <div className="p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
