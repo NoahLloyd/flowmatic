@@ -243,7 +243,10 @@ const WeeklyTaskPlanner: React.FC<WeeklyTaskPlannerProps> = ({
             type="text"
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAddTask();
+              if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+            }}
             placeholder={`Add ${TYPE_CONFIG[addingToType]?.label?.toLowerCase() || ""} task...`}
             disabled={disabled || isAdding}
             className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
@@ -393,10 +396,10 @@ const TaskRow: React.FC<{
             key={opt.type}
             onClick={() => onMove(task.id, opt.type)}
             disabled={disabled}
-            className="px-2 py-1 text-xs rounded-md bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-700 transition-colors disabled:cursor-not-allowed"
+            className="w-6 h-6 text-xs rounded-md bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-700 transition-colors disabled:cursor-not-allowed flex items-center justify-center"
             title={`Move to ${opt.label}`}
           >
-            {opt.label}
+            {opt.label.charAt(0)}
           </button>
         ))}
         <button

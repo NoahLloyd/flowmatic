@@ -124,23 +124,29 @@ const Sidebar: React.FC<SidebarProps> = ({
         const day = getDayOfWeekInTimezone(now, timezone);
         setCurrentDayOfWeek(day);
 
-        // Calculate current review week start (Wednesday).
-        // Week runs Wed-Tue, so Mon/Tue belong to the previous week.
+        // Calculate current review week start (Monday).
+        // Week period is Mon-Sun. Review is editable Fri through Tue after.
+        // On Fri/Sat/Sun: show this week's Monday
+        // On Mon/Tue: show previous week's Monday
+        // On Wed/Thu: show this week's Monday (preview, not yet editable)
         let daysToSubtract;
-        if (day >= 3) {
-          // Wed-Sat: subtract day-3 to get to Wed
-          daysToSubtract = day - 3;
+        if (day === 0) {
+          // Sunday -> go back 6 to Monday
+          daysToSubtract = 6;
+        } else if (day <= 2) {
+          // Mon(1), Tue(2) -> previous week's Monday
+          daysToSubtract = day + 6;
         } else {
-          // Sun-Tue: subtract day+4 to get to previous Wed
-          daysToSubtract = day + 4;
+          // Wed(3)-Sat(6) -> this week's Monday
+          daysToSubtract = day - 1;
         }
 
         // Subtract days using milliseconds to avoid date rollover issues
-        const weekWednesday = new Date(
+        const weekMonday = new Date(
           now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
         );
         // Format the date in the user's timezone to get consistent YYYY-MM-DD
-        const weekStart = formatDateInTimezone(weekWednesday, timezone);
+        const weekStart = formatDateInTimezone(weekMonday, timezone);
 
         // Review is considered "done" only if it exists AND is marked completed.
         const review = await api.getWeeklyReview(weekStart);
@@ -178,8 +184,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     // Don't show red while loading or if review is completed
     if (!isReviewStatusLoaded || isReviewCompleted) return "none";
 
-    // Show red on Sat(6), Sun(0), Mon(1), Tue(2) if review not completed
+    // Show urgent on Fri(5), Sat(6), Sun(0), Mon(1), Tue(2) — the editable window
     if (
+      currentDayOfWeek === 5 ||
       currentDayOfWeek === 6 ||
       currentDayOfWeek === 0 ||
       currentDayOfWeek === 1 ||

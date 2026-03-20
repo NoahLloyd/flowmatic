@@ -171,7 +171,7 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
-      // 'f' key to open record session modal (focus session)
+      // 'f' or Alt+F key to open record session modal (focus session)
       if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         if (isRunning) {

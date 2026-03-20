@@ -14,5 +14,6 @@ interface Window {
       quickAddNote: string;
     }) => Promise<{ quickAddTask: string; quickAddNote: string }>;
     setDoNotDisturb: (enabled: boolean) => Promise<boolean>;
+    requestShortcutsAccess: () => Promise<string>;
   };
 }

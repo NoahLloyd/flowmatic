@@ -95,50 +95,79 @@ const getDayOfWeekInTimezone = (date: Date, timezone: string): number => {
   return dayMap[dayStr] ?? 0;
 };
 
-// Helper to get the Wednesday of the current review week
-// Week runs Wed-Tue, so Mon/Tue belong to the previous week
-const getWeekStart = (date: Date, timezone: string): string => {
+// Helper to get the Monday of the current review week
+// Week period is Mon-Sun. The review can be edited from Friday of that week
+// through Tuesday of the following week.
+// On Wed/Thu we show the upcoming week (which started Monday) but it's not editable yet.
+// On Fri/Sat/Sun we show the current Mon-Sun week (editable).
+// On Mon/Tue we show the previous Mon-Sun week (still editable).
+const getReviewWeekStart = (date: Date, timezone: string): string => {
   try {
     const day = getDayOfWeekInTimezone(date, timezone);
 
-    // Calculate days to subtract to get to Wednesday
-    // If Wed(3), Thu(4), Fri(5), Sat(6) -> subtract (day - 3)
-    // If Sun(0) -> subtract 4 (to get to previous Wed)
-    // If Mon(1) -> subtract 5 (to get to previous Wed)
-    // If Tue(2) -> subtract 6 (to get to previous Wed)
+    // We want the Monday of the week being reviewed.
+    // Fri(5), Sat(6), Sun(0): the current calendar week's Monday
+    // Mon(1), Tue(2): the previous calendar week's Monday
+    // Wed(3), Thu(4): the current calendar week's Monday (upcoming, read-only preview)
     let daysToSubtract;
-    if (day >= 3) {
-      daysToSubtract = day - 3; // Wed=0, Thu=1, Fri=2, Sat=3
+    if (day === 0) {
+      // Sunday -> go back 6 to Monday
+      daysToSubtract = 6;
+    } else if (day <= 2) {
+      // Mon(1), Tue(2) -> previous week's Monday: day + 6
+      daysToSubtract = day + 6;
     } else {
-      daysToSubtract = day + 4; // Sun=4, Mon=5, Tue=6
+      // Wed(3)-Sat(6) -> this week's Monday: day - 1
+      daysToSubtract = day - 1;
     }
 
-    const wednesday = new Date(
+    const monday = new Date(
       date.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
     );
-    return formatDateInTimezone(wednesday, timezone);
+    return formatDateInTimezone(monday, timezone);
   } catch (error) {
     console.error("Error getting week start:", error);
     const day = date.getDay();
     let daysToSubtract;
-    if (day >= 3) {
-      daysToSubtract = day - 3;
+    if (day === 0) {
+      daysToSubtract = 6;
+    } else if (day <= 2) {
+      daysToSubtract = day + 6;
     } else {
-      daysToSubtract = day + 4;
+      daysToSubtract = day - 1;
     }
-    const wednesday = new Date(
+    const monday = new Date(
       date.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
     );
-    return wednesday.toISOString().split("T")[0];
+    return monday.toISOString().split("T")[0];
   }
 };
 
-// Helper to get the Tuesday (end of the review week)
+// Helper to get the Sunday (end of the review week)
 const getWeekEnd = (weekStart: string): string => {
-  const wednesday = new Date(weekStart);
-  const tuesday = new Date(wednesday);
-  tuesday.setDate(wednesday.getDate() + 6);
-  return tuesday.toISOString().split("T")[0];
+  const monday = new Date(weekStart);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return sunday.toISOString().split("T")[0];
+};
+
+// Check if the review is currently in its editable window (Friday of the week through Tuesday after)
+const isInEditableWindow = (weekStart: string, date: Date, timezone: string): boolean => {
+  const day = getDayOfWeekInTimezone(date, timezone);
+  const todayStr = formatDateInTimezone(date, timezone);
+  const monday = new Date(weekStart);
+
+  // Friday of the review week (day 4 after Monday)
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  const fridayStr = friday.toISOString().split("T")[0];
+
+  // Tuesday after the review week (day 8 after Monday)
+  const tuesday = new Date(monday);
+  tuesday.setDate(monday.getDate() + 8);
+  const tuesdayStr = tuesday.toISOString().split("T")[0];
+
+  return todayStr >= fridayStr && todayStr <= tuesdayStr;
 };
 
 // Format week range for display
@@ -162,9 +191,13 @@ const Review: React.FC = () => {
 
   // Current week dates
   const [weekStart, setWeekStart] = useState(() =>
-    getWeekStart(new Date(), timezone)
+    getReviewWeekStart(new Date(), timezone)
   );
   const [weekEnd, setWeekEnd] = useState(() => getWeekEnd(weekStart));
+
+  // Whether the current date falls in the review focus window (Fri-Tue).
+  // Used only for sidebar urgency badge — editing is always allowed.
+  const inReviewWindow = isInEditableWindow(weekStart, new Date(), timezone);
 
   // Review state
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -275,7 +308,7 @@ const Review: React.FC = () => {
 
   // Update week start when timezone changes
   useEffect(() => {
-    const newWeekStart = getWeekStart(new Date(), timezone);
+    const newWeekStart = getReviewWeekStart(new Date(), timezone);
     setWeekStart(newWeekStart);
     setWeekEnd(getWeekEnd(newWeekStart));
   }, [timezone]);
@@ -494,6 +527,12 @@ const Review: React.FC = () => {
                 Done
               </span>
             )}
+
+            {!inReviewWindow && !isCompleted && (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                Review window: Fri-Tue
+              </span>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400 min-w-[80px] justify-end">
@@ -531,7 +570,10 @@ const Review: React.FC = () => {
               type="text"
               value={newInboxItem}
               onChange={(e) => setNewInboxItem(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddInboxItem()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddInboxItem();
+                if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+              }}
               placeholder="Drop something here to process during review..."
               disabled={!isEditing}
               className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"

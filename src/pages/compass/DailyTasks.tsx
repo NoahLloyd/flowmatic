@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
+import { useTasks } from "../../hooks/useTasks";
 import { useNavigation } from "../../hooks/useNavigation";
 import {
   DragDropContext,
@@ -15,6 +16,7 @@ const DailyTasks: React.FC = () => {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { selected } = useNavigation();
+  const { handleDeleteTask, handleChangeTaskType } = useTasks();
 
   // Editing state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -86,6 +88,36 @@ const DailyTasks: React.FC = () => {
       fetchTasks();
     }
   }, [selected]);
+
+  // Detect day change when app regains focus
+  useEffect(() => {
+    let lastCheckedDay = new Date().toDateString();
+
+    const checkDayChange = () => {
+      const today = new Date().toDateString();
+      if (today !== lastCheckedDay) {
+        lastCheckedDay = today;
+        fetchTasks();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkDayChange();
+      }
+    };
+    const onFocus = () => checkDayChange();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(checkDayChange, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToTaskAdded((newTask) => {
@@ -288,6 +320,28 @@ const DailyTasks: React.FC = () => {
           e.stopPropagation();
           startEditing(task);
           // editingTaskId change will auto-exit task mode via the useEffect above
+          return;
+        }
+
+        if (e.key === "d" || e.key === "D") {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveTasks((prev) => prev.filter((t) => t.id !== task.id));
+          const currentOrder = getTaskOrderFromStorage("day") || [];
+          saveTaskOrderToStorage("day", currentOrder.filter((taskId) => taskId !== task.id));
+          setSelectedTaskIndex(null);
+          handleDeleteTask(task.id).catch(() => fetchTasks());
+          return;
+        }
+
+        if (e.key === "w" || e.key === "W") {
+          e.preventDefault();
+          e.stopPropagation();
+          setActiveTasks((prev) => prev.filter((t) => t.id !== task.id));
+          const currentOrder = getTaskOrderFromStorage("day") || [];
+          saveTaskOrderToStorage("day", currentOrder.filter((taskId) => taskId !== task.id));
+          setSelectedTaskIndex(null);
+          handleChangeTaskType(task.id, "week").catch(() => fetchTasks());
           return;
         }
       }
@@ -495,6 +549,12 @@ const DailyTasks: React.FC = () => {
                                 </kbd>
                                 <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
                                   e
+                                </kbd>
+                                <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700">
+                                  w
+                                </kbd>
+                                <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-700">
+                                  d
                                 </kbd>
                               </div>
                             )}

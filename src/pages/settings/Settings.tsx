@@ -126,6 +126,8 @@ const Settings = () => {
   // DND test state
   const [dndTestStatus, setDndTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [dndTestMessage, setDndTestMessage] = useState("");
+  const [accessStatus, setAccessStatus] = useState<"idle" | "requesting" | "granted" | "missing" | "error">("idle");
+  const [missingShortcuts, setMissingShortcuts] = useState<string[]>([]);
 
   // Update state when user data changes
   useEffect(() => {
@@ -469,21 +471,25 @@ const Settings = () => {
                         setDndTestStatus("testing");
                         setDndTestMessage("Testing Focus On...");
                         try {
-                          const onResult = await window.electron.setDoNotDisturb(true);
-                          if (onResult) {
+                          const onResult: any = await window.electron.setDoNotDisturb(true);
+                          const onOk = typeof onResult === "object" ? onResult.success : onResult;
+                          const onError = typeof onResult === "object" ? onResult.error : null;
+                          if (onOk) {
                             setDndTestMessage("Focus On worked! Testing Focus Off...");
                             await new Promise((r) => setTimeout(r, 1500));
-                            const offResult = await window.electron.setDoNotDisturb(false);
-                            if (offResult) {
+                            const offResult: any = await window.electron.setDoNotDisturb(false);
+                            const offOk = typeof offResult === "object" ? offResult.success : offResult;
+                            const offError = typeof offResult === "object" ? offResult.error : null;
+                            if (offOk) {
                               setDndTestStatus("success");
                               setDndTestMessage("DND is working correctly.");
                             } else {
                               setDndTestStatus("error");
-                              setDndTestMessage("\"Focus Off\" shortcut failed. See setup guide below.");
+                              setDndTestMessage(offError || "\"Focus Off\" shortcut failed.");
                             }
                           } else {
                             setDndTestStatus("error");
-                            setDndTestMessage("\"Focus On\" shortcut failed. See setup guide below.");
+                            setDndTestMessage(onError || "\"Focus On\" shortcut failed.");
                           }
                         } catch (err) {
                           setDndTestStatus("error");
@@ -511,45 +517,98 @@ const Settings = () => {
                     </div>
                   )}
 
-                  <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 space-y-3">
                     <p className="font-medium text-gray-700 dark:text-gray-300">
                       Setup Guide
                     </p>
-                    <p>
-                      This feature requires two shortcuts in the macOS Shortcuts
-                      app:
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1 ml-1">
-                      <li>
-                        Open the <strong>Shortcuts</strong> app on your Mac
-                      </li>
-                      <li>
-                        Create a shortcut named{" "}
-                        <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
-                          Focus On
-                        </code>{" "}
-                        that turns on your preferred Focus mode
-                      </li>
-                      <li>
-                        Create a shortcut named{" "}
-                        <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
-                          Focus Off
-                        </code>{" "}
-                        that turns off Focus mode
-                      </li>
-                      <li>
-                        When prompted, allow Flowmatic to control Shortcuts
-                      </li>
-                    </ol>
-                    <p className="mt-1.5 text-gray-500 dark:text-gray-500">
-                      If you don't see a permission prompt, go to{" "}
-                      <strong>
-                        System Settings &rarr; Privacy & Security &rarr;
-                        Automation
-                      </strong>{" "}
-                      and enable <strong>Shortcuts Events</strong> for
-                      Flowmatic.
-                    </p>
+
+                    {/* Step 1: Check shortcuts exist */}
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-gray-700 dark:text-gray-300">
+                        1. Check shortcuts are set up
+                      </p>
+                      <p>
+                        Flowmatic uses the macOS <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">shortcuts</code> CLI
+                        to run your Focus shortcuts. No extra permissions needed.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          setAccessStatus("requesting");
+                          setMissingShortcuts([]);
+                          try {
+                            const result = await window.electron.requestShortcutsAccess();
+                            if (result === "granted") {
+                              setAccessStatus("granted");
+                            } else if (typeof result === "string" && result.startsWith("missing:")) {
+                              setAccessStatus("missing");
+                              setMissingShortcuts(result.replace("missing:", "").split(","));
+                            } else {
+                              setAccessStatus("error");
+                            }
+                          } catch {
+                            setAccessStatus("error");
+                          }
+                        }}
+                        disabled={accessStatus === "requesting"}
+                        className="mt-1 text-xs px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 font-medium"
+                      >
+                        {accessStatus === "requesting"
+                          ? "Checking..."
+                          : accessStatus === "granted"
+                          ? "Shortcuts found"
+                          : "Check Shortcuts"}
+                      </button>
+                      {accessStatus === "granted" && (
+                        <p className="text-green-600 dark:text-green-400">
+                          Both "Focus On" and "Focus Off" shortcuts found.
+                        </p>
+                      )}
+                      {accessStatus === "missing" && (
+                        <p className="text-amber-600 dark:text-amber-400">
+                          Missing shortcut{missingShortcuts.length > 1 ? "s" : ""}:{" "}
+                          {missingShortcuts.map((s) => `"${s}"`).join(", ")}.
+                          Create {missingShortcuts.length > 1 ? "them" : "it"} in the Shortcuts app (step 2 below).
+                        </p>
+                      )}
+                      {accessStatus === "error" && (
+                        <p className="text-red-600 dark:text-red-400">
+                          Could not check shortcuts. Make sure macOS Shortcuts app is available.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Step 2: Create shortcuts */}
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-gray-700 dark:text-gray-300">
+                        2. Create the shortcuts
+                      </p>
+                      <ol className="list-decimal list-inside space-y-1 ml-1">
+                        <li>
+                          Open the <strong>Shortcuts</strong> app on your Mac
+                        </li>
+                        <li>
+                          Create a shortcut named{" "}
+                          <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
+                            Focus On
+                          </code>{" "}
+                          that turns on your preferred Focus mode
+                        </li>
+                        <li>
+                          Create a shortcut named{" "}
+                          <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
+                            Focus Off
+                          </code>{" "}
+                          that turns off Focus mode
+                        </li>
+                      </ol>
+                    </div>
+
+                    {/* Step 3: Test */}
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-gray-700 dark:text-gray-300">
+                        3. Test it using the button above
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

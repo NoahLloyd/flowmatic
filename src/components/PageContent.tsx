@@ -233,6 +233,37 @@ const PageContent = () => {
 
   const { isAuthenticated, isLoading } = useAuth();
 
+  // Handle global shortcut IPC events for timer control
+  useEffect(() => {
+    const handleToggleTimer = () => {
+      handleStartPause();
+    };
+
+    const handleOpenRecordModal = () => {
+      // Navigate to Compass so the modal is visible, pause timer, then open modal
+      setSelected("Compass");
+      if (isRunning) {
+        handleStartPause();
+      }
+      if (!isModalOpen) {
+        handleCloseModal();
+      }
+    };
+
+    if (window.electron?.on) {
+      window.electron.on("toggle-timer", handleToggleTimer);
+      window.electron.on("open-record-modal", handleOpenRecordModal);
+    }
+
+    return () => {
+      const electron = window.electron as any;
+      if (electron?.removeListener) {
+        electron.removeListener("toggle-timer", handleToggleTimer);
+        electron.removeListener("open-record-modal", handleOpenRecordModal);
+      }
+    };
+  }, [handleStartPause, isRunning, isModalOpen, handleCloseModal]);
+
   // Force synchronize timer state when selected page changes to Compass
   useEffect(() => {
     if (selected === "Compass") {

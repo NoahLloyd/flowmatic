@@ -106,6 +106,33 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
     loadMorningEntries();
   }, [user]);
 
+  // Refresh signal data when day changes (e.g. app left open overnight)
+  useEffect(() => {
+    let lastCheckedDay = getTodayInUserTimezone();
+
+    const checkDayChange = () => {
+      const currentDay = getTodayInUserTimezone();
+      if (currentDay !== lastCheckedDay) {
+        lastCheckedDay = currentDay;
+        loadSignalHistory();
+        loadMorningEntries();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") checkDayChange();
+    };
+    const onFocus = () => checkDayChange();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [user]);
+
   // Load morning entries for journaling signal
   const loadMorningEntries = async () => {
     if (!user) return;

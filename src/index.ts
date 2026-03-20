@@ -10,7 +10,7 @@ import {
 } from "electron";
 import path from "path";
 import * as fs from "fs";
-import { exec } from "child_process";
+import { exec, execFile, spawn } from "child_process";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -136,10 +136,27 @@ const registerGlobalShortcuts = () => {
 
   const shortcuts = loadShortcuts();
 
-  // Register toggle timer shortcut
-  globalShortcut.register("Alt+Space", () => {
+  // Register toggle timer shortcut (Hyperkey + Space)
+  // Hyperkey sends Cmd+Ctrl+Shift+Alt on macOS, so we need all four modifiers
+  const timerShortcut = process.platform === "darwin"
+    ? "Command+Control+Shift+Alt+Space"
+    : "Control+Shift+Alt+Space";
+  try {
+    globalShortcut.register(timerShortcut, () => {
+      if (mainWindow) {
+        mainWindow.webContents.send("toggle-timer");
+      }
+    });
+  } catch (error) {
+    console.error("Failed to register timer shortcut:", error);
+  }
+
+  // Register open record session modal shortcut (Alt+F)
+  globalShortcut.register("Alt+F", () => {
     if (mainWindow) {
-      mainWindow.webContents.send("toggle-timer");
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("open-record-modal");
     }
   });
 
@@ -174,14 +191,16 @@ const createWindow = (): void => {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, "assets", "icons", "png", "512x512.png"),
+    // On macOS the dock/app icon comes from the .icns in the bundle (forge packagerConfig.icon).
+    // Only set the icon property on non-macOS for the window/taskbar icon.
+    ...(process.platform !== "darwin" && {
+      icon: path.join(__dirname, "assets", "icons", "png", "512x512.png"),
+    }),
   });
 
-  if (process.platform === "darwin") {
-    app.dock.setIcon(
-      path.join(__dirname, "assets", "icons", "png", "512x512.png")
-    );
-  }
+  // Dock icon is set via packagerConfig.icon (.icns) in forge.config.ts.
+  // Do NOT call app.dock.setIcon() with a PNG — it bypasses the macOS
+  // squircle mask that .icns icons get automatically.
 
   // Register all global shortcuts
   registerGlobalShortcuts();
@@ -350,43 +369,90 @@ ipcMain.on("overlay-close", () => {
 });
 
 // Do Not Disturb control for macOS
-// Uses Shortcuts app via AppleScript for reliable Focus mode control
-// Requires user to have shortcuts named "Focus On" and "Focus Off" set up
-const setDoNotDisturb = (enabled: boolean): Promise<boolean> => {
+// Uses the `shortcuts` CLI (/usr/bin/shortcuts) which runs shortcuts directly
+// without needing Automation/Apple Events permissions.
+// Requires user to have shortcuts named "Focus On" and "Focus Off" set up.
+const setDoNotDisturb = (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
   return new Promise((resolve) => {
     if (process.platform !== "darwin") {
-      console.log("Do Not Disturb is only supported on macOS");
-      resolve(false);
+      resolve({ success: false, error: "Do Not Disturb is only supported on macOS" });
       return;
     }
 
     const shortcutName = enabled ? "Focus On" : "Focus Off";
-
-    // Use AppleScript to run the shortcut - better permission handling
-    const command = `osascript -e 'tell application "Shortcuts Events" to run shortcut "${shortcutName}"'`;
-
     console.log(`Running DND shortcut: ${shortcutName}`);
 
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error(
-          `Failed to run shortcut "${shortcutName}":`,
-          error.message
-        );
-        if (stderr) console.error("stderr:", stderr);
-        resolve(false);
-        return;
-      }
+    // Use spawn with stdin set to 'ignore'. The shortcuts CLI hangs if stdin
+    // is a pipe (Node.js default) because it waits for input. Ignoring stdin
+    // lets it complete immediately.
+    const proc = spawn("/usr/bin/shortcuts", ["run", shortcutName], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-      console.log(`Do Not Disturb ${enabled ? "enabled" : "disabled"}`);
-      resolve(true);
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (data: Buffer) => { stdout += data.toString(); });
+    proc.stderr.on("data", (data: Buffer) => { stderr += data.toString(); });
+
+    // Safety timeout
+    const timer = setTimeout(() => {
+      proc.kill();
+      resolve({ success: false, error: `Shortcut "${shortcutName}" timed out after 15s` });
+    }, 15000);
+
+    proc.on("close", (code: number | null) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        const errOutput = stderr.trim();
+        console.error(`Shortcut "${shortcutName}" exited with code ${code}: ${errOutput}`);
+        let userError: string;
+        if (errOutput.includes("couldn't find")) {
+          userError = `Shortcut "${shortcutName}" not found. Create it in the Shortcuts app.`;
+        } else {
+          userError = errOutput || `Shortcut exited with code ${code}`;
+        }
+        resolve({ success: false, error: userError });
+      } else {
+        console.log(`Do Not Disturb ${enabled ? "enabled" : "disabled"}`);
+        resolve({ success: true });
+      }
     });
   });
 };
 
 // IPC handler for Do Not Disturb
 ipcMain.handle("set-do-not-disturb", async (_event, enabled: boolean) => {
-  return await setDoNotDisturb(enabled);
+  const result = await setDoNotDisturb(enabled);
+  return result;
+});
+
+// Check if shortcuts exist and the `shortcuts` CLI is available.
+// Uses `shortcuts list` which doesn't need any permissions.
+ipcMain.handle("request-shortcuts-access", async () => {
+  if (process.platform !== "darwin") return "not-macos";
+
+  return new Promise<string>((resolve) => {
+    execFile("/usr/bin/shortcuts", ["list"], { timeout: 10000 }, (error, stdout) => {
+      if (error) {
+        console.error("shortcuts CLI failed:", error.message);
+        resolve("error");
+        return;
+      }
+
+      const shortcuts = stdout.trim().split("\n").map((s) => s.trim().toLowerCase());
+      const hasFocusOn = shortcuts.includes("focus on");
+      const hasFocusOff = shortcuts.includes("focus off");
+
+      if (hasFocusOn && hasFocusOff) {
+        resolve("granted");
+      } else {
+        const missing: string[] = [];
+        if (!hasFocusOn) missing.push("Focus On");
+        if (!hasFocusOff) missing.push("Focus Off");
+        resolve(`missing:${missing.join(",")}`);
+      }
+    });
+  });
 });
 
 app.whenReady().then(() => {
