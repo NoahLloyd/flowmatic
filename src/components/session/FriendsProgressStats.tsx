@@ -423,6 +423,41 @@ const FriendsProgressStats: React.FC = () => {
     };
   }, [fetchData]);
 
+  // Detect day change when app regains focus (e.g. coming back to office next morning)
+  useEffect(() => {
+    let lastCheckedDay = startOfDay(new Date()).getTime();
+
+    const checkDayChange = () => {
+      const today = startOfDay(new Date()).getTime();
+      if (today !== lastCheckedDay) {
+        lastCheckedDay = today;
+        setSelectedDate(startOfDay(new Date()));
+      }
+    };
+
+    // Check on visibility change (tab/window regains focus)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkDayChange();
+      }
+    };
+
+    // Also check on window focus (Electron app brought to foreground)
+    const onFocus = () => checkDayChange();
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+
+    // Periodic check every 5 minutes as a fallback
+    const interval = setInterval(checkDayChange, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Calculate stats when data changes
   useEffect(() => {
     if (recentSessions !== undefined) {

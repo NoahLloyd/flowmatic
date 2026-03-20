@@ -34,7 +34,7 @@ CREATE TABLE tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('day', 'week', 'future', 'blocked')),
+  type TEXT NOT NULL CHECK (type IN ('day', 'week', 'future', 'blocked', 'shopping')),
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()

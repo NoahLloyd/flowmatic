@@ -116,9 +116,10 @@ const TaskItem: React.FC<TaskItemProps> = ({
                 <button
                   key={type}
                   onClick={() => onChangeTaskType(task.id, type)}
-                  className="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                  className="w-6 h-6 text-xs rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center justify-center"
+                  title={type.charAt(0).toUpperCase() + type.slice(1)}
                 >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {type.charAt(0).toUpperCase()}
                 </button>
               ))}
             <button

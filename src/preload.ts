@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("electron", {
       "show-window",
       "update-tray",
       "toggle-timer",
+      "open-record-modal",
       "global-quick-add-task",
       "global-quick-add-note",
       "task-added-from-overlay",
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld("electron", {
       "show-window",
       "update-tray",
       "toggle-timer",
+      "open-record-modal",
       "global-quick-add-task",
       "global-quick-add-note",
       "task-added-from-overlay",
@@ -49,5 +51,9 @@ contextBridge.exposeInMainWorld("electron", {
 
   setDoNotDisturb: (enabled: boolean) => {
     return ipcRenderer.invoke("set-do-not-disturb", enabled);
+  },
+
+  requestShortcutsAccess: () => {
+    return ipcRenderer.invoke("request-shortcuts-access");
   },
 });

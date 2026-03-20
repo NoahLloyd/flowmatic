@@ -61,6 +61,12 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
               id={`question-${question.id}`}
               value={question.answer}
               onChange={(e) => onChange(question.id, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+              }}
               placeholder="Type your answer..."
               rows={3}
               disabled={disabled}
