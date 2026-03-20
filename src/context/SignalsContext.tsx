@@ -50,6 +50,8 @@ interface SignalsContextType {
   signalScore: number;
   totalSignals: number;
   completedSignals: number;
+  signalStreak: number;
+  signalStreakDanger: boolean;
   updateSignal: (metric: string, value: number | boolean) => Promise<void>;
   refreshSignals: () => Promise<void>;
 }
@@ -60,9 +62,72 @@ const SignalsContext = createContext<SignalsContextType>({
   signalScore: 0,
   totalSignals: 0,
   completedSignals: 0,
+  signalStreak: 0,
+  signalStreakDanger: false,
   updateSignal: async () => {},
   refreshSignals: async () => {},
 });
+
+// Compute a signal score for a single day's worth of signal data.
+// Returns 0-100 representing the average completion across active signals.
+const computeDayScore = (
+  daySignals: Record<string, any>,
+  activeSignals: string[],
+  availableSignals: Record<string, SignalConfig>,
+  signalGoals: Record<string, number>,
+): number => {
+  let totalActive = 0;
+  let totalScore = 0;
+
+  for (const key of activeSignals) {
+    // Skip computed signals — not stored in signal history
+    if (key === "journaling" || key === "focusHours") continue;
+
+    const config = availableSignals[key];
+    if (!config) continue;
+
+    totalActive++;
+    const value = daySignals[key];
+
+    // No data recorded for this signal = 0 score
+    if (value === undefined || value === null) continue;
+
+    let score = 0;
+
+    if (config.type === "binary") {
+      score =
+        value === true || value === "true" || value === 1 || value === "1"
+          ? 100
+          : 0;
+    } else if (config.type === "scale") {
+      if (typeof value === "number") {
+        score = (value / 5) * 100;
+      }
+    } else if (config.type === "number" || config.type === "water") {
+      if (config.hasGoal && key in signalGoals) {
+        const goal = signalGoals[key];
+        if (typeof value === "number") {
+          if (key === "minutesToOffice") {
+            // Lower is better
+            score =
+              value <= goal
+                ? 100
+                : Math.max(0, 100 - ((value - goal) / goal) * 100);
+          } else {
+            // Higher is better
+            score = value >= goal ? 100 : (value / goal) * 100;
+          }
+        }
+      }
+      // No goal = 0 score (can't evaluate)
+    }
+
+    totalScore += score;
+  }
+
+  if (totalActive === 0) return 0;
+  return Math.round(totalScore / totalActive);
+};
 
 // Helper function to get the current signals configuration (including custom signals)
 const getAvailableSignals = (user: any) => {
@@ -80,6 +145,26 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   const [signalScore, setSignalScore] = useState(0);
   const [totalSignals, setTotalSignals] = useState(0);
   const [completedSignals, setCompletedSignals] = useState(0);
+  const [signalStreak, setSignalStreak] = useState(() => {
+    const cached = localStorage.getItem("signalStreak");
+    return cached ? parseInt(cached, 10) : 0;
+  });
+  const [signalStreakDanger, setSignalStreakDanger] = useState(() => {
+    return localStorage.getItem("signalStreakDanger") === "true";
+  });
+
+  // Sync streak from user preferences on login (cross-device support)
+  useEffect(() => {
+    if (user?.preferences?.signalStreakCount !== undefined) {
+      const prefCount = user.preferences.signalStreakCount;
+      setSignalStreak(prefCount);
+      localStorage.setItem("signalStreak", String(prefCount));
+    }
+    if (user?.preferences?.signalStreakDanger !== undefined) {
+      setSignalStreakDanger(user.preferences.signalStreakDanger);
+      localStorage.setItem("signalStreakDanger", String(user.preferences.signalStreakDanger));
+    }
+  }, [user?.id]);
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   const getTodayInUserTimezone = () => {
@@ -302,6 +387,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       // Get signal goals from user preferences
       const signalGoals = user?.preferences?.signalGoals || {};
 
+      // Get the signal percentage goal threshold (default 75%)
+      const signalPercentageGoal = user?.preferences?.signalPercentageGoal || 75;
+
       // Track total active signals and their scores
       let totalActiveSignals = 0;
       let totalCompletedSignals = 0;
@@ -392,15 +480,15 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             completionScore = (value / 5) * 100;
 
             // Determine completion value for display
-            if (completionScore >= 80) {
+            if (completionScore >= signalPercentageGoal) {
               completionValue = 1;
               totalCompletedSignals++;
-            } else if (completionScore >= 60) {
+            } else if (completionScore >= signalPercentageGoal * 0.75) {
               completionValue = 0.75;
               // Do not increment totalCompletedSignals for partial completion
-            } else if (completionScore >= 40) {
+            } else if (completionScore >= signalPercentageGoal * 0.5) {
               completionValue = 0.5;
-            } else if (completionScore >= 20) {
+            } else if (completionScore >= signalPercentageGoal * 0.25) {
               completionValue = 0.25;
             } else {
               completionValue = 0;
@@ -426,14 +514,14 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
                   );
 
                   // Determine completion value for display
-                  if (completionScore >= 80) {
+                  if (completionScore >= signalPercentageGoal) {
                     completionValue = 1;
                     totalCompletedSignals++;
-                  } else if (completionScore >= 60) {
+                  } else if (completionScore >= signalPercentageGoal * 0.75) {
                     completionValue = 0.75;
-                  } else if (completionScore >= 40) {
+                  } else if (completionScore >= signalPercentageGoal * 0.5) {
                     completionValue = 0.5;
-                  } else if (completionScore >= 20) {
+                  } else if (completionScore >= signalPercentageGoal * 0.25) {
                     completionValue = 0.25;
                   } else {
                     completionValue = 0;
@@ -451,14 +539,14 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
                   completionScore = (value / goal) * 100;
 
                   // Determine completion value for display
-                  if (completionScore >= 80) {
+                  if (completionScore >= signalPercentageGoal) {
                     completionValue = 1;
                     totalCompletedSignals++;
-                  } else if (completionScore >= 60) {
+                  } else if (completionScore >= signalPercentageGoal * 0.75) {
                     completionValue = 0.75;
-                  } else if (completionScore >= 40) {
+                  } else if (completionScore >= signalPercentageGoal * 0.5) {
                     completionValue = 0.5;
-                  } else if (completionScore >= 20) {
+                  } else if (completionScore >= signalPercentageGoal * 0.25) {
                     completionValue = 0.25;
                   } else {
                     completionValue = 0;
@@ -506,9 +594,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         0
       );
 
-      // Count signals that are at or above 80% as completed
+      // Count signals that are at or above the goal threshold as completed
       const displayCompletedSignals = Object.values(signalScores).filter(
-        (score) => score >= 80
+        (score) => score >= signalPercentageGoal
       ).length;
 
       // Calculate average score (0-100)
@@ -534,6 +622,150 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       setSignalScore(averageScore);
       setTotalSignals(totalActiveSignals);
       setCompletedSignals(displayCompletedSignals);
+
+      // --- Signal streak (hybrid +1/-1 with hard reset) ---
+      // Hit goal = +1, miss 1 day = -1, miss 2 days in a row = reset to 0.
+      // `signalStreakCount` = confirmed score from finalized past days only.
+      // `signalStreakDate` = last date fully processed.
+      // `signalStreakDanger` = true if last processed day was a miss (on thin ice).
+      // Display = confirmedCount + (todayMeetsGoal ? 1 : 0), computed live.
+      try {
+        const yesterday = getDateDaysAgo(1);
+        const storedCount = user?.preferences?.signalStreakCount ?? -1;
+        const storedDate = user?.preferences?.signalStreakDate ?? "";
+        const storedDanger = user?.preferences?.signalStreakDanger ?? false;
+        const todayMeetsGoal = averageScore >= signalPercentageGoal;
+
+        let confirmedCount = storedCount === -1 ? 0 : storedCount;
+        let lastProcessed = storedDate;
+        let danger = storedDanger;
+        let needsSave = false;
+
+        // Helper: generate YYYY-MM-DD dates between two dates (exclusive start, inclusive end)
+        const getDatesBetween = (startDate: string, endDate: string): string[] => {
+          const dates: string[] = [];
+          const start = new Date(startDate + "T12:00:00Z");
+          const end = new Date(endDate + "T12:00:00Z");
+          const current = new Date(start);
+          current.setUTCDate(current.getUTCDate() + 1);
+          while (current <= end) {
+            dates.push(current.toISOString().split("T")[0]);
+            current.setUTCDate(current.getUTCDate() + 1);
+          }
+          return dates;
+        };
+
+        // Process a single day: returns new count and danger state
+        const processDay = (
+          daySignals: Record<string, any> | undefined,
+          currentCount: number,
+          wasDanger: boolean,
+        ): { count: number; isDanger: boolean } => {
+          let met = false;
+          if (daySignals && Object.keys(daySignals).length > 0) {
+            const score = computeDayScore(
+              daySignals,
+              activeSignals as string[],
+              availableSignals,
+              signalGoals as Record<string, number>,
+            );
+            met = score >= signalPercentageGoal;
+          }
+
+          if (met) {
+            return { count: currentCount + 1, isDanger: false };
+          } else if (wasDanger) {
+            // Two misses in a row — hard reset
+            return { count: 0, isDanger: true };
+          } else {
+            return { count: Math.max(0, currentCount - 1), isDanger: true };
+          }
+        };
+
+        if (storedCount === -1 || !storedDate) {
+          // First time — backfill from history
+          const backfillStart = getDateDaysAgo(365);
+          const historyData = await api.getAllSignalHistory(backfillStart, yesterday);
+          const byDate: Record<string, Record<string, any>> = {};
+          if (Array.isArray(historyData)) {
+            historyData.forEach((item: any) => {
+              if (!byDate[item.date]) byDate[item.date] = {};
+              byDate[item.date][item.metric] = item.value;
+            });
+          }
+
+          const datesWithData = Object.keys(byDate).sort();
+          if (datesWithData.length > 0) {
+            const earliestDate = datesWithData[0];
+            const dayBefore = (() => {
+              const d = new Date(earliestDate + "T12:00:00Z");
+              d.setUTCDate(d.getUTCDate() - 1);
+              return d.toISOString().split("T")[0];
+            })();
+            const allDates = getDatesBetween(dayBefore, yesterday);
+
+            let score = 0;
+            let wasDanger = false;
+            for (const dateStr of allDates) {
+              const result = processDay(byDate[dateStr], score, wasDanger);
+              score = result.count;
+              wasDanger = result.isDanger;
+            }
+
+            confirmedCount = score;
+            danger = wasDanger;
+          } else {
+            confirmedCount = 0;
+            danger = false;
+          }
+
+          lastProcessed = yesterday;
+          needsSave = true;
+        } else if (lastProcessed < yesterday) {
+          // Catch up on unprocessed past days
+          const historyData = await api.getAllSignalHistory(lastProcessed, yesterday);
+          const byDate: Record<string, Record<string, any>> = {};
+          if (Array.isArray(historyData)) {
+            historyData.forEach((item: any) => {
+              if (!byDate[item.date]) byDate[item.date] = {};
+              byDate[item.date][item.metric] = item.value;
+            });
+          }
+
+          const unprocessedDates = getDatesBetween(lastProcessed, yesterday);
+          for (const dateStr of unprocessedDates) {
+            const result = processDay(byDate[dateStr], confirmedCount, danger);
+            confirmedCount = result.count;
+            danger = result.isDanger;
+          }
+
+          lastProcessed = yesterday;
+          needsSave = true;
+        }
+
+        // Display = confirmed past days + today's live contribution
+        const displayCount = confirmedCount + (todayMeetsGoal ? 1 : 0);
+
+        // Danger for display: yesterday was a miss AND today hasn't saved it yet
+        const displayDanger = danger && !todayMeetsGoal;
+
+        setSignalStreak(displayCount);
+        setSignalStreakDanger(displayDanger);
+        localStorage.setItem("signalStreak", String(displayCount));
+        localStorage.setItem("signalStreakDanger", String(displayDanger));
+
+        if (needsSave && user?.id) {
+          api.updateUserPreferences(user.id, {
+            signalStreakCount: confirmedCount,
+            signalStreakDate: lastProcessed,
+            signalStreakDanger: danger,
+          }).catch((err: Error) =>
+            console.error("Failed to save streak to preferences:", err)
+          );
+        }
+      } catch (streakError) {
+        console.error("Failed to calculate signal streak:", streakError);
+      }
     } catch (error) {
       console.error("Failed to fetch signals data:", error);
     }
@@ -649,6 +881,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         signalScore,
         totalSignals,
         completedSignals,
+        signalStreak,
+        signalStreakDanger,
         updateSignal,
         refreshSignals,
       }}

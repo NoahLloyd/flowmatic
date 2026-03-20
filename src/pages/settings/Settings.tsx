@@ -102,6 +102,12 @@ const Settings = () => {
   const [autoDoNotDisturb, setAutoDoNotDisturb] = useState<boolean>(
     user?.preferences?.autoDoNotDisturb || false
   );
+  const [stopwatchAlertMinutes, setStopwatchAlertMinutes] = useState<number>(
+    user?.preferences?.stopwatchAlertMinutes || 60
+  );
+  const [signalPercentageGoal, setSignalPercentageGoal] = useState<number>(
+    user?.preferences?.signalPercentageGoal || 75
+  );
   const [lightModeFromColor, setLightModeFromColor] = useState<string>(
     user?.preferences?.lightModeFromColor || defaultLightFromColor
   );
@@ -135,6 +141,8 @@ const Settings = () => {
       setDefaultProject(user.preferences.defaultProject || "");
       setDefaultMinutes(user.preferences.defaultMinutes || 60);
       setAutoDoNotDisturb(user.preferences.autoDoNotDisturb || false);
+      setStopwatchAlertMinutes(user.preferences.stopwatchAlertMinutes || 60);
+      setSignalPercentageGoal(user.preferences.signalPercentageGoal || 75);
       setLightModeFromColor(
         user.preferences.lightModeFromColor || defaultLightFromColor
       );
@@ -227,6 +235,8 @@ const Settings = () => {
         defaultProject,
         defaultMinutes,
         autoDoNotDisturb,
+        stopwatchAlertMinutes,
+        signalPercentageGoal,
         lightModeFromColor,
         lightModeToColor,
         darkModeFromColor,
@@ -429,6 +439,50 @@ const Settings = () => {
               </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Default timer duration (1-180 minutes)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Stopwatch Break Alert
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  placeholder="60"
+                  value={stopwatchAlertMinutes}
+                  onChange={(e) => setStopwatchAlertMinutes(Number(e.target.value))}
+                  min={1}
+                  max={480}
+                  className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 pr-16"
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">
+                  minutes
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Background turns red after this many minutes in stopwatch mode
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Signal Percentage Goal
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  placeholder="75"
+                  value={signalPercentageGoal}
+                  onChange={(e) => setSignalPercentageGoal(Number(e.target.value))}
+                  min={1}
+                  max={100}
+                  className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 pr-16"
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">
+                  %
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Signal score threshold for goal completion
               </p>
             </div>
             <div className="pt-2 border-t border-gray-200 dark:border-gray-800">

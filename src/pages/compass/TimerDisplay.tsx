@@ -13,6 +13,7 @@ interface TimerDisplayProps {
   onOpenRecordModal?: () => void;
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
+  stopwatchAlertMinutes?: number;
 }
 
 const WaveComponent = ({
@@ -82,6 +83,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onOpenRecordModal = () => {},
   isStopwatchMode = false,
   onToggleStopwatchMode = () => {},
+  stopwatchAlertMinutes = 60,
 }) => {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -105,7 +107,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   const defaultDarkToColor = "#0F172A";
 
   // Use the appropriate colors based on theme
-  const fromColor = isDarkMode
+  const baseFromColor = isDarkMode
     ? user?.preferences?.darkModeFromColor ||
       user?.preferences?.fromColor ||
       defaultDarkFromColor
@@ -113,13 +115,20 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
       user?.preferences?.fromColor ||
       defaultLightFromColor;
 
-  const toColor = isDarkMode
+  const baseToColor = isDarkMode
     ? user?.preferences?.darkModeToColor ||
       user?.preferences?.toColor ||
       defaultDarkToColor
     : user?.preferences?.lightModeToColor ||
       user?.preferences?.toColor ||
       defaultLightToColor;
+
+  // Check if stopwatch has exceeded the alert threshold
+  const isOverAlertThreshold = isStopwatchMode && time >= stopwatchAlertMinutes * 60;
+
+  // Override colors to red when over threshold
+  const fromColor = isOverAlertThreshold ? (isDarkMode ? "#7F1D1D" : "#DC2626") : baseFromColor;
+  const toColor = isOverAlertThreshold ? (isDarkMode ? "#991B1B" : "#EF4444") : baseToColor;
 
   useEffect(() => {
     if (!isRunning) {

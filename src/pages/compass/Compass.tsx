@@ -442,6 +442,7 @@ const Compass: React.FC<CompassProps> = ({
             onOpenRecordModal={onCloseModal}
             isStopwatchMode={isStopwatchMode}
             onToggleStopwatchMode={onToggleStopwatchMode}
+            stopwatchAlertMinutes={user?.preferences?.stopwatchAlertMinutes || 60}
           />
         </div>
 
