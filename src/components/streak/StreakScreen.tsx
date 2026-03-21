@@ -40,6 +40,14 @@ const MONTH_LABELS = [
   "Dec",
 ];
 
+// Format as YYYY-MM-DD using local date parts (not UTC via toISOString)
+const formatLocalDate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 interface StreakScreenProps {
   onClose: () => void;
 }
@@ -56,7 +64,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
   } = useSignals();
   const { user } = useAuth();
 
-  const [heatmapData, setHeatmapData] = useState<HeatmapDay[]>([]);
+  const [rawHeatmapData, setRawHeatmapData] = useState<HeatmapDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(() =>
     new Date().getFullYear()
@@ -71,10 +79,10 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
   const signalPercentageGoal =
     user?.preferences?.signalPercentageGoal || 75;
   const currentYear = new Date().getFullYear();
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = formatLocalDate(new Date());
 
   // Build today's live signal details from context state
-  const buildTodayEntry = useCallback((): HeatmapDay => {
+  const todayEntry = useMemo((): HeatmapDay => {
     const activeSignals = (user?.preferences?.activeSignals || []) as string[];
     const signalGoals = (user?.preferences?.signalGoals || {}) as Record<string, number>;
     const availableSignals = getAllSignals(
@@ -91,7 +99,8 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
 
       let score = 0;
       if (config.type === "binary") {
-        score = (value === true || value === 1) ? 100 : 0;
+        const binaryVal = value as unknown;
+        score = (binaryVal === true || binaryVal === "true" || binaryVal === 1 || binaryVal === "1") ? 100 : 0;
       } else if (config.type === "scale") {
         if (typeof value === "number") score = (value / 5) * 100;
       } else if (config.type === "number" || config.type === "water") {
@@ -119,7 +128,21 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
     return { date: todayStr, score: signalScore, signals: details };
   }, [signals, signalScore, user, todayStr]);
 
-  // Load heatmap data for the selected year
+  // Merge raw fetched data with today's live entry
+  const heatmapData = useMemo(() => {
+    if (selectedYear !== currentYear) return rawHeatmapData;
+
+    const merged = [...rawHeatmapData];
+    const todayIdx = merged.findIndex((d) => d.date === todayStr);
+    if (todayIdx >= 0) {
+      merged[todayIdx] = todayEntry;
+    } else if (merged.length > 0) {
+      merged.push(todayEntry);
+    }
+    return merged;
+  }, [rawHeatmapData, todayEntry, selectedYear, currentYear, todayStr]);
+
+  // Load heatmap data for the selected year (no dependency on live signals)
   const loadYear = useCallback(
     async (year: number) => {
       setIsLoading(true);
@@ -130,22 +153,10 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
           : `${year}-12-31`;
 
       const data = await fetchHeatmapData(startDate, endDate);
-
-      // Override today's entry with live data from context
-      if (year === currentYear) {
-        const todayEntry = buildTodayEntry();
-        const todayIdx = data.findIndex((d) => d.date === todayStr);
-        if (todayIdx >= 0) {
-          data[todayIdx] = todayEntry;
-        } else {
-          data.push(todayEntry);
-        }
-      }
-
-      setHeatmapData(data);
+      setRawHeatmapData(data);
       setIsLoading(false);
     },
-    [fetchHeatmapData, currentYear, todayStr, buildTodayEntry]
+    [fetchHeatmapData, currentYear, todayStr]
   );
 
   useEffect(() => {
@@ -205,9 +216,10 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
         weekIdx = weeksArr.length - 1;
       }
 
-      const dateStr = current.toISOString().split("T")[0];
+      const dateStr = formatLocalDate(current);
       const dayOfWeek = (current.getDay() + 6) % 7; // 0=Mon, 6=Sun
-      const inRange = current >= yearStart && current <= yearEnd;
+      const isToday = dateStr === todayStr;
+      const inRange = isToday || (current >= yearStart && current <= yearEnd);
 
       // Track month boundaries
       const month = current.getMonth();
@@ -454,7 +466,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
             <div className="flex gap-0">
               {/* Day labels */}
               <div className="flex flex-col gap-[3px] mr-1.5 flex-shrink-0">
-                {["Mon", "", "Wed", "", "Fri", "", ""].map((label, i) => (
+                {["Mon", "", "Wed", "", "Fri", "", "Sun"].map((label, i) => (
                   <div
                     key={i}
                     className="h-[11px] flex items-center text-[10px] text-gray-400 dark:text-gray-500 leading-none"

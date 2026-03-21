@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { AVAILABLE_SIGNALS } from "../settings/components/SignalSettings";
 import DailyTasks from "./DailyTasks";
 import BlockedTasks from "./BlockedTasks";
+import ContextReminder from "./ContextReminder";
 
 // Define the session form data interface
 interface SessionFormData {
@@ -409,7 +410,8 @@ const Compass: React.FC<CompassProps> = ({
   ]);
 
   return (
-    <div className="p-0 gap-4 flex flex-col h-full">
+    <div className="p-0 gap-4 flex flex-col h-full relative">
+      <ContextReminder isRunning={isRunning} />
       <TimerCompleteModal
         isOpen={isModalOpen}
         onClose={onCloseModal}
