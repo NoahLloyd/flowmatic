@@ -297,11 +297,14 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
           Signals
         </h2>
         {(signalStreak > 0 || signalStreakDanger) && (
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-            signalStreakDanger
-              ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400"
-              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-          }`}>
+          <span
+            onClick={() => window.dispatchEvent(new CustomEvent("openStreakScreen"))}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+              signalStreakDanger
+                ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
             <Flame className="w-3 h-3" />
             {signalStreak} day{signalStreak !== 1 ? "s" : ""}
           </span>
