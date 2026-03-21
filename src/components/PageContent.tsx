@@ -19,6 +19,7 @@ import QuickAddTaskModal from "./task/QuickAddTaskModal";
 import QuickAddNoteModal from "./note/QuickAddNoteModal";
 import GlobalQuickAddTask from "./global/GlobalQuickAddTask";
 import GlobalQuickAddNote from "./global/GlobalQuickAddNote";
+import StreakScreen from "./streak/StreakScreen";
 import { dispatchTaskAdded } from "../utils/taskEvents";
 
 const PageContent = () => {
@@ -33,6 +34,8 @@ const PageContent = () => {
     useState(false);
   const [isGlobalQuickAddNoteOpen, setIsGlobalQuickAddNoteOpen] =
     useState(false);
+  // Track previous selected page so we can return to it from Streak
+  const [previousPage, setPreviousPage] = useState("Compass");
 
   // Create a direct navigation function
   const directNavigate = useCallback(
@@ -59,6 +62,13 @@ const PageContent = () => {
       showToast("Daily task added", "success");
     };
 
+    // Handle streak screen open event
+    const handleOpenStreakScreen = () => {
+      setPreviousPage(selected);
+      setSelected("Streak");
+    };
+    window.addEventListener("openStreakScreen", handleOpenStreakScreen);
+
     // Register listeners
     if (window.electron?.on) {
       window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
@@ -68,6 +78,7 @@ const PageContent = () => {
 
     // Cleanup listeners on unmount
     return () => {
+      window.removeEventListener("openStreakScreen", handleOpenStreakScreen);
       // Cast to any to access removeListener which is available at runtime
       const electron = window.electron as any;
       if (electron?.removeListener) {
@@ -434,6 +445,13 @@ const PageContent = () => {
         break;
       case "Settings":
         content = <Settings />;
+        break;
+      case "Streak":
+        content = (
+          <StreakScreen
+            onClose={() => setSelected(previousPage)}
+          />
+        );
         break;
       default:
         content = <div>Select a page from the sidebar</div>;

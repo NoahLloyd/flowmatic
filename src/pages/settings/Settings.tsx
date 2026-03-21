@@ -264,6 +264,27 @@ const Settings = () => {
         ...(signalSettings.customSignals
           ? { customSignals: signalSettings.customSignals }
           : {}),
+        // Track active signals changes over time for accurate historical scoring
+        ...(signalSettings.activeSignals ? (() => {
+          const prevActive = user?.preferences?.activeSignals as string[] | undefined;
+          const newActive = signalSettings.activeSignals as string[];
+          const changed = !prevActive ||
+            prevActive.length !== newActive.length ||
+            prevActive.some((s: string) => !newActive.includes(s));
+          if (changed) {
+            const history = [...(user?.preferences?.signalActiveHistory || [])];
+            const today = new Date().toISOString().split("T")[0];
+            // Don't duplicate if we already have an entry for today
+            const lastEntry = history[history.length - 1];
+            if (lastEntry?.date === today) {
+              lastEntry.signals = newActive;
+            } else {
+              history.push({ date: today, signals: newActive });
+            }
+            return { signalActiveHistory: history };
+          }
+          return {};
+        })() : {}),
 
         // Morning settings
         ...(morningSettings.weeklyMorningSchedule
