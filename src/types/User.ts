@@ -36,6 +36,7 @@ interface UserPreferences {
   signalStreakDate?: string; // YYYY-MM-DD of last day fully processed
   signalStreakDanger?: boolean; // deprecated, always false
   signalStreakPoints?: number; // accumulated bonus points for streak saves
+  signalStreakAlgoVersion?: number; // algorithm version for migration detection
   signalStreakLongest?: number; // personal best streak
   signalStreakMilestones?: number[]; // milestones achieved (e.g. [7, 14, 30])
   signalActiveHistory?: { date: string; signals: string[] }[]; // snapshots of active signals list over time

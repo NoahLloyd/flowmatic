@@ -372,6 +372,9 @@ ipcMain.on("overlay-close", () => {
 // Uses the `shortcuts` CLI (/usr/bin/shortcuts) which runs shortcuts directly
 // without needing Automation/Apple Events permissions.
 // Requires user to have shortcuts named "Focus On" and "Focus Off" set up.
+let dndProc: ReturnType<typeof spawn> | null = null;
+let dndTimer: ReturnType<typeof setTimeout> | null = null;
+
 const setDoNotDisturb = (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
   return new Promise((resolve) => {
     if (process.platform !== "darwin") {
@@ -379,29 +382,60 @@ const setDoNotDisturb = (enabled: boolean): Promise<{ success: boolean; error?: 
       return;
     }
 
+    // Kill any in-flight shortcuts process to avoid accumulating zombie processes.
+    // EAGAIN occurs when too many child processes are alive.
+    if (dndProc) {
+      dndProc.kill();
+      dndProc = null;
+    }
+    if (dndTimer) {
+      clearTimeout(dndTimer);
+      dndTimer = null;
+    }
+
     const shortcutName = enabled ? "Focus On" : "Focus Off";
     console.log(`Running DND shortcut: ${shortcutName}`);
 
-    // Use spawn with stdin set to 'ignore'. The shortcuts CLI hangs if stdin
-    // is a pipe (Node.js default) because it waits for input. Ignoring stdin
-    // lets it complete immediately.
-    const proc = spawn("/usr/bin/shortcuts", ["run", shortcutName], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    let proc: ReturnType<typeof spawn>;
+    try {
+      // Use spawn with stdin set to 'ignore'. The shortcuts CLI hangs if stdin
+      // is a pipe (Node.js default) because it waits for input. Ignoring stdin
+      // lets it complete immediately.
+      proc = spawn("/usr/bin/shortcuts", ["run", shortcutName], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      console.error(`Failed to spawn shortcuts CLI: ${error}`);
+      resolve({ success: false, error: `Failed to launch shortcut: ${error}` });
+      return;
+    }
 
-    let stdout = "";
+    dndProc = proc;
+
     let stderr = "";
-    proc.stdout.on("data", (data: Buffer) => { stdout += data.toString(); });
+    proc.stdout.on("data", () => {});
     proc.stderr.on("data", (data: Buffer) => { stderr += data.toString(); });
 
+    proc.on("error", (error) => {
+      console.error(`Shortcuts process error: ${error.message}`);
+      if (dndTimer) clearTimeout(dndTimer);
+      dndTimer = null;
+      dndProc = null;
+      resolve({ success: false, error: `Shortcuts process failed: ${error.message}` });
+    });
+
     // Safety timeout
-    const timer = setTimeout(() => {
+    dndTimer = setTimeout(() => {
       proc.kill();
-      resolve({ success: false, error: `Shortcut "${shortcutName}" timed out after 15s` });
-    }, 15000);
+      dndProc = null;
+      dndTimer = null;
+      resolve({ success: false, error: `Shortcut "${shortcutName}" timed out after 10s` });
+    }, 10000);
 
     proc.on("close", (code: number | null) => {
-      clearTimeout(timer);
+      if (dndTimer) clearTimeout(dndTimer);
+      dndTimer = null;
+      if (dndProc === proc) dndProc = null;
       if (code !== 0) {
         const errOutput = stderr.trim();
         console.error(`Shortcut "${shortcutName}" exited with code ${code}: ${errOutput}`);
