@@ -90,3 +90,10 @@ typings/
 
 # Electron-Forge
 out/
+
+# Conductor
+.context/
+
+# Environment variables
+.env.local
+.env.production
