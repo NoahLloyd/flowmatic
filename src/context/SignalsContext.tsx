@@ -98,15 +98,19 @@ const SignalsContext = createContext<SignalsContextType>({
 // Returns 0-100 representing the average completion across active signals.
 // When historicalMode is true, only count signals that have data for that day
 // (avoids penalizing historical days when active signals change over time).
+// When signalPercentageGoal is provided, forces 100% if every individual signal
+// meets the goal — matching the live daily score algorithm exactly.
 const computeDayScore = (
   daySignals: Record<string, any>,
   activeSignals: string[],
   availableSignals: Record<string, SignalConfig>,
   signalGoals: Record<string, number>,
   historicalMode: boolean = false,
+  signalPercentageGoal: number = 0,
 ): number => {
   let totalActive = 0;
   let totalScore = 0;
+  let allMeetGoal = signalPercentageGoal > 0; // starts true, any miss flips it
 
   // In historical mode, only evaluate signals that have data for this day
   const signalsToEvaluate = historicalMode
@@ -125,7 +129,10 @@ const computeDayScore = (
     const value = daySignals[key];
 
     // No data recorded for this signal = 0 score
-    if (value === undefined || value === null) continue;
+    if (value === undefined || value === null) {
+      if (signalPercentageGoal > 0) allMeetGoal = false;
+      continue;
+    }
 
     let score = 0;
 
@@ -157,10 +164,19 @@ const computeDayScore = (
       // No goal = 0 score (can't evaluate)
     }
 
+    if (signalPercentageGoal > 0 && score < signalPercentageGoal) {
+      allMeetGoal = false;
+    }
+
     totalScore += score;
   }
 
   if (totalActive === 0) return 0;
+
+  // Force 100% when every signal individually meets the goal — matches the
+  // live daily score calculation so historical points are consistent.
+  if (allMeetGoal && totalActive > 0) return 100;
+
   return Math.round(totalScore / totalActive);
 };
 
@@ -823,8 +839,11 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         const storedPoints = user?.preferences?.signalStreakPoints ?? undefined;
         const todayMeetsGoal = averageScore >= signalPercentageGoal;
 
-        // Migration: if signalStreakPoints is undefined, force a full backfill
-        const needsMigration = storedPoints === undefined;
+        // Migration: force a full backfill when the scoring algorithm changes.
+        // v1 = initial points system, v2 = force-100% applied to historical scoring.
+        const STREAK_ALGO_VERSION = 2;
+        const storedAlgoVersion = user?.preferences?.signalStreakAlgoVersion ?? 0;
+        const needsMigration = storedPoints === undefined || storedAlgoVersion < STREAK_ALGO_VERSION;
 
         let confirmedCount = (storedCount === -1 || needsMigration) ? 0 : storedCount;
         let confirmedPoints = storedPoints ?? 0;
@@ -869,6 +888,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
               availableSignals,
               signalGoals as Record<string, number>,
               true,
+              signalPercentageGoal,
             );
             met = dayScore >= signalPercentageGoal;
           }
@@ -1042,6 +1062,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             signalStreakCount: confirmedCount,
             signalStreakDate: lastProcessed,
             signalStreakPoints: confirmedPoints,
+            signalStreakAlgoVersion: STREAK_ALGO_VERSION,
             signalStreakDanger: false, // deprecated
             ...(longestChanged ? { signalStreakLongest: newLongest } : {}),
             ...(milestonesChanged ? { signalStreakMilestones: newMilestones } : {}),
@@ -1093,7 +1114,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         const signalDetails: HeatmapSignalDetail[] = [];
 
         if (daySignals && Object.keys(daySignals).length > 0) {
-          score = computeDayScore(daySignals, dayActiveSignals, availableSignals, signalGoals, true);
+          const percentageGoal = (user?.preferences?.signalPercentageGoal || 75) as number;
+          score = computeDayScore(daySignals, dayActiveSignals, availableSignals, signalGoals, true, percentageGoal);
 
           // Build per-signal details for tooltip — show signals that were active on this date
           for (const key of Object.keys(daySignals)) {
