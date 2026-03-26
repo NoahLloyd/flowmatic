@@ -11,6 +11,7 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
+  Zap,
 } from "lucide-react";
 
 const MILESTONES = [7, 14, 30, 60, 100, 200, 365];
@@ -56,6 +57,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
   const {
     signalStreak,
     signalStreakDanger,
+    signalStreakPoints,
     signalStreakLongest,
     signalStreakMilestones,
     signalScore,
@@ -325,7 +327,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
       </div>
 
       {/* Top section: hero + stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
         {/* Hero streak */}
         <div className="lg:col-span-2 rounded-xl border border-gray-200 dark:border-gray-800 p-6 flex items-center gap-6">
           <div className="flex-shrink-0">
@@ -366,7 +368,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
             </div>
             {signalStreakDanger ? (
               <p className="text-xs text-red-500 dark:text-red-400 mt-1.5">
-                Missed yesterday — lock in today to keep your streak
+                Low on points — lock in today to protect your streak
               </p>
             ) : nextMilestone ? (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-1">
@@ -390,6 +392,22 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
             {signalStreakLongest}
             <span className="text-sm font-normal text-gray-400 ml-1">
               days
+            </span>
+          </span>
+        </div>
+
+        {/* Streak Points */}
+        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-6 flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-1">
+            <Zap className={`w-4 h-4 ${signalStreakPoints >= 100 ? "text-emerald-500" : "text-amber-500"}`} />
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              Points
+            </span>
+          </div>
+          <span className="text-3xl font-bold text-gray-900 dark:text-white tabular-nums">
+            {Math.round(signalStreakPoints)}
+            <span className="text-sm font-normal text-gray-400 ml-1">
+              pts
             </span>
           </span>
         </div>

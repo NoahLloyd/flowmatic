@@ -67,6 +67,7 @@ interface SignalsContextType {
   completedSignals: number;
   signalStreak: number;
   signalStreakDanger: boolean;
+  signalStreakPoints: number;
   signalStreakLongest: number;
   signalStreakMilestones: number[];
   updateSignal: (metric: string, value: number | boolean) => Promise<void>;
@@ -85,6 +86,7 @@ const SignalsContext = createContext<SignalsContextType>({
   completedSignals: 0,
   signalStreak: 0,
   signalStreakDanger: false,
+  signalStreakPoints: 0,
   signalStreakLongest: 0,
   signalStreakMilestones: [],
   updateSignal: async () => {},
@@ -206,6 +208,10 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   const [signalStreakDanger, setSignalStreakDanger] = useState(() => {
     return localStorage.getItem("signalStreakDanger") === "true";
   });
+  const [signalStreakPoints, setSignalStreakPoints] = useState(() => {
+    const cached = localStorage.getItem("signalStreakPoints");
+    return cached ? parseInt(cached, 10) : 0;
+  });
   const [signalStreakLongest, setSignalStreakLongest] = useState(() => {
     const cached = localStorage.getItem("signalStreakLongest");
     return cached ? parseInt(cached, 10) : 0;
@@ -228,6 +234,10 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     if (user?.preferences?.signalStreakDanger !== undefined) {
       setSignalStreakDanger(user.preferences.signalStreakDanger);
       localStorage.setItem("signalStreakDanger", String(user.preferences.signalStreakDanger));
+    }
+    if (user?.preferences?.signalStreakPoints !== undefined) {
+      setSignalStreakPoints(user.preferences.signalStreakPoints);
+      localStorage.setItem("signalStreakPoints", String(user.preferences.signalStreakPoints));
     }
     if (user?.preferences?.signalStreakLongest !== undefined) {
       setSignalStreakLongest(user.preferences.signalStreakLongest);
@@ -810,12 +820,15 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         const yesterday = getDateDaysAgo(1);
         const storedCount = user?.preferences?.signalStreakCount ?? -1;
         const storedDate = user?.preferences?.signalStreakDate ?? "";
-        const storedDanger = user?.preferences?.signalStreakDanger ?? false;
+        const storedPoints = user?.preferences?.signalStreakPoints ?? undefined;
         const todayMeetsGoal = averageScore >= signalPercentageGoal;
 
-        let confirmedCount = storedCount === -1 ? 0 : storedCount;
+        // Migration: if signalStreakPoints is undefined, force a full backfill
+        const needsMigration = storedPoints === undefined;
+
+        let confirmedCount = (storedCount === -1 || needsMigration) ? 0 : storedCount;
+        let confirmedPoints = storedPoints ?? 0;
         let lastProcessed = storedDate;
-        let danger = storedDanger;
         let needsSave = false;
 
         // Helper: generate YYYY-MM-DD dates between two dates (exclusive start, inclusive end)
@@ -835,41 +848,44 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         // Resolve historical active signals
         const signalActiveHistory = user?.preferences?.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
 
-        // Process a single day: returns new count and danger state
+        // Process a single day: returns new count and points
         const processDay = (
           daySignals: Record<string, any> | undefined,
           currentCount: number,
-          wasDanger: boolean,
+          currentPoints: number,
           dateStr?: string,
-        ): { count: number; isDanger: boolean } => {
+        ): { count: number; points: number } => {
           let met = false;
+          let dayScore = 0;
           if (daySignals && Object.keys(daySignals).length > 0) {
             // Use the active signals list that was in effect on this date
             const dayActive = dateStr
               ? getActiveSignalsForDate(dateStr, activeSignals as string[], signalActiveHistory)
               : activeSignals as string[];
             // Use historicalMode so we only score signals that have data for that day
-            const score = computeDayScore(
+            dayScore = computeDayScore(
               daySignals,
               dayActive,
               availableSignals,
               signalGoals as Record<string, number>,
               true,
             );
-            met = score >= signalPercentageGoal;
+            met = dayScore >= signalPercentageGoal;
           }
 
           if (met) {
-            return { count: currentCount + 1, isDanger: false };
-          } else if (wasDanger) {
-            // Two misses in a row — hard reset
-            return { count: 0, isDanger: true };
-          } else {
-            return { count: Math.max(0, currentCount - 1), isDanger: true };
+            const earned = Math.max(0, dayScore - signalPercentageGoal);
+            return { count: currentCount + 1, points: currentPoints + earned };
           }
+          // Miss — can we pay 100 points to save the streak?
+          if (currentPoints >= 100) {
+            return { count: currentCount, points: Math.max(0, currentPoints - 100) };
+          }
+          // Streak lost
+          return { count: 0, points: 0 };
         };
 
-        if (storedCount === -1 || !storedDate) {
+        if (storedCount === -1 || !storedDate || needsMigration) {
           // First time — backfill from history
           const backfillStart = getDateDaysAgo(365);
           const historyData = await api.getAllSignalHistory(backfillStart, yesterday);
@@ -891,18 +907,18 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             })();
             const allDates = getDatesBetween(dayBefore, yesterday);
 
-            let score = 0;
-            let wasDanger = false;
+            let walkCount = 0;
+            let walkPoints = 0;
             let maxStreakSeen = 0;
             for (const dateStr of allDates) {
-              const result = processDay(byDate[dateStr], score, wasDanger, dateStr);
-              score = result.count;
-              wasDanger = result.isDanger;
-              if (score > maxStreakSeen) maxStreakSeen = score;
+              const result = processDay(byDate[dateStr], walkCount, walkPoints, dateStr);
+              walkCount = result.count;
+              walkPoints = result.points;
+              if (walkCount > maxStreakSeen) maxStreakSeen = walkCount;
             }
 
-            confirmedCount = score;
-            danger = wasDanger;
+            confirmedCount = walkCount;
+            confirmedPoints = walkPoints;
             // Update longest from the full historical walk
             const prevLongestFromPref = user?.preferences?.signalStreakLongest ?? 0;
             if (maxStreakSeen > prevLongestFromPref) {
@@ -911,7 +927,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             }
           } else {
             confirmedCount = 0;
-            danger = false;
+            confirmedPoints = 0;
           }
 
           lastProcessed = yesterday;
@@ -929,9 +945,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
           const unprocessedDates = getDatesBetween(lastProcessed, yesterday);
           for (const dateStr of unprocessedDates) {
-            const result = processDay(byDate[dateStr], confirmedCount, danger, dateStr);
+            const result = processDay(byDate[dateStr], confirmedCount, confirmedPoints, dateStr);
             confirmedCount = result.count;
-            danger = result.isDanger;
+            confirmedPoints = result.points;
           }
 
           lastProcessed = yesterday;
@@ -965,12 +981,12 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
               const allDatesForMax = getDatesBetween(dayBefore, yesterday);
 
               let tempCount = 0;
-              let tempDanger = false;
+              let tempPoints = 0;
               let historicalMax = 0;
               for (const dateStr of allDatesForMax) {
-                const result = processDay(fullByDate[dateStr], tempCount, tempDanger, dateStr);
+                const result = processDay(fullByDate[dateStr], tempCount, tempPoints, dateStr);
                 tempCount = result.count;
-                tempDanger = result.isDanger;
+                tempPoints = result.points;
                 if (tempCount > historicalMax) historicalMax = tempCount;
               }
 
@@ -987,9 +1003,11 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
         // Display = confirmed past days + today's live contribution
         const displayCount = confirmedCount + (todayMeetsGoal ? 1 : 0);
+        const todayPoints = todayMeetsGoal ? Math.max(0, averageScore - signalPercentageGoal) : 0;
+        const displayPoints = confirmedPoints + todayPoints;
 
-        // Danger for display: yesterday was a miss AND today hasn't saved it yet
-        const displayDanger = danger && !todayMeetsGoal;
+        // Danger = vulnerable to streak loss (not enough points to save and today not meeting goal)
+        const displayDanger = displayPoints < 100 && !todayMeetsGoal;
 
         // Track personal best — use the recalculated value if it was updated above
         const recalcLongest = parseInt(localStorage.getItem("signalStreakLongest") || "0", 10);
@@ -1007,10 +1025,12 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
         setSignalStreak(displayCount);
         setSignalStreakDanger(displayDanger);
+        setSignalStreakPoints(displayPoints);
         setSignalStreakLongest(newLongest);
         setSignalStreakMilestones(newMilestones);
         localStorage.setItem("signalStreak", String(displayCount));
         localStorage.setItem("signalStreakDanger", String(displayDanger));
+        localStorage.setItem("signalStreakPoints", String(confirmedPoints));
         localStorage.setItem("signalStreakLongest", String(newLongest));
         localStorage.setItem("signalStreakMilestones", JSON.stringify(newMilestones));
 
@@ -1021,7 +1041,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           api.updateUserPreferences(user.id, {
             signalStreakCount: confirmedCount,
             signalStreakDate: lastProcessed,
-            signalStreakDanger: danger,
+            signalStreakPoints: confirmedPoints,
+            signalStreakDanger: false, // deprecated
             ...(longestChanged ? { signalStreakLongest: newLongest } : {}),
             ...(milestonesChanged ? { signalStreakMilestones: newMilestones } : {}),
           }).catch((err: Error) =>
@@ -1232,6 +1253,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         completedSignals,
         signalStreak,
         signalStreakDanger,
+        signalStreakPoints,
         signalStreakLongest,
         signalStreakMilestones,
         updateSignal,

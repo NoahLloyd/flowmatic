@@ -105,7 +105,7 @@ const ContextReminder: React.FC<ContextReminderProps> = ({ isRunning }) => {
     // Check 3: Lunch reminder (11am-1pm, Lunch signal is off)
     if (hour >= 11 && hour < 13) {
       const lunchValue = signals["lunch"];
-      if (!lunchValue || lunchValue === false || lunchValue === 0) {
+      if (!lunchValue || (lunchValue as unknown) === false || lunchValue === 0) {
         setReminder({
           id: "lunch-" + Date.now(),
           lines: ["Time for lunch?"],
