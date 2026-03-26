@@ -1,8 +1,8 @@
 // @ts-ignore — supabase-js ships its own types but TS 4.x can't resolve them
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = "https://kujhoojkrxkoftcbrgun.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_uHqEH-CEUBbqiq1RoTkciQ_TApuopZC";
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_ANON_KEY || "";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
