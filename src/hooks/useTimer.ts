@@ -85,6 +85,20 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const timerIntervalRef = useRef<number | null>(null);
   const breakTimerIntervalRef = useRef<number | null>(null);
 
+  // Current task being worked on (persisted in localStorage)
+  const [currentTask, setCurrentTaskState] = useState<string>(() => {
+    return localStorage.getItem("currentTask") || "";
+  });
+
+  const setCurrentTask = (task: string) => {
+    setCurrentTaskState(task);
+    if (task) {
+      localStorage.setItem("currentTask", task);
+    } else {
+      localStorage.removeItem("currentTask");
+    }
+  };
+
   // Ref to track the last adjustment time to prevent rapid clicking
   const lastAdjustmentTimeRef = useRef<number>(0);
   const adjustmentCooldown = 200; // ms cooldown between adjustments
@@ -373,6 +387,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
     // Remove from localStorage
     localStorage.removeItem("timerState");
+
+    // Clear current task when timer completes
+    setCurrentTask("");
   };
 
   // Handle break timer completion
@@ -565,6 +582,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
     // Clear from localStorage
     localStorage.removeItem("timerState");
+
+    // Clear current task on reset
+    setCurrentTask("");
   };
 
   // Start a break timer
@@ -959,5 +979,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     isStopwatchMode,
     toggleStopwatchMode,
     sessionMinutes,
+    // Current task
+    currentTask,
+    setCurrentTask,
   };
 };
