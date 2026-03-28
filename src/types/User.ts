@@ -40,6 +40,7 @@ interface UserPreferences {
   signalStreakLongest?: number; // personal best streak
   signalStreakMilestones?: number[]; // milestones achieved (e.g. [7, 14, 30])
   signalActiveHistory?: { date: string; signals: string[] }[]; // snapshots of active signals list over time
+  signalGoalHistory?: { date: string; goals: Record<string, number> }[]; // snapshots of signal goals over time
 }
 
 export interface User {

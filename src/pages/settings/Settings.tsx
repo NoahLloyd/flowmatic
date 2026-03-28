@@ -286,6 +286,27 @@ const Settings = () => {
           return {};
         })() : {}),
 
+        // Track signal goal changes over time for accurate historical scoring
+        ...(signalSettings.signalGoals ? (() => {
+          const prevGoals = user?.preferences?.signalGoals as Record<string, number> | undefined;
+          const newGoals = signalSettings.signalGoals as Record<string, number>;
+          const changed = !prevGoals ||
+            Object.keys(newGoals).length !== Object.keys(prevGoals).length ||
+            Object.keys(newGoals).some((k) => newGoals[k] !== prevGoals[k]);
+          if (changed) {
+            const history = [...(user?.preferences?.signalGoalHistory || [])];
+            const today = new Date().toISOString().split("T")[0];
+            const lastEntry = history[history.length - 1];
+            if (lastEntry?.date === today) {
+              lastEntry.goals = newGoals;
+            } else {
+              history.push({ date: today, goals: newGoals });
+            }
+            return { signalGoalHistory: history };
+          }
+          return {};
+        })() : {}),
+
         // Morning settings
         ...(morningSettings.weeklyMorningSchedule
           ? { weeklyMorningSchedule: morningSettings.weeklyMorningSchedule }

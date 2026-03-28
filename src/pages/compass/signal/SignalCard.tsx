@@ -1,6 +1,6 @@
 import React, { useState, KeyboardEvent, useEffect } from "react";
 import { Signal, SignalStatus } from "../../../types/Signal";
-import { useSignals } from "../../../context/SignalsContext";
+import { useSignals, scoreMinutesToOffice } from "../../../context/SignalsContext";
 
 interface SignalCardProps {
   metric: string;
@@ -97,42 +97,27 @@ const SignalCard = ({
   const bgClass = "bg-white dark:bg-gray-900";
 
   const getTimeColor = (minutes: number) => {
-    // Check if we have a goal value for comparison (use metric key, not display label)
+    // Use the scoring curve to determine color based on the score
     if (goalValue && metric === "minutesToOffice") {
-      if (minutes <= goalValue * 0.5) {
-        // Very fast - purple/green
-        return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
-      } else if (minutes <= goalValue) {
-        // Good - green
-        return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
-      } else if (minutes <= goalValue * 1.25) {
-        // Acceptable - yellow
-        return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200";
-      } else if (minutes <= goalValue * 1.5) {
-        // Borderline - orange
-        return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200";
-      } else if (minutes <= goalValue * 2) {
-        // Bad - light red
-        return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200";
-      } else {
-        // Very bad - dark red
-        return "bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-100";
-      }
+      const score = scoreMinutesToOffice(minutes, goalValue);
+      if (score >= 100) return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
+      if (score >= 75) return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200";
+      if (score >= 50) return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200";
+      if (score >= 25) return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200";
+      return "bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-100";
     }
 
     // Default colors if no goal is set (60 or less is green/good)
     if (minutes <= 30)
-      return "bg-green-200 dark:bg-green-900 text-green-800 dark:text-green-200"; // Excellent - darker green
+      return "bg-green-200 dark:bg-green-900 text-green-800 dark:text-green-200";
     if (minutes <= 60)
-      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200"; // Good - green
+      return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200";
     if (minutes <= 75)
-      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"; // Acceptable - yellow
+      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200";
     if (minutes <= 90)
-      return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200"; // Borderline - orange
+      return "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200";
     if (minutes <= 120)
-      return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200"; // Bad - red
-
-    // Very bad - dark red for anything above 120 mins
+      return "bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200";
     return "bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-100";
   };
 

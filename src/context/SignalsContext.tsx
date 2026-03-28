@@ -150,11 +150,7 @@ const computeDayScore = (
         const goal = signalGoals[key];
         if (typeof value === "number") {
           if (key === "minutesToOffice") {
-            // Lower is better
-            score =
-              value <= goal
-                ? 100
-                : Math.max(0, 100 - ((value - goal) / goal) * 100);
+            score = scoreMinutesToOffice(value, goal);
           } else {
             // Higher is better
             score = value >= goal ? 100 : (value / goal) * 100;
@@ -178,6 +174,45 @@ const computeDayScore = (
   if (allMeetGoal && totalActive > 0) return 100;
 
   return Math.round(totalScore / totalActive);
+};
+
+// Score minutesToOffice with an exponential decay curve.
+// Best at goal (100), gentle decline to 2x goal (75), then exponential decay to 0 at 8x goal.
+// Exported so SignalCard can use the same curve for coloring.
+export const scoreMinutesToOffice = (minutes: number, goal: number): number => {
+  if (minutes <= goal) return 100;
+  const doubleGoal = goal * 2;
+  if (minutes <= doubleGoal) {
+    // Linear decline from 100 → 75 between goal and 2x goal
+    return 100 - 25 * ((minutes - goal) / (doubleGoal - goal));
+  }
+  // Exponential decay from 75 → ~0, reaching floor at 8x goal
+  const maxMinutes = goal * 8; // e.g. 240 when goal=30
+  const decayRange = maxMinutes - doubleGoal; // e.g. 180
+  // k chosen so that 75 * e^(-k * decayRange) ≈ 2 (essentially 0)
+  const k = 3.6 / decayRange;
+  const elapsed = minutes - doubleGoal;
+  const score = 75 * Math.exp(-k * elapsed);
+  return Math.max(0, Math.min(75, score));
+};
+
+// Resolve the goal value for a signal on a given date using signalGoalHistory.
+// Falls back to current goals if no history covers that date.
+const getGoalsForDate = (
+  date: string,
+  currentGoals: Record<string, number>,
+  history: { date: string; goals: Record<string, number> }[] | undefined,
+): Record<string, number> => {
+  if (!history || history.length === 0) return currentGoals;
+  let applicable = history[0].goals;
+  for (const entry of history) {
+    if (entry.date <= date) {
+      applicable = entry.goals;
+    } else {
+      break;
+    }
+  }
+  return applicable;
 };
 
 // Resolve which signals were active on a given date using the signalActiveHistory log.
@@ -703,18 +738,13 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             const goal = signalGoals[key];
 
             if (typeof value === "number") {
-              // For "Minutes to Office" - lower is better
+              // For "Minutes to Office" - lower is better (exponential curve)
               if (key === "minutesToOffice") {
+                completionScore = scoreMinutesToOffice(value, goal);
                 if (value <= goal) {
-                  completionScore = 100;
                   completionValue = 1;
                   totalCompletedSignals++;
                 } else {
-                  // Partial credit: How close to the goal are we?
-                  completionScore = Math.max(
-                    0,
-                    100 - ((value - goal) / goal) * 100
-                  );
 
                   // Determine completion value for display
                   if (completionScore >= signalPercentageGoal) {
@@ -840,8 +870,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         const todayMeetsGoal = averageScore >= signalPercentageGoal;
 
         // Migration: force a full backfill when the scoring algorithm changes.
-        // v1 = initial points system, v2 = force-100% applied to historical scoring.
-        const STREAK_ALGO_VERSION = 2;
+        // v1 = initial points system, v2 = force-100% applied to historical scoring, v3 = exponential scoring + goal history.
+        const STREAK_ALGO_VERSION = 3;
         const storedAlgoVersion = user?.preferences?.signalStreakAlgoVersion ?? 0;
         const needsMigration = storedPoints === undefined || storedAlgoVersion < STREAK_ALGO_VERSION;
 
@@ -864,8 +894,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           return dates;
         };
 
-        // Resolve historical active signals
+        // Resolve historical active signals and goal history
         const signalActiveHistory = user?.preferences?.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
+        const signalGoalHistory = user?.preferences?.signalGoalHistory as { date: string; goals: Record<string, number> }[] | undefined;
 
         // Process a single day: returns new count and points
         const processDay = (
@@ -881,12 +912,16 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
             const dayActive = dateStr
               ? getActiveSignalsForDate(dateStr, activeSignals as string[], signalActiveHistory)
               : activeSignals as string[];
+            // Use the goals that were in effect on this date
+            const dayGoals = dateStr
+              ? getGoalsForDate(dateStr, signalGoals as Record<string, number>, signalGoalHistory)
+              : signalGoals as Record<string, number>;
             // Use historicalMode so we only score signals that have data for that day
             dayScore = computeDayScore(
               daySignals,
               dayActive,
               availableSignals,
-              signalGoals as Record<string, number>,
+              dayGoals,
               true,
               signalPercentageGoal,
             );
@@ -1096,7 +1131,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
       const currentActiveSignals = (user?.preferences?.activeSignals || []) as string[];
       const signalActiveHistory = user?.preferences?.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
-      const signalGoals = (user?.preferences?.signalGoals || {}) as Record<string, number>;
+      const currentSignalGoals = (user?.preferences?.signalGoals || {}) as Record<string, number>;
+      const signalGoalHistory = user?.preferences?.signalGoalHistory as { date: string; goals: Record<string, number> }[] | undefined;
       const availableSignals = getAvailableSignals(user);
 
       const results: HeatmapDay[] = [];
@@ -1107,8 +1143,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         const dateStr = current.toISOString().split("T")[0];
         const daySignals = byDate[dateStr];
 
-        // Use the active signals list that was in effect on this date
+        // Use the active signals list and goals that were in effect on this date
         const dayActiveSignals = getActiveSignalsForDate(dateStr, currentActiveSignals, signalActiveHistory);
+        const signalGoals = getGoalsForDate(dateStr, currentSignalGoals, signalGoalHistory);
 
         let score = 0;
         const signalDetails: HeatmapSignalDetail[] = [];
@@ -1134,7 +1171,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
                 const goal = signalGoals[key];
                 if (typeof value === "number") {
                   if (key === "minutesToOffice") {
-                    signalScore = value <= goal ? 100 : Math.max(0, 100 - ((value - goal) / goal) * 100);
+                    signalScore = scoreMinutesToOffice(value, goal);
                   } else {
                     signalScore = value >= goal ? 100 : (value / goal) * 100;
                   }
