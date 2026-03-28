@@ -6,8 +6,8 @@ declare module "utils/*";
 interface Window {
   electron: {
     send: (channel: string, data?: any) => void;
-    on: (channel: string, func: (...args: any[]) => void) => void;
-    removeListener: (channel: string, func: (...args: any[]) => void) => void;
+    on: (channel: string, func: (...args: any[]) => void) => number;
+    removeListener: (channel: string, idOrFunc: number | ((...args: any[]) => void)) => void;
     getShortcuts: () => Promise<{ quickAddTask: string; quickAddNote: string }>;
     updateShortcuts: (shortcuts: {
       quickAddTask: string;

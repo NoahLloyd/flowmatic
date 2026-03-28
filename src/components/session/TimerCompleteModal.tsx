@@ -32,6 +32,7 @@ interface TimerCompleteModalProps {
   onBreakTimerReset?: () => void; // Reset the break timer
   onBreakTimerAdjust?: (amount: number) => void; // Adjust break timer
   initialMinutes?: number; // Pre-fill minutes (e.g., from stopwatch elapsed time)
+  initialTask?: string; // Pre-fill task from current working task
 }
 
 // Define the break options
@@ -71,6 +72,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
   onBreakTimerReset = () => {},
   onBreakTimerAdjust = () => {},
   initialMinutes,
+  initialTask = "",
 }) => {
   const { user } = useAuth();
   const [dayTasks, setDayTasks] = useState<Task[]>([]);
@@ -105,7 +107,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
         id: "",
         user_id: user?.id || "",
         notes: "",
-        task: "",
+        task: initialTask,
         project: defaultProject,
         minutes: initialMinutes ?? 60,
         focus: 0,
@@ -116,7 +118,7 @@ const TimerCompleteModal: React.FC<TimerCompleteModalProps> = ({
         setDayTasks(tasks.filter((t) => !t.completed));
       }).catch((err) => console.error("Failed to fetch day tasks:", err));
     }
-  }, [isOpen, user, defaultProject, initialMinutes]);
+  }, [isOpen, user, defaultProject, initialMinutes, initialTask]);
 
   // Handle break timer completion
   useEffect(() => {

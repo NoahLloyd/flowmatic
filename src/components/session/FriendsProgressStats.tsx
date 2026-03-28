@@ -222,7 +222,7 @@ const DailySessionBar = ({
                 onSessionClick
                   ? "cursor-pointer hover:opacity-80 transition-opacity"
                   : ""
-              }`}
+              } group/session`}
               style={{ width: `${widthPercent}%` }}
               onClick={
                 onSessionClick ? () => onSessionClick(session) : undefined
@@ -232,6 +232,20 @@ const DailySessionBar = ({
               {showLeftDivider && (
                 <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-800 z-10"></div>
               )}
+              {/* Hover tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/session:block z-30 pointer-events-none">
+                <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-md px-2.5 py-1.5 whitespace-nowrap shadow-lg">
+                  {session.task && <div className="font-medium mb-0.5">{session.task}</div>}
+                  <div className="flex items-center gap-1.5">
+                    <span>{session.project || "No project"}</span>
+                    <span className="opacity-40">&middot;</span>
+                    <span>{session.minutes}m</span>
+                    <span className="opacity-40">&middot;</span>
+                    <span>Focus {session.focus}/5</span>
+                  </div>
+                  {session.notes && <div className="text-gray-300 dark:text-gray-600 mt-0.5">{session.notes}</div>}
+                </div>
+              </div>
             </div>
           );
         })}

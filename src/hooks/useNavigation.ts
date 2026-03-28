@@ -34,11 +34,6 @@ export const useNavigation = () => {
       }
     };
 
-    window.electron.on("toggle-timer", () => {
-      // Note: This will need to be handled differently since we moved timer logic
-      // We'll need to pass this handler from the parent component
-    });
-
     document.addEventListener("keydown", handleKeyPress);
 
     return () => {

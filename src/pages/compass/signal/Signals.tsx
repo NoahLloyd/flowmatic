@@ -312,9 +312,10 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
       </div>
       <div className="p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(allSignals)
-            .filter(([key]) => activeSignals.includes(key))
-            .map(([key, config]) => {
+          {activeSignals
+            .filter((key) => allSignals[key])
+            .map((key) => {
+              const config = allSignals[key];
               // Special handling for journaling signal - use morning entries data
               if (key === "journaling") {
                 return (

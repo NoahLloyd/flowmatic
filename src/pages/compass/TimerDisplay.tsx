@@ -14,6 +14,7 @@ interface TimerDisplayProps {
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
   stopwatchAlertMinutes?: number;
+  currentTask?: string;
 }
 
 const WaveComponent = ({
@@ -84,6 +85,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   isStopwatchMode = false,
   onToggleStopwatchMode = () => {},
   stopwatchAlertMinutes = 60,
+  currentTask = "",
 }) => {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -238,6 +240,14 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           >
             {isSimpleMode ? simpleTimeDisplay : `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`}
           </motion.div>
+
+          {currentTask && (
+            <div className="mb-5 px-3.5 py-1 rounded-full bg-white/15 dark:bg-white/10 backdrop-blur-sm max-w-[80%] text-center border border-white/10">
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate block">
+                {currentTask}
+              </span>
+            </div>
+          )}
 
           <div className="flex space-x-2 mb-6">
             <motion.button

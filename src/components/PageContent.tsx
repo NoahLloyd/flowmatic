@@ -70,30 +70,22 @@ const PageContent = () => {
     window.addEventListener("openStreakScreen", handleOpenStreakScreen);
 
     // Register listeners
+    let quickTaskId: number | undefined;
+    let quickNoteId: number | undefined;
+    let overlayTaskId: number | undefined;
     if (window.electron?.on) {
-      window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
-      window.electron.on("global-quick-add-note", handleGlobalQuickAddNote);
-      window.electron.on("task-added-from-overlay", handleTaskAddedFromOverlay);
+      quickTaskId = window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
+      quickNoteId = window.electron.on("global-quick-add-note", handleGlobalQuickAddNote);
+      overlayTaskId = window.electron.on("task-added-from-overlay", handleTaskAddedFromOverlay);
     }
 
     // Cleanup listeners on unmount
     return () => {
       window.removeEventListener("openStreakScreen", handleOpenStreakScreen);
-      // Cast to any to access removeListener which is available at runtime
-      const electron = window.electron as any;
-      if (electron?.removeListener) {
-        electron.removeListener(
-          "global-quick-add-task",
-          handleGlobalQuickAddTask
-        );
-        electron.removeListener(
-          "global-quick-add-note",
-          handleGlobalQuickAddNote
-        );
-        electron.removeListener(
-          "task-added-from-overlay",
-          handleTaskAddedFromOverlay
-        );
+      if (window.electron?.removeListener) {
+        if (quickTaskId !== undefined) window.electron.removeListener("global-quick-add-task", quickTaskId);
+        if (quickNoteId !== undefined) window.electron.removeListener("global-quick-add-note", quickNoteId);
+        if (overlayTaskId !== undefined) window.electron.removeListener("task-added-from-overlay", overlayTaskId);
       }
     };
   }, [showToast]);
@@ -232,6 +224,9 @@ const PageContent = () => {
     isStopwatchMode,
     toggleStopwatchMode,
     sessionMinutes,
+    // Current task
+    currentTask,
+    setCurrentTask,
   } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
@@ -244,36 +239,47 @@ const PageContent = () => {
 
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Handle global shortcut IPC events for timer control
+  // Use refs so the IPC listener always calls the latest handler
+  // without needing to re-register (which leaked listeners before)
+  const handleStartPauseRef = React.useRef(handleStartPause);
+  handleStartPauseRef.current = handleStartPause;
+  const isRunningRef = React.useRef(isRunning);
+  isRunningRef.current = isRunning;
+  const isModalOpenRef = React.useRef(isModalOpen);
+  isModalOpenRef.current = isModalOpen;
+  const handleCloseModalRef = React.useRef(handleCloseModal);
+  handleCloseModalRef.current = handleCloseModal;
+
+  // Handle global shortcut IPC events for timer control — register once
   useEffect(() => {
     const handleToggleTimer = () => {
-      handleStartPause();
+      handleStartPauseRef.current();
     };
 
     const handleOpenRecordModal = () => {
-      // Navigate to Compass so the modal is visible, pause timer, then open modal
       setSelected("Compass");
-      if (isRunning) {
-        handleStartPause();
+      if (isRunningRef.current) {
+        handleStartPauseRef.current();
       }
-      if (!isModalOpen) {
-        handleCloseModal();
+      if (!isModalOpenRef.current) {
+        handleCloseModalRef.current();
       }
     };
 
+    let timerId: number | undefined;
+    let recordId: number | undefined;
     if (window.electron?.on) {
-      window.electron.on("toggle-timer", handleToggleTimer);
-      window.electron.on("open-record-modal", handleOpenRecordModal);
+      timerId = window.electron.on("toggle-timer", handleToggleTimer);
+      recordId = window.electron.on("open-record-modal", handleOpenRecordModal);
     }
 
     return () => {
-      const electron = window.electron as any;
-      if (electron?.removeListener) {
-        electron.removeListener("toggle-timer", handleToggleTimer);
-        electron.removeListener("open-record-modal", handleOpenRecordModal);
+      if (window.electron?.removeListener) {
+        if (timerId !== undefined) window.electron.removeListener("toggle-timer", timerId);
+        if (recordId !== undefined) window.electron.removeListener("open-record-modal", recordId);
       }
     };
-  }, [handleStartPause, isRunning, isModalOpen, handleCloseModal]);
+  }, []); // Register once, refs keep handlers fresh
 
   // Force synchronize timer state when selected page changes to Compass
   useEffect(() => {
@@ -414,6 +420,8 @@ const PageContent = () => {
             isStopwatchMode={isStopwatchMode}
             onToggleStopwatchMode={toggleStopwatchMode}
             sessionMinutes={sessionMinutes}
+            currentTask={currentTask}
+            onSetCurrentTask={setCurrentTask}
           />
         );
         break;

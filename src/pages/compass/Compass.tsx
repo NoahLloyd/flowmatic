@@ -43,6 +43,9 @@ interface CompassProps {
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
   sessionMinutes?: number;
+  // Current task
+  currentTask?: string;
+  onSetCurrentTask?: (task: string) => void;
 }
 
 const Compass: React.FC<CompassProps> = ({
@@ -66,9 +69,15 @@ const Compass: React.FC<CompassProps> = ({
   isStopwatchMode = false,
   onToggleStopwatchMode = () => {},
   sessionMinutes = 60,
+  currentTask = "",
+  onSetCurrentTask = () => {},
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
   const { user } = useAuth();
+
+  // Task picker state for "w" shortcut
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [pickerTasks, setPickerTasks] = useState<{ id: string; title: string }[]>([]);
 
   // Refs for keyboard shortcuts
   const signalsRef = useRef<HTMLDivElement>(null);
@@ -184,6 +193,44 @@ const Compass: React.FC<CompassProps> = ({
           onCloseModal();
         }
         return;
+      }
+
+      // 'w' key to pick current working task
+      if (e.key === "w" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (showTaskPicker) {
+          // Close picker and clear task
+          setShowTaskPicker(false);
+          onSetCurrentTask("");
+        } else {
+          // Open task picker — fetch fresh tasks
+          api.getTasksByType("day").then((tasks) => {
+            setPickerTasks(tasks.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title })));
+            setShowTaskPicker(true);
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      // Number keys to select task when picker is open
+      if (showTaskPicker) {
+        const num = parseInt(e.key);
+        if (!isNaN(num) && num >= 1 && num <= 9) {
+          e.preventDefault();
+          e.stopPropagation();
+          const idx = num - 1;
+          if (idx < pickerTasks.length) {
+            onSetCurrentTask(pickerTasks[idx].title);
+          }
+          setShowTaskPicker(false);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setShowTaskPicker(false);
+          return;
+        }
       }
 
       // Timer adjustment keys
@@ -407,6 +454,9 @@ const Compass: React.FC<CompassProps> = ({
     awaitingScaleValue,
     user?.preferences?.activeSignals,
     isModalOpen,
+    showTaskPicker,
+    pickerTasks,
+    onSetCurrentTask,
   ]);
 
   return (
@@ -424,6 +474,7 @@ const Compass: React.FC<CompassProps> = ({
         onBreakTimerReset={onBreakTimerReset}
         onBreakTimerAdjust={onBreakTimerAdjust}
         initialMinutes={sessionMinutes}
+        initialTask={currentTask}
       />
 
       {/* Signals Section - Added ref for keyboard shortcuts */}
@@ -445,6 +496,7 @@ const Compass: React.FC<CompassProps> = ({
             isStopwatchMode={isStopwatchMode}
             onToggleStopwatchMode={onToggleStopwatchMode}
             stopwatchAlertMinutes={user?.preferences?.stopwatchAlertMinutes || 60}
+            currentTask={currentTask}
           />
         </div>
 
@@ -453,6 +505,51 @@ const Compass: React.FC<CompassProps> = ({
           <FriendsProgressStats />
         </div>
       </div>
+
+      {/* Task picker overlay */}
+      {showTaskPicker && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowTaskPicker(false)}
+          />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl p-4 w-80 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                Working on
+              </div>
+              <div className="text-xs text-gray-400 dark:text-gray-500">
+                press # or Esc
+              </div>
+            </div>
+            {pickerTasks.length === 0 ? (
+              <div className="text-sm text-gray-400 dark:text-gray-500 py-2">No active daily tasks</div>
+            ) : (
+              <div className="space-y-1">
+                {pickerTasks.map((task, idx) => (
+                  <button
+                    key={task.id}
+                    onClick={() => {
+                      onSetCurrentTask(task.title);
+                      setShowTaskPicker(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                      currentTask === task.title
+                        ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                        : "text-gray-800 dark:text-gray-200"
+                    }`}
+                  >
+                    <kbd className="flex-shrink-0 w-5 h-5 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-mono text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                      {idx + 1}
+                    </kbd>
+                    <span className="truncate">{task.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Bottom section: Daily Tasks and Blocked Tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
