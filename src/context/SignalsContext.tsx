@@ -113,8 +113,12 @@ const computeDayScore = (
   let allMeetGoal = signalPercentageGoal > 0; // starts true, any miss flips it
 
   // In historical mode, only evaluate signals that have data for this day
+  // and skip computed signals (focusHours, journaling) whose historical
+  // values may be stale or incorrect — they're only reliably computed live.
   const signalsToEvaluate = historicalMode
     ? activeSignals.filter((key) => {
+        const config = availableSignals[key];
+        if (config?.isComputed) return false;
         const value = daySignals[key];
         return value !== undefined && value !== null;
       })
