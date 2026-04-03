@@ -207,6 +207,29 @@ const getAvailableSignals = (user: any) => {
   return getAllSignals(customSignals);
 };
 
+// Apply shower 3-day window to a byDate map so historical scoring matches live scoring.
+// If shower was recorded as truthy on any of the 2 previous days, set it to 1 for the current day.
+const applyShower3DayWindow = (byDate: Record<string, Record<string, any>>) => {
+  const dates = Object.keys(byDate).sort();
+  for (const dateStr of dates) {
+    const showerVal = byDate[dateStr]?.shower;
+    if (showerVal === true || showerVal === "true" || showerVal === 1 || showerVal === "1") continue;
+
+    const d = new Date(dateStr + "T12:00:00Z");
+    for (let i = 1; i <= 2; i++) {
+      const prev = new Date(d);
+      prev.setUTCDate(prev.getUTCDate() - i);
+      const prevStr = prev.toISOString().split("T")[0];
+      const prevShower = byDate[prevStr]?.shower;
+      if (prevShower === true || prevShower === "true" || prevShower === 1 || prevShower === "1") {
+        if (!byDate[dateStr]) byDate[dateStr] = {};
+        byDate[dateStr].shower = 1;
+        break;
+      }
+    }
+  }
+};
+
 // Provider component to wrap application
 export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   children,
@@ -667,7 +690,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           // Ensure we're checking for any truthy representation of true
           // Cast to unknown to handle potential string values from API
           const binaryVal = value as unknown;
-          if (binaryVal === true || binaryVal === "true" || binaryVal === 1) {
+          if (binaryVal === true || binaryVal === "true" || binaryVal === 1 || binaryVal === "1") {
             completionScore = 100;
             completionValue = 1;
             // Count as completed if 100%
@@ -841,7 +864,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
         // Migration: force a full backfill when the scoring algorithm changes.
         // v1 = initial points system, v2 = force-100% applied to historical scoring.
-        const STREAK_ALGO_VERSION = 2;
+        // v3 = shower 3-day window applied to historical scoring.
+        const STREAK_ALGO_VERSION = 3;
         const storedAlgoVersion = user?.preferences?.signalStreakAlgoVersion ?? 0;
         const needsMigration = storedPoints === undefined || storedAlgoVersion < STREAK_ALGO_VERSION;
 
@@ -916,6 +940,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
               byDate[item.date][item.metric] = item.value;
             });
           }
+          applyShower3DayWindow(byDate);
 
           const datesWithData = Object.keys(byDate).sort();
           if (datesWithData.length > 0) {
@@ -954,7 +979,13 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           needsSave = true;
         } else if (lastProcessed < yesterday) {
           // Catch up on unprocessed past days
-          const historyData = await api.getAllSignalHistory(lastProcessed, yesterday);
+          // Fetch 2 extra days before lastProcessed so shower 3-day window works
+          const showerPaddedStart = (() => {
+            const d = new Date(lastProcessed + "T12:00:00Z");
+            d.setUTCDate(d.getUTCDate() - 2);
+            return d.toISOString().split("T")[0];
+          })();
+          const historyData = await api.getAllSignalHistory(showerPaddedStart, yesterday);
           const byDate: Record<string, Record<string, any>> = {};
           if (Array.isArray(historyData)) {
             historyData.forEach((item: any) => {
@@ -962,6 +993,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
               byDate[item.date][item.metric] = item.value;
             });
           }
+          applyShower3DayWindow(byDate);
 
           const unprocessedDates = getDatesBetween(lastProcessed, yesterday);
           for (const dateStr of unprocessedDates) {
@@ -989,6 +1021,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
                 fullByDate[item.date][item.metric] = item.value;
               });
             }
+            applyShower3DayWindow(fullByDate);
 
             const fullDatesWithData = Object.keys(fullByDate).sort();
             if (fullDatesWithData.length > 0) {
@@ -1085,7 +1118,13 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     if (!user) return [];
 
     try {
-      const historyData = await api.getAllSignalHistory(startDate, endDate);
+      // Fetch 2 extra days before startDate so shower 3-day window works for the first days
+      const paddedStart = (() => {
+        const d = new Date(startDate + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 2);
+        return d.toISOString().split("T")[0];
+      })();
+      const historyData = await api.getAllSignalHistory(paddedStart, endDate);
       const byDate: Record<string, Record<string, any>> = {};
       if (Array.isArray(historyData)) {
         historyData.forEach((item: any) => {
@@ -1093,6 +1132,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           byDate[item.date][item.metric] = item.value;
         });
       }
+      applyShower3DayWindow(byDate);
 
       const currentActiveSignals = (user?.preferences?.activeSignals || []) as string[];
       const signalActiveHistory = user?.preferences?.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
