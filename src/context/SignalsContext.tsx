@@ -96,6 +96,8 @@ const SignalsContext = createContext<SignalsContextType>({
 
 // Compute a signal score for a single day's worth of signal data.
 // Returns 0-100 representing the average completion across active signals.
+// When a _dailyScore was persisted by the live scoring algorithm, it is used
+// directly — this guarantees historical views match what the user actually saw.
 // When historicalMode is true, only count signals that have data for that day
 // (avoids penalizing historical days when active signals change over time).
 // When signalPercentageGoal is provided, forces 100% if every individual signal
@@ -108,6 +110,11 @@ const computeDayScore = (
   historicalMode: boolean = false,
   signalPercentageGoal: number = 0,
 ): number => {
+  // If a live score was persisted, use it directly — no recalculation drift.
+  if (daySignals._dailyScore !== undefined && daySignals._dailyScore !== null) {
+    return Math.round(Number(daySignals._dailyScore));
+  }
+
   let totalActive = 0;
   let totalScore = 0;
   let allMeetGoal = signalPercentageGoal > 0; // starts true, any miss flips it
@@ -845,6 +852,14 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       // Ensure the score is between 0 and 100
       averageScore = Math.max(0, Math.min(100, averageScore));
 
+      // Persist the live score so historical views show exactly what the user saw.
+      // This eliminates drift between live and historical scoring algorithms.
+      try {
+        await api.recordSignal(today, "_dailyScore", averageScore);
+      } catch (e) {
+        console.error("Failed to persist _dailyScore:", e);
+      }
+
       setSignalScore(averageScore);
       setTotalSignals(totalActiveSignals);
       setCompletedSignals(displayCompletedSignals);
@@ -865,7 +880,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         // Migration: force a full backfill when the scoring algorithm changes.
         // v1 = initial points system, v2 = force-100% applied to historical scoring.
         // v3 = shower 3-day window applied to historical scoring.
-        const STREAK_ALGO_VERSION = 3;
+        // v4 = use persisted _dailyScore for historical scoring when available.
+        const STREAK_ALGO_VERSION = 4;
         const storedAlgoVersion = user?.preferences?.signalStreakAlgoVersion ?? 0;
         const needsMigration = storedPoints === undefined || storedAlgoVersion < STREAK_ALGO_VERSION;
 
