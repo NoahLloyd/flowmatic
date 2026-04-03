@@ -30,10 +30,21 @@ const { error: delErr } = await supabase.from('signals').delete()
   .eq('user_id', userId).eq('metric', '_dailyScore');
 if (delErr) console.error('Delete error:', delErr.message);
 
-// Step 2: Fetch all signal data
+// Step 2: Fetch all signal data (paginated to avoid Supabase 1000-row default limit)
 console.log(`Fetching signals ${startStr} to ${todayStr}...`);
-const { data: signals } = await supabase.from('signals').select('*').eq('user_id', userId)
-  .gte('date', startStr).lte('date', todayStr).order('date', { ascending: true });
+let signals = [];
+let offset = 0;
+const PAGE_SIZE = 1000;
+while (true) {
+  const { data: page, error: fetchErr } = await supabase.from('signals').select('*').eq('user_id', userId)
+    .gte('date', startStr).lte('date', todayStr).order('date', { ascending: true })
+    .range(offset, offset + PAGE_SIZE - 1);
+  if (fetchErr) { console.error('Fetch error:', fetchErr.message); break; }
+  signals = signals.concat(page);
+  if (page.length < PAGE_SIZE) break;
+  offset += PAGE_SIZE;
+}
+console.log(`Fetched ${signals.length} signal entries.`);
 
 const byDate = {};
 for (const s of signals) {
