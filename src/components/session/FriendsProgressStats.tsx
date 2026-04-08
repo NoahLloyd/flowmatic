@@ -1065,7 +1065,7 @@ const FriendsProgressStats: React.FC = () => {
       {/* User's card */}
       {statsData[user?.id || "you"] && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-2.5 flex items-center justify-between">
+          <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-medium text-gray-900 dark:text-white">
                 Sessions

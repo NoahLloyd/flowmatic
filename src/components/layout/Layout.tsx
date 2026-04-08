@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import { useTheme } from "../../context/ThemeContext";
-import SidebarTimer from "./SidebarTimer";
 import { useTimer } from "../../hooks/useTimer";
 import { useAuth } from "../../context/AuthContext";
 
@@ -49,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     showInSidebar,
     synchronizeTimerState,
     isStopwatchMode,
+    currentTask,
   } = useTimer();
 
   // Force sync timer state when Layout mounts/updates
@@ -152,6 +152,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
         <Sidebar
           selected={selected}
           onSelect={setSelected}
+          currentTask={currentTask}
           timerProps={
             displaySidebarTimer
               ? {

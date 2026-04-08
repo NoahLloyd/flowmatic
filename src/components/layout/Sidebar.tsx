@@ -25,12 +25,14 @@ type SidebarProps = {
     isBreakTimer?: boolean;
     isStopwatchMode?: boolean;
   };
+  currentTask?: string;
 };
 
 const Sidebar: React.FC<SidebarProps> = ({
   selected,
   onSelect,
   timerProps,
+  currentTask,
 }) => {
   const { user } = useAuth();
 
@@ -170,6 +172,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="flex-grow" />
+
+      {/* Current task */}
+      {currentTask && (
+        <div className="mb-2 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/10 border border-indigo-400/20 dark:border-indigo-400/15 px-4 py-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70 dark:text-indigo-400/60 mb-1">
+            Working on
+          </div>
+          <div className="text-sm font-medium text-indigo-200 dark:text-indigo-300 leading-snug break-words">
+            {currentTask}
+          </div>
+        </div>
+      )}
 
       {/* Timer */}
       {timerProps && (

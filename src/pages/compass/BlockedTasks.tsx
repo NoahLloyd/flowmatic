@@ -193,7 +193,7 @@ const BlockedTasks: React.FC = () => {
   if (isLoading) {
     return (
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
-        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
+        <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-medium text-gray-900 dark:text-white">
             Blocked
           </h2>
@@ -218,7 +218,7 @@ const BlockedTasks: React.FC = () => {
   if (activeTasks.length === 0) {
     return (
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
-        <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
+        <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
           <h2 className="text-sm font-medium text-gray-900 dark:text-white">
             Blocked
           </h2>

@@ -14,7 +14,6 @@ interface TimerDisplayProps {
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
   stopwatchAlertMinutes?: number;
-  currentTask?: string;
 }
 
 const WaveComponent = ({
@@ -85,7 +84,6 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   isStopwatchMode = false,
   onToggleStopwatchMode = () => {},
   stopwatchAlertMinutes = 60,
-  currentTask = "",
 }) => {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -167,7 +165,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center">
+      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center">
         <h2
           className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
           onClick={onToggleStopwatchMode}
@@ -175,8 +173,8 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           {isStopwatchMode ? "Stopwatch" : "Timer"}
         </h2>
       </div>
-      <div 
-        className="relative flex flex-col w-full items-center justify-center overflow-hidden h-[calc(100%-48px)]"
+      <div
+        className="relative flex flex-col w-full items-center justify-center overflow-hidden flex-1"
       >
         <div className="absolute inset-0 overflow-hidden bg-white dark:bg-gray-900">
           {isSimpleMode ? (
@@ -240,14 +238,6 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           >
             {isSimpleMode ? simpleTimeDisplay : `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`}
           </motion.div>
-
-          {currentTask && (
-            <div className="mb-5 px-3.5 py-1 rounded-full bg-white/15 dark:bg-white/10 backdrop-blur-sm max-w-[80%] text-center border border-white/10">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate block">
-                {currentTask}
-              </span>
-            </div>
-          )}
 
           <div className="flex space-x-2 mb-6">
             <motion.button

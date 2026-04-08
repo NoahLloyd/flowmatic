@@ -163,6 +163,19 @@ const registerGlobalShortcuts = () => {
     }
   });
 
+  // Register current task picker shortcut (Alt+W)
+  try {
+    globalShortcut.register("Alt+W", () => {
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send("open-current-task-picker");
+      }
+    });
+  } catch (error) {
+    console.error("Failed to register current task picker shortcut:", error);
+  }
+
   // Register quick add task shortcut
   if (shortcuts.quickAddTask) {
     try {
