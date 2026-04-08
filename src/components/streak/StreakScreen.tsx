@@ -505,14 +505,14 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
                         return (
                           <div
                             key={dayIdx}
-                            className="w-[11px] h-[11px]"
+                            className="w-[14px] h-[14px]"
                           />
                         );
                       }
                       return (
                         <div
                           key={cell.date}
-                          className={`w-[11px] h-[11px] rounded-[2px] cursor-pointer hover:ring-1 hover:ring-gray-400 dark:hover:ring-gray-500 ${getHeatmapColor(
+                          className={`w-[14px] h-[14px] rounded-[2px] cursor-pointer hover:ring-1 hover:ring-gray-400 dark:hover:ring-gray-500 ${getHeatmapColor(
                             cell.score,
                             cell.inRange
                           )}`}
@@ -598,11 +598,11 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
               <span className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">
                 Less
               </span>
-              <div className="w-[11px] h-[11px] rounded-[2px] bg-gray-100 dark:bg-gray-800/60" />
-              <div className="w-[11px] h-[11px] rounded-[2px] bg-emerald-200 dark:bg-emerald-800/50" />
-              <div className="w-[11px] h-[11px] rounded-[2px] bg-emerald-300 dark:bg-emerald-700/60" />
-              <div className="w-[11px] h-[11px] rounded-[2px] bg-emerald-400 dark:bg-emerald-600/70" />
-              <div className="w-[11px] h-[11px] rounded-[2px] bg-emerald-500 dark:bg-emerald-500" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-gray-100 dark:bg-gray-800/60" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-200 dark:bg-emerald-800/50" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-300 dark:bg-emerald-700/60" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-400 dark:bg-emerald-600/70" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-500 dark:bg-emerald-500" />
               <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">
                 More
               </span>

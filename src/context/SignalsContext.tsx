@@ -7,7 +7,7 @@ import React, {
   ReactNode,
 } from "react";
 import { api } from "../utils/api";
-import { supabase } from "../utils/supabase";
+import { supabase, getCurrentUserId } from "../utils/supabase";
 import { useAuth } from "./AuthContext";
 import { useTimezone } from "./TimezoneContext";
 import { AVAILABLE_SIGNALS as ImportedAvailableSignals, getAllSignals, SignalConfig } from "../pages/settings/components/SignalSettings";
@@ -268,6 +268,203 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  // ── Confirmed streak from past days (computed once on mount) ──
+  // These are set by the one-time streak backfill and used to derive
+  // the display streak = confirmedStreak + (today meets goal ? 1 : 0).
+  const confirmedStreakRef = React.useRef<{
+    count: number;
+    points: number;
+    longest: number;
+    milestones: number[];
+    computed: boolean;
+  }>({ count: 0, points: 0, longest: 0, milestones: [], computed: false });
+
+  // Recompute today's score from current signals state and update display.
+  // This is cheap — no DB calls, just math on the current state.
+  const recomputeTodayScore = useCallback((currentSignals: Record<string, number | boolean>) => {
+    if (!user) return;
+    const prefs = user.preferences || {};
+    const activeSignals = (prefs.activeSignals || []) as string[];
+    const signalGoals = (prefs.signalGoals || {}) as Record<string, number>;
+    const signalPercentageGoal: number = prefs.signalPercentageGoal || 75;
+    const availableSignals = getAvailableSignals(user);
+
+    const todayScore = computeDayScore(currentSignals, activeSignals, availableSignals, signalGoals, false);
+
+    // Count completed signals
+    let completed = 0;
+    for (const key of activeSignals) {
+      const config = availableSignals[key];
+      if (!config) continue;
+      const score = currentSignals[key] !== undefined
+        ? computeDayScore({ [key]: currentSignals[key] }, [key], availableSignals, signalGoals, false)
+        : 0;
+      if (score >= signalPercentageGoal) completed++;
+    }
+
+    const ref = confirmedStreakRef.current;
+    const todayMeets = todayScore >= signalPercentageGoal;
+    const displayCount = ref.count + (todayMeets ? 1 : 0);
+    const displayPoints = ref.points + (todayMeets ? Math.max(0, todayScore - signalPercentageGoal) : 0);
+    const displayDanger = displayPoints < 100 && !todayMeets;
+    const displayLongest = Math.max(ref.longest, displayCount);
+
+    const MILESTONES = [7, 14, 30, 60, 100, 200, 365];
+    const newMilestones = [...ref.milestones];
+    for (const m of MILESTONES) {
+      if (displayCount >= m && !newMilestones.includes(m)) newMilestones.push(m);
+    }
+
+    setSignalScore(todayScore);
+    setCompletedSignals(completed);
+    setTotalSignals(activeSignals.length);
+    setSignalStreak(displayCount);
+    setSignalStreakDanger(displayDanger);
+    setSignalStreakPoints(displayPoints);
+    setSignalStreakLongest(displayLongest);
+    setSignalStreakMilestones(newMilestones);
+
+    // Cache
+    localStorage.setItem("signalStreak", String(displayCount));
+    localStorage.setItem("signalStreakDanger", String(displayDanger));
+    localStorage.setItem("signalStreakPoints", String(displayPoints));
+    localStorage.setItem("signalStreakLongest", String(displayLongest));
+    localStorage.setItem("signalStreakMilestones", JSON.stringify(newMilestones));
+
+    // Update tray
+    if (window.electron?.send) {
+      const trayText = displayCount > 0 ? ` ${displayCount} · ${todayScore}%` : ` ${todayScore}%`;
+      window.electron.send("update-signal-tray", { text: trayText, goalMet: todayMeets });
+    }
+  }, [user]);
+
+  // One-time client-side streak backfill from signal history.
+  // Runs once on mount when the edge function is unavailable.
+  const computeStreakOnce = async (today: string) => {
+    if (!user || confirmedStreakRef.current.computed) return;
+    confirmedStreakRef.current.computed = true;
+
+    try {
+      const prefs = user.preferences || {};
+      const activeSignals = (prefs.activeSignals || []) as string[];
+      const signalGoals = (prefs.signalGoals || {}) as Record<string, number>;
+      const signalPercentageGoal: number = prefs.signalPercentageGoal || 75;
+      const signalActiveHistory = prefs.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
+      const availableSignals = getAvailableSignals(user);
+
+      const startDate = (() => {
+        const d = new Date(today + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 365);
+        return d.toISOString().split("T")[0];
+      })();
+
+      const yesterday = (() => {
+        const d = new Date(new Date().getTime() - 86400000);
+        try {
+          const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+          }).formatToParts(d);
+          const m = parts.find(p => p.type === "month")?.value || "01";
+          const dy = parts.find(p => p.type === "day")?.value || "01";
+          const y = parts.find(p => p.type === "year")?.value || "2024";
+          return `${y}-${m}-${dy}`;
+        } catch { return d.toISOString().split("T")[0]; }
+      })();
+
+      // Paginate to fetch ALL signal data (Supabase default limit is 1000 rows)
+      const PAGE_SIZE = 1000;
+      const userId = await getCurrentUserId();
+      let allHistory: any[] = [];
+      let offset = 0;
+      while (true) {
+        const { data: page, error: fetchErr } = await supabase
+          .from("signals")
+          .select("date, metric, value")
+          .eq("user_id", userId)
+          .gte("date", startDate)
+          .lte("date", yesterday)
+          .order("date", { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (fetchErr) { console.error("[Signals] Fetch error:", fetchErr.message); break; }
+        allHistory = allHistory.concat(page || []);
+        if (!page || page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+
+      console.log("[Signals] Fetched", allHistory.length, "signal entries for streak backfill");
+
+      const byDate: Record<string, Record<string, any>> = {};
+      for (const item of allHistory) {
+        if (!byDate[item.date]) byDate[item.date] = {};
+        byDate[item.date][item.metric] = item.value;
+      }
+      applyShower3DayWindow(byDate);
+
+      const datesWithData = Object.keys(byDate).sort();
+      if (datesWithData.length === 0) {
+        console.log("[Signals] No historical data for streak computation");
+        return;
+      }
+
+      const earliest = datesWithData[0];
+      const allDates: string[] = [];
+      const cur = new Date(earliest + "T12:00:00Z");
+      const end = new Date(yesterday + "T12:00:00Z");
+      while (cur <= end) {
+        allDates.push(cur.toISOString().split("T")[0]);
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+
+      // One-time streak protection: clamp last 20 days to goal during migration
+      const STREAK_PROTECTION_DAYS = 20;
+      const protectionCutoff = (() => {
+        const d = new Date(today + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - STREAK_PROTECTION_DAYS);
+        return d.toISOString().split("T")[0];
+      })();
+
+      let streak = 0;
+      let points = 0;
+      let maxStreak = 0;
+
+      for (const dateStr of allDates) {
+        const daySignals = byDate[dateStr];
+        let dayScore = 0;
+        if (daySignals && Object.keys(daySignals).length > 0) {
+          const dayActive = getActiveSignalsForDate(dateStr, activeSignals, signalActiveHistory);
+          dayScore = computeDayScore(daySignals, dayActive, availableSignals, signalGoals, true);
+        }
+
+        if (dateStr > protectionCutoff && dayScore < signalPercentageGoal) {
+          dayScore = signalPercentageGoal;
+        }
+
+        if (dayScore >= signalPercentageGoal) {
+          streak++;
+          points += Math.max(0, dayScore - signalPercentageGoal);
+        } else if (points >= 100) {
+          points = Math.max(0, points - 100);
+        } else {
+          streak = 0;
+          points = 0;
+        }
+        if (streak > maxStreak) maxStreak = streak;
+      }
+
+      console.log("[Signals] Streak backfill complete — confirmed past streak:", streak, "points:", Math.round(points));
+
+      confirmedStreakRef.current = {
+        count: streak,
+        points,
+        longest: Math.max(prefs.signalStreakLongest ?? 0, maxStreak),
+        milestones: prefs.signalStreakMilestones ?? [],
+        computed: true,
+      };
+    } catch (error) {
+      console.error("[Signals] Streak backfill failed:", error);
+    }
+  };
+
   // Function to refresh signals by calling the edge function
   const refreshSignals = async () => {
     if (!user) return;
@@ -275,47 +472,82 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const today = getTodayInUserTimezone();
 
-      const { data, error } = await supabase.functions.invoke("compute-daily-score", {
-        body: { date: today, timezone },
-      });
+      // Try the edge function first
+      const { data: sessionData } = await supabase.auth.refreshSession();
+      const accessToken = sessionData?.session?.access_token;
+      let edgeSuccess = false;
 
-      if (error) {
-        console.error("Failed to compute daily score:", error);
-        // Fall back to direct DB load so signals still appear
+      if (accessToken) {
+        try {
+          const supabaseUrl = process.env.SUPABASE_URL || "";
+          const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+          const response = await fetch(`${supabaseUrl}/functions/v1/compute-daily-score`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+              "apikey": supabaseKey,
+            },
+            body: JSON.stringify({ date: today, timezone }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.signals) {
+              console.log("[Signals] Edge function success — streak:", data.streak?.count, "score:", data.score);
+              edgeSuccess = true;
+
+              setSignals(data.signals);
+              setSignalScore(data.score);
+              setTotalSignals(data.totalSignals);
+              setCompletedSignals(data.completedSignals);
+              setSignalStreak(data.streak.count);
+              setSignalStreakDanger(data.streak.danger);
+              setSignalStreakPoints(data.streak.points);
+              setSignalStreakLongest(data.streak.longest);
+              setSignalStreakMilestones(data.streak.milestones);
+
+              // Also update the confirmed streak ref so local updates work
+              confirmedStreakRef.current = {
+                count: data.streak.count - (data.score >= (user?.preferences?.signalPercentageGoal || 75) ? 1 : 0),
+                points: data.streak.points,
+                longest: data.streak.longest,
+                milestones: data.streak.milestones,
+                computed: true,
+              };
+
+              if (window.electron?.send) {
+                const signalGoal = user?.preferences?.signalPercentageGoal || 75;
+                const trayText = data.streak.count > 0 ? ` ${data.streak.count} · ${data.score}%` : ` ${data.score}%`;
+                window.electron.send("update-signal-tray", { text: trayText, goalMet: data.score >= signalGoal });
+              }
+
+              localStorage.setItem("signalStreak", String(data.streak.count));
+              localStorage.setItem("signalStreakDanger", String(data.streak.danger));
+              localStorage.setItem("signalStreakPoints", String(data.streak.points));
+              localStorage.setItem("signalStreakLongest", String(data.streak.longest));
+              localStorage.setItem("signalStreakMilestones", JSON.stringify(data.streak.milestones));
+            }
+          }
+        } catch (e) {
+          // Edge function failed, fall through to client-side
+        }
+      }
+
+      // Fallback: load signals from DB and compute score locally
+      if (!edgeSuccess) {
         await loadSignalsFromDB();
-        return;
+        // Compute streak once on first failure, then just update today's score
+        if (!confirmedStreakRef.current.computed) {
+          await computeStreakOnce(today);
+        }
+        // Recompute today's score from current signals state
+        setSignals((currentSignals) => {
+          // Use setTimeout to avoid state update during render
+          setTimeout(() => recomputeTodayScore(currentSignals), 0);
+          return currentSignals;
+        });
       }
-
-      if (!data?.signals) {
-        console.error("Edge function returned no signals data");
-        await loadSignalsFromDB();
-        return;
-      }
-
-      setSignals(data.signals);
-      setSignalScore(data.score);
-      setTotalSignals(data.totalSignals);
-      setCompletedSignals(data.completedSignals);
-
-      setSignalStreak(data.streak.count);
-      setSignalStreakDanger(data.streak.danger);
-      setSignalStreakPoints(data.streak.points);
-      setSignalStreakLongest(data.streak.longest);
-      setSignalStreakMilestones(data.streak.milestones);
-
-      // Update the signal tray in the menu bar
-      if (window.electron?.send) {
-        const signalGoal = user?.preferences?.signalPercentageGoal || 75;
-        const trayText = data.streak.count > 0 ? ` ${data.streak.count} · ${data.score}%` : ` ${data.score}%`;
-        window.electron.send("update-signal-tray", { text: trayText, goalMet: data.score >= signalGoal });
-      }
-
-      // Cache in localStorage for instant display on next load
-      localStorage.setItem("signalStreak", String(data.streak.count));
-      localStorage.setItem("signalStreakDanger", String(data.streak.danger));
-      localStorage.setItem("signalStreakPoints", String(data.streak.points));
-      localStorage.setItem("signalStreakLongest", String(data.streak.longest));
-      localStorage.setItem("signalStreakMilestones", JSON.stringify(data.streak.milestones));
     } catch (error) {
       console.error("Failed to fetch signals data:", error);
     }
@@ -335,20 +567,48 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
         d.setUTCDate(d.getUTCDate() - 2);
         return d.toISOString().split("T")[0];
       })();
-      const historyData = await api.getAllSignalHistory(paddedStart, endDate);
+      // Paginate to fetch ALL signal data (Supabase default limit is 1000 rows)
+      const heatmapUserId = await getCurrentUserId();
+      let historyData: any[] = [];
+      let hmOffset = 0;
+      const HM_PAGE = 1000;
+      while (true) {
+        const { data: page, error: fetchErr } = await supabase
+          .from("signals")
+          .select("date, metric, value")
+          .eq("user_id", heatmapUserId)
+          .gte("date", paddedStart)
+          .lte("date", endDate)
+          .order("date", { ascending: true })
+          .range(hmOffset, hmOffset + HM_PAGE - 1);
+        if (fetchErr) break;
+        historyData = historyData.concat(page || []);
+        if (!page || page.length < HM_PAGE) break;
+        hmOffset += HM_PAGE;
+      }
+
       const byDate: Record<string, Record<string, any>> = {};
-      if (Array.isArray(historyData)) {
-        historyData.forEach((item: any) => {
-          if (!byDate[item.date]) byDate[item.date] = {};
-          byDate[item.date][item.metric] = item.value;
-        });
+      for (const item of historyData) {
+        if (!byDate[item.date]) byDate[item.date] = {};
+        byDate[item.date][item.metric] = item.value;
       }
       applyShower3DayWindow(byDate);
 
       const currentActiveSignals = (user?.preferences?.activeSignals || []) as string[];
       const signalActiveHistory = user?.preferences?.signalActiveHistory as { date: string; signals: string[] }[] | undefined;
       const signalGoals = (user?.preferences?.signalGoals || {}) as Record<string, number>;
+      const signalPercentageGoal: number = (user?.preferences?.signalPercentageGoal as number) || 75;
       const availableSignals = getAvailableSignals(user);
+
+      // Clamp below-goal days in the last 20 days to the goal threshold.
+      // Historical _dailyScore values may have been computed by a different
+      // algorithm; this ensures they display consistently with the streak.
+      // Naturally expires as correct scores are recorded going forward.
+      const protectionCutoff = (() => {
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() - 20);
+        return d.toISOString().split("T")[0];
+      })();
 
       const results: HeatmapDay[] = [];
       const current = new Date(startDate + "T12:00:00Z");
@@ -365,6 +625,11 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
         if (daySignals && Object.keys(daySignals).length > 0) {
           score = computeDayScore(daySignals, dayActiveSignals, availableSignals, signalGoals, true);
+
+          // Apply streak protection: clamp below-goal days in the last 20 days
+          if (dateStr > protectionCutoff && score < signalPercentageGoal && score > 0) {
+            score = signalPercentageGoal;
+          }
 
           // Build per-signal details for tooltip
           for (const key of Object.keys(daySignals)) {
@@ -433,16 +698,17 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const today = getTodayInUserTimezone();
 
-      // Update the signal immediately in the local state first
-      setSignals((prev) => ({
-        ...prev,
-        [metric]: value,
-      }));
+      // Update the signal immediately in the local state and recompute score
+      const newSignals = { ...signals, [metric]: value };
+      setSignals(newSignals);
+
+      // Immediately recompute today's score from updated signals
+      recomputeTodayScore(newSignals);
 
       // Call the API to update the signal
       await api.recordSignal(today, metric, value);
 
-      // Recalculate scores via edge function
+      // Try the edge function (will use client-side fallback if it fails)
       await refreshSignals();
 
       // Dispatch event to notify other components
@@ -456,6 +722,8 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   // Load today's raw signal values directly from the DB for instant display.
   // The edge function (refreshSignals) may take a moment or fail; this ensures
   // the UI shows persisted values immediately on mount.
+  // Also loads streak data from user preferences as a fallback when the edge
+  // function is unavailable.
   const loadSignalsFromDB = useCallback(async () => {
     if (!user) return;
     try {
@@ -463,8 +731,11 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       const rows = await api.getSignalRange(today, today);
       if (Array.isArray(rows) && rows.length > 0) {
         const dbSignals: Record<string, number | boolean> = {};
+        let dailyScore: number | undefined;
         for (const row of rows) {
-          if (row.metric && !row.metric.startsWith("_")) {
+          if (row.metric === "_dailyScore") {
+            dailyScore = Number(row.value);
+          } else if (row.metric && !row.metric.startsWith("_")) {
             dbSignals[row.metric] = row.value;
           }
         }
@@ -478,6 +749,39 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
           if (hasExistingData) return prev;
           return { ...prev, ...dbSignals };
         });
+        // Use the persisted daily score if available
+        if (dailyScore !== undefined) {
+          setSignalScore((prev) => prev || dailyScore!);
+        }
+      }
+
+      // Derive totalSignals from active signals config so the sidebar card
+      // renders even when the edge function hasn't returned yet.
+      const activeSignals = (user.preferences?.activeSignals || []) as string[];
+      if (activeSignals.length > 0) {
+        setTotalSignals((prev) => prev || activeSignals.length);
+      }
+
+      // Load streak from user preferences when edge function is unavailable
+      const prefs = user.preferences;
+      console.log("[Signals] Fallback load — streakCount in prefs:", prefs?.signalStreakCount, "activeSignals:", activeSignals.length);
+      if (prefs) {
+        if (prefs.signalStreakCount !== undefined) {
+          setSignalStreak((prev) => prev || prefs.signalStreakCount);
+          localStorage.setItem("signalStreak", String(prefs.signalStreakCount));
+        }
+        if (prefs.signalStreakDanger !== undefined) {
+          setSignalStreakDanger(prefs.signalStreakDanger);
+        }
+        if (prefs.signalStreakPoints !== undefined) {
+          setSignalStreakPoints((prev) => prev || prefs.signalStreakPoints);
+        }
+        if (prefs.signalStreakLongest !== undefined) {
+          setSignalStreakLongest((prev) => prev || prefs.signalStreakLongest);
+        }
+        if (prefs.signalStreakMilestones !== undefined) {
+          setSignalStreakMilestones((prev) => prev.length > 0 ? prev : prefs.signalStreakMilestones);
+        }
       }
     } catch (error) {
       console.error("Failed to load signals from DB:", error);

@@ -56,7 +56,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 
   return (
     <button
-      className={`relative flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl transition-all duration-150 w-full ${c.bg}`}
+      className={`relative flex items-center gap-3 pl-4 pr-3 py-3.5 rounded-xl transition-all duration-150 w-full ${c.bg}`}
       onClick={() => onSelect(label)}
       style={{ border: "none", outline: "none" }}
     >
@@ -66,8 +66,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           isSelected ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
       />
-      <Icon className={`w-5 h-5 transition-colors duration-150 flex-shrink-0 ${c.icon}`} />
-      <span className={`text-sm transition-colors duration-150 ${c.text}`}>{label}</span>
+      <Icon className={`w-[22px] h-[22px] transition-colors duration-150 flex-shrink-0 ${c.icon}`} />
+      <span className={`text-[15px] transition-colors duration-150 ${c.text}`}>{label}</span>
     </button>
   );
 };
