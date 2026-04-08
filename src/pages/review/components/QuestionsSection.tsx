@@ -1,5 +1,5 @@
 import React from "react";
-import { MessageSquare, CheckCircle } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { QuestionItem } from "../../../types/Review";
 
 interface QuestionsSectionProps {
@@ -25,18 +25,9 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
             Questions
           </h2>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            {questions.filter((q) => q.answer.trim().length > 0).length} /{" "}
-            {questions.length}
-          </span>
-          <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+        <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+          {questions.filter((q) => q.answer.trim().length > 0).length}/{questions.length}
+        </span>
       </div>
 
       {/* Questions List */}
@@ -46,17 +37,12 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
             key={question.id}
             className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5"
           >
-            <div className="flex items-start justify-between mb-3">
-              <label
-                htmlFor={`question-${question.id}`}
-                className="text-base font-medium text-slate-700 dark:text-slate-200 flex-1"
-              >
-                {question.question}
-              </label>
-              {question.answer.trim().length > 0 && (
-                <CheckCircle className="w-5 h-5 text-emerald-500 dark:text-emerald-400 ml-2 flex-shrink-0" />
-              )}
-            </div>
+            <label
+              htmlFor={`question-${question.id}`}
+              className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2"
+            >
+              {question.question}
+            </label>
             <textarea
               id={`question-${question.id}`}
               value={question.answer}

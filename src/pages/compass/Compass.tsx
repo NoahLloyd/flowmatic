@@ -5,7 +5,7 @@ import Signals from "./signal/Signals";
 import TimerCompleteModal from "../../components/session/TimerCompleteModal";
 import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
-import { AVAILABLE_SIGNALS } from "../settings/components/SignalSettings";
+import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../settings/components/SignalSettings";
 import DailyTasks from "./DailyTasks";
 import BlockedTasks from "./BlockedTasks";
 import ContextReminder from "./ContextReminder";
@@ -46,6 +46,9 @@ interface CompassProps {
   // Current task
   currentTask?: string;
   onSetCurrentTask?: (task: string) => void;
+  // DND toggle
+  dndEnabled?: boolean;
+  onToggleDnd?: () => void;
 }
 
 const Compass: React.FC<CompassProps> = ({
@@ -71,6 +74,8 @@ const Compass: React.FC<CompassProps> = ({
   sessionMinutes = 60,
   currentTask = "",
   onSetCurrentTask = () => {},
+  dndEnabled = false,
+  onToggleDnd = () => {},
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
   const { user } = useAuth();
@@ -282,14 +287,14 @@ const Compass: React.FC<CompassProps> = ({
 
         // Get the active signals
         const activeSignals = user?.preferences?.activeSignals || [];
+        const allSignals = getAllSignals(
+          user?.preferences?.customSignals as Record<string, SignalConfig> | undefined
+        );
 
         // First, check if we're already in an interaction mode with a selected signal
         if (selectedSignalIndex !== null) {
           const selectedSignalKey = activeSignals[selectedSignalIndex];
-          const selectedSignalConfig =
-            AVAILABLE_SIGNALS[
-              selectedSignalKey as keyof typeof AVAILABLE_SIGNALS
-            ];
+          const selectedSignalConfig = allSignals[selectedSignalKey];
 
           // Handle water signal special case
           if (selectedSignalConfig?.type === "water") {
@@ -365,8 +370,7 @@ const Compass: React.FC<CompassProps> = ({
         // No signal selected yet - get signal info to handle it
         if (index < activeSignals.length && index < signalCards.length) {
           const signalKey = activeSignals[index];
-          const signalConfig =
-            AVAILABLE_SIGNALS[signalKey as keyof typeof AVAILABLE_SIGNALS];
+          const signalConfig = allSignals[signalKey];
           const targetSignalCard = signalCards[index] as HTMLElement;
 
           // Handle different signal types
@@ -497,6 +501,8 @@ const Compass: React.FC<CompassProps> = ({
             onToggleStopwatchMode={onToggleStopwatchMode}
             stopwatchAlertMinutes={user?.preferences?.stopwatchAlertMinutes || 60}
             currentTask={currentTask}
+            dndEnabled={dndEnabled}
+            onToggleDnd={onToggleDnd}
           />
         </div>
 

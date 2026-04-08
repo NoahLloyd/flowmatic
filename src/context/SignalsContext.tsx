@@ -281,6 +281,14 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
       if (error) {
         console.error("Failed to compute daily score:", error);
+        // Fall back to direct DB load so signals still appear
+        await loadSignalsFromDB();
+        return;
+      }
+
+      if (!data?.signals) {
+        console.error("Edge function returned no signals data");
+        await loadSignalsFromDB();
         return;
       }
 
@@ -445,10 +453,45 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
+  // Load today's raw signal values directly from the DB for instant display.
+  // The edge function (refreshSignals) may take a moment or fail; this ensures
+  // the UI shows persisted values immediately on mount.
+  const loadSignalsFromDB = useCallback(async () => {
+    if (!user) return;
+    try {
+      const today = getTodayInUserTimezone();
+      const rows = await api.getSignalRange(today, today);
+      if (Array.isArray(rows) && rows.length > 0) {
+        const dbSignals: Record<string, number | boolean> = {};
+        for (const row of rows) {
+          if (row.metric && !row.metric.startsWith("_")) {
+            dbSignals[row.metric] = row.value;
+          }
+        }
+        // Only merge into existing state so we don't overwrite
+        // optimistic updates that may have happened before this returns
+        setSignals((prev) => {
+          const hasExistingData = Object.keys(prev).some(
+            (k) => prev[k] !== false && prev[k] !== 0
+          );
+          // If we already have meaningful data (e.g., from edge function), skip
+          if (hasExistingData) return prev;
+          return { ...prev, ...dbSignals };
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load signals from DB:", error);
+    }
+  }, [user, timezone]);
+
   // Initial fetch of signal data
   useEffect(() => {
     if (!user) return;
 
+    // Load raw signal values from DB immediately (fast, no edge function)
+    loadSignalsFromDB();
+
+    // Then call the edge function for scoring/streak (may be slower)
     setTimeout(() => {
       refreshSignals();
     }, 100);
