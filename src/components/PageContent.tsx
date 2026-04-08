@@ -19,6 +19,7 @@ import QuickAddTaskModal from "./task/QuickAddTaskModal";
 import QuickAddNoteModal from "./note/QuickAddNoteModal";
 import GlobalQuickAddTask from "./global/GlobalQuickAddTask";
 import GlobalQuickAddNote from "./global/GlobalQuickAddNote";
+import ShortcutsHelpModal from "./global/ShortcutsHelpModal";
 import StreakScreen from "./streak/StreakScreen";
 import { dispatchTaskAdded } from "../utils/taskEvents";
 
@@ -34,6 +35,8 @@ const PageContent = () => {
     useState(false);
   const [isGlobalQuickAddNoteOpen, setIsGlobalQuickAddNoteOpen] =
     useState(false);
+  // State for Shortcuts Help Modal
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   // Track previous selected page so we can return to it from Streak
   const [previousPage, setPreviousPage] = useState("Compass");
 
@@ -73,10 +76,12 @@ const PageContent = () => {
     let quickTaskId: number | undefined;
     let quickNoteId: number | undefined;
     let overlayTaskId: number | undefined;
+    let navigateStreakId: number | undefined;
     if (window.electron?.on) {
       quickTaskId = window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
       quickNoteId = window.electron.on("global-quick-add-note", handleGlobalQuickAddNote);
       overlayTaskId = window.electron.on("task-added-from-overlay", handleTaskAddedFromOverlay);
+      navigateStreakId = window.electron.on("navigate-to-streak", handleOpenStreakScreen);
     }
 
     // Cleanup listeners on unmount
@@ -86,6 +91,7 @@ const PageContent = () => {
         if (quickTaskId !== undefined) window.electron.removeListener("global-quick-add-task", quickTaskId);
         if (quickNoteId !== undefined) window.electron.removeListener("global-quick-add-note", quickNoteId);
         if (overlayTaskId !== undefined) window.electron.removeListener("task-added-from-overlay", overlayTaskId);
+        if (navigateStreakId !== undefined) window.electron.removeListener("navigate-to-streak", navigateStreakId);
       }
     };
   }, [showToast]);
@@ -101,6 +107,14 @@ const PageContent = () => {
         (document.activeElement &&
           document.activeElement.hasAttribute("contenteditable"))
       ) {
+        return;
+      }
+
+      // Global "?" key to open shortcuts help modal
+      if (e.key === "?" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsShortcutsHelpOpen(true);
         return;
       }
 
@@ -490,6 +504,11 @@ const PageContent = () => {
         isOpen={isGlobalQuickAddNoteOpen}
         onClose={() => setIsGlobalQuickAddNoteOpen(false)}
         onAddNote={handleGlobalQuickAddNote}
+      />
+      <ShortcutsHelpModal
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        currentPage={selected}
       />
     </Layout>
   );

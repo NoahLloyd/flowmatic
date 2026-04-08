@@ -249,7 +249,7 @@ const Compass: React.FC<CompassProps> = ({
         onAdjustTime(-60 * 10); // Subtract 10 minutes
         return;
       }
-      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+      if (e.key === "=" && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onAdjustTime(60 * 10); // Add 10 minutes
         return;

@@ -17,56 +17,57 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   onSelect,
   highlight = "none",
 }) => {
-  // Determine background classes based on highlight and selection state
-  const getBackgroundClasses = () => {
+  const getClasses = () => {
     if (highlight === "urgent") {
-      // Sunday - red/urgent indicator
-      return isSelected
-        ? "bg-red-500/40 dark:bg-red-600/50 shadow"
-        : "bg-red-500/30 dark:bg-red-600/40 hover:bg-red-500/40 dark:hover:bg-red-600/50";
+      return {
+        bg: isSelected
+          ? "bg-red-500/20 dark:bg-red-500/15"
+          : "hover:bg-red-500/10 dark:hover:bg-red-500/10",
+        accent: "bg-red-500",
+        icon: "text-red-600 dark:text-red-400",
+        text: "text-red-700 dark:text-red-300 font-semibold",
+      };
     }
     if (highlight === "warning") {
-      // Saturday - amber/warning indicator
-      return isSelected
-        ? "bg-amber-500/40 dark:bg-amber-600/50 shadow"
-        : "bg-amber-500/30 dark:bg-amber-600/40 hover:bg-amber-500/40 dark:hover:bg-amber-600/50";
+      return {
+        bg: isSelected
+          ? "bg-amber-500/20 dark:bg-amber-500/15"
+          : "hover:bg-amber-500/10 dark:hover:bg-amber-500/10",
+        accent: "bg-amber-500",
+        icon: "text-amber-600 dark:text-amber-400",
+        text: "text-amber-700 dark:text-amber-300 font-semibold",
+      };
     }
-    // Default - no highlight
-    return isSelected
-      ? "bg-white/30 dark:bg-slate-800/40 shadow"
-      : "hover:bg-white/20 dark:hover:bg-slate-700/30";
+    return {
+      bg: isSelected
+        ? "bg-white/25 dark:bg-white/[0.08]"
+        : "hover:bg-white/15 dark:hover:bg-white/[0.04]",
+      accent: "bg-slate-700 dark:bg-slate-300",
+      icon: isSelected
+        ? "text-slate-800 dark:text-white"
+        : "text-slate-500 dark:text-slate-400",
+      text: isSelected
+        ? "text-slate-800 dark:text-white font-semibold"
+        : "text-slate-600 dark:text-slate-300 font-medium",
+    };
   };
 
-  // Determine text classes based on highlight
-  const getTextClasses = () => {
-    if (highlight === "urgent") {
-      return "text-red-900 dark:text-red-100 font-semibold";
-    }
-    if (highlight === "warning") {
-      return "text-amber-900 dark:text-amber-100 font-semibold";
-    }
-    return "text-slate-700 dark:text-slate-200 font-medium";
-  };
-
-  // Determine icon classes based on highlight
-  const getIconClasses = () => {
-    if (highlight === "urgent") {
-      return "w-6 h-6 text-red-900 dark:text-red-100";
-    }
-    if (highlight === "warning") {
-      return "w-6 h-6 text-amber-900 dark:text-amber-100";
-    }
-    return "w-6 h-6 text-slate-700 dark:text-slate-200";
-  };
+  const c = getClasses();
 
   return (
     <button
-      className={`flex items-center space-x-2 px-4 my-0 py-3 rounded-xl transition duration-200 ease-in-out text-md ${getBackgroundClasses()}`}
+      className={`relative flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl transition-all duration-150 w-full ${c.bg}`}
       onClick={() => onSelect(label)}
       style={{ border: "none", outline: "none" }}
     >
-      <Icon className={getIconClasses()} />
-      <span className={getTextClasses()}>{label}</span>
+      {/* Left accent bar */}
+      <div
+        className={`absolute left-0.5 top-1/2 -translate-y-1/2 w-[3px] rounded-full transition-all duration-150 ${c.accent} ${
+          isSelected ? "h-5 opacity-100" : "h-0 opacity-0"
+        }`}
+      />
+      <Icon className={`w-5 h-5 transition-colors duration-150 flex-shrink-0 ${c.icon}`} />
+      <span className={`text-sm transition-colors duration-150 ${c.text}`}>{label}</span>
     </button>
   );
 };

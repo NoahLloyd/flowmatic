@@ -21,6 +21,9 @@ let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let overlayType: "task" | "note" = "task";
 let tray: Tray | null = null;
+let signalTray: Tray | null = null;
+let signalTrayIconOutline: Electron.NativeImage | null = null;
+let signalTrayIconFilled: Electron.NativeImage | null = null;
 
 // Default shortcuts
 const DEFAULT_SHORTCUTS = {
@@ -270,6 +273,56 @@ const createWindow = (): void => {
         mainWindow.show();
       }
     });
+
+    // Create a separate signal/streak tray icon (Lucide Flame)
+    try {
+      // Load outline (default) and filled (goal met) flame icons
+      const loadFireIcon = (name: string) => {
+        const path2x = path.join(__dirname, "assets", `${name}@2x.png`);
+        const path1x = path.join(__dirname, "assets", `${name}.png`);
+        const raw = fs.existsSync(path2x)
+          ? nativeImage.createFromPath(path2x)
+          : nativeImage.createFromPath(path1x);
+        const resized = raw.resize({ width: 16, height: 16, quality: "best" });
+        resized.setTemplateImage(true);
+        return resized;
+      };
+
+      signalTrayIconOutline = loadFireIcon("fire-Template");
+      signalTrayIconFilled = loadFireIcon("fire-filled-Template");
+
+      signalTray = new Tray(signalTrayIconOutline);
+      signalTray.setToolTip("Signals & Streak");
+
+      const signalContextMenu = Menu.buildFromTemplate([
+        {
+          label: "Show App",
+          click: () => {
+            if (mainWindow) {
+              mainWindow.show();
+            }
+          },
+        },
+        {
+          label: "Quit",
+          click: () => {
+            app.quit();
+          },
+        },
+      ]);
+
+      signalTray.setContextMenu(signalContextMenu);
+      signalTray.on("click", () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.webContents.send("navigate-to-streak");
+        }
+      });
+
+      console.log("Signal tray created successfully");
+    } catch (signalTrayError) {
+      console.error("Failed to create signal tray:", signalTrayError);
+    }
   } catch (error) {
     console.error("Failed to create tray:", error);
     console.error("Error details:", {
@@ -282,6 +335,14 @@ const createWindow = (): void => {
 ipcMain.on("update-tray", (_event, text: string) => {
   if (tray) {
     tray.setTitle(text);
+  }
+});
+
+ipcMain.on("update-signal-tray", (_event, data: { text: string; goalMet: boolean }) => {
+  if (signalTray) {
+    signalTray.setTitle(data.text);
+    const icon = data.goalMet ? signalTrayIconFilled : signalTrayIconOutline;
+    if (icon) signalTray.setImage(icon);
   }
 });
 

@@ -8,7 +8,7 @@ let listenerId = 0;
 
 contextBridge.exposeInMainWorld("electron", {
   send: (channel: string, data?: any) => {
-    const validChannels = ["show-window", "update-tray", "toggle-timer"];
+    const validChannels = ["show-window", "update-tray", "update-signal-tray", "toggle-timer"];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }
@@ -18,11 +18,13 @@ contextBridge.exposeInMainWorld("electron", {
     const validChannels = [
       "show-window",
       "update-tray",
+      "update-signal-tray",
       "toggle-timer",
       "open-record-modal",
       "global-quick-add-task",
       "global-quick-add-note",
       "task-added-from-overlay",
+      "navigate-to-streak",
     ];
     if (validChannels.includes(channel)) {
       const id = listenerId++;
@@ -38,11 +40,13 @@ contextBridge.exposeInMainWorld("electron", {
     const validChannels = [
       "show-window",
       "update-tray",
+      "update-signal-tray",
       "toggle-timer",
       "open-record-modal",
       "global-quick-add-task",
       "global-quick-add-note",
       "task-added-from-overlay",
+      "navigate-to-streak",
     ];
     if (validChannels.includes(channel)) {
       if (typeof idOrFunc === "number") {

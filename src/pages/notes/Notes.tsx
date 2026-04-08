@@ -124,12 +124,8 @@ const Notes: React.FC = () => {
     fetchNotes();
   }, []);
 
-  // Focus the new note textarea when the component loads
-  useEffect(() => {
-    if (newNoteRef.current) {
-      newNoteRef.current.focus();
-    }
-  }, []);
+  // Focus the new note textarea when clicked into, not on page load
+  // (auto-focusing on mount steals focus from keyboard navigation)
 
   // Focus the tag input when shown
   useEffect(() => {
@@ -141,17 +137,8 @@ const Notes: React.FC = () => {
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent 'n' from being added to input when using navigation shortcut
-      if (
-        e.key === "n" &&
-        (e.target as HTMLElement).tagName !== "TEXTAREA" &&
-        (e.target as HTMLElement).tagName !== "INPUT"
-      ) {
-        e.preventDefault();
-        if (newNoteRef.current) {
-          newNoteRef.current.focus();
-        }
-      }
+      // Let 'n' pass through for sidebar navigation — don't intercept it
+
 
       // Handle Escape key to blur active element
       if (e.key === "Escape") {
