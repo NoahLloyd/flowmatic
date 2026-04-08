@@ -152,7 +152,6 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
         <Sidebar
           selected={selected}
           onSelect={setSelected}
-          currentTask={currentTask}
           timerProps={
             displaySidebarTimer
               ? {
