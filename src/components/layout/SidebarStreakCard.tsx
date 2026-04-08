@@ -101,11 +101,7 @@ const SidebarStreakCard: React.FC<SidebarStreakCardProps> = ({
             </span>
           </div>
         </div>
-        {streakDanger && streak > 0 && (
-          <p className="text-[10px] text-red-400/50 mt-2 leading-snug">
-            Complete today's signals to keep your streak
-          </p>
-        )}
+        {/* Red color on the streak number is sufficient danger indicator */}
       </div>
 
       {/* ── Progress bar as separator ── */}

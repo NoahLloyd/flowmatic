@@ -10,7 +10,10 @@ import {
   StickyNote,
   ClipboardList,
 } from "lucide-react";
+import logoImage from "../../assets/logo-black-Template.png";
+import logoDarkImage from "../../assets/logo-white-Template.png";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import SidebarTimer from "./SidebarTimer";
 import { api } from "../../utils/api";
 import { useSignals } from "../../context/SignalsContext";
@@ -35,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentTask,
 }) => {
   const { user } = useAuth();
+  const { isDarkMode } = useTheme();
 
   const [isReviewCompleted, setIsReviewCompleted] = useState(true);
   const [isReviewStatusLoaded, setIsReviewStatusLoaded] = useState(false);
@@ -156,7 +160,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   const signalGoal = user?.preferences?.signalPercentageGoal || 75;
 
   return (
-    <div className="w-60 flex flex-col pr-4">
+    <div className="w-64 flex flex-col pr-4">
+      {/* Logo */}
+      <div className="p-4 mb-4 flex items-center bg-white/10 dark:bg-slate-800/30 border-white/20 dark:border-slate-700/60 rounded-xl border">
+        <img
+          src={isDarkMode ? logoDarkImage : logoImage}
+          alt="Logo"
+          className="w-8 h-8 mr-4"
+        />
+        <h1 className="text-lg font-medium text-slate-700 dark:text-slate-200">
+          Flowmatic
+        </h1>
+      </div>
+
       {/* Navigation */}
       <nav className="space-y-0.5">
         {navItems.map((item) => (

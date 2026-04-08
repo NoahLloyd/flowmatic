@@ -52,7 +52,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
   const { timezone } = useTimezone();
   // Use the Signals context instead of local state
-  const { signals, updateSignal, refreshSignals, signalScore, signalStreak, signalStreakDanger } = useSignals();
+  const { signals, updateSignal, refreshSignals, signalScore, signalStreak, signalStreakDanger, totalSignals } = useSignals();
 
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -296,7 +296,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
         </h2>
-        {(signalStreak > 0 || signalStreakDanger) && (() => {
+        {(signalStreak > 0 || signalStreakDanger || totalSignals > 0) && (() => {
           const goalMet = signalScore >= (user?.preferences?.signalPercentageGoal || 75);
           const pillClass = signalStreakDanger
             ? "bg-red-500/10 dark:bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-500/20"
