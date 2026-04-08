@@ -150,7 +150,6 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
       {/* Sidebar with timer and title */}
       {!isFocusMode && (
         <Sidebar
-          title="User"
           selected={selected}
           onSelect={setSelected}
           timerProps={

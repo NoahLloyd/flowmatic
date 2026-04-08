@@ -295,6 +295,13 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       setSignalStreakLongest(data.streak.longest);
       setSignalStreakMilestones(data.streak.milestones);
 
+      // Update the signal tray in the menu bar
+      if (window.electron?.send) {
+        const signalGoal = user?.preferences?.signalPercentageGoal || 75;
+        const trayText = data.streak.count > 0 ? ` ${data.streak.count} · ${data.score}%` : ` ${data.score}%`;
+        window.electron.send("update-signal-tray", { text: trayText, goalMet: data.score >= signalGoal });
+      }
+
       // Cache in localStorage for instant display on next load
       localStorage.setItem("signalStreak", String(data.streak.count));
       localStorage.setItem("signalStreakDanger", String(data.streak.danger));

@@ -5,7 +5,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../../../pages/settings/components/SignalSettings";
 import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
 import { useSignals } from "../../../context/SignalsContext";
-import { Flame } from "lucide-react";
+
 import { useTimezone } from "../../../context/TimezoneContext";
 import { MorningEntry } from "../../../types/Morning";
 
@@ -52,7 +52,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
   const { timezone } = useTimezone();
   // Use the Signals context instead of local state
-  const { signals, updateSignal, refreshSignals, signalStreak, signalStreakDanger } = useSignals();
+  const { signals, updateSignal, refreshSignals, signalScore, signalStreak, signalStreakDanger } = useSignals();
 
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
@@ -296,19 +296,28 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
         </h2>
-        {(signalStreak > 0 || signalStreakDanger) && (
-          <span
-            onClick={() => window.dispatchEvent(new CustomEvent("openStreakScreen"))}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-              signalStreakDanger
-                ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
-          >
-            <Flame className="w-3 h-3" />
-            {signalStreak} day{signalStreak !== 1 ? "s" : ""}
-          </span>
-        )}
+        {(signalStreak > 0 || signalStreakDanger) && (() => {
+          const goalMet = signalScore >= (user?.preferences?.signalPercentageGoal || 75);
+          const pillClass = signalStreakDanger
+            ? "bg-red-500/10 dark:bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-500/20"
+            : goalMet
+              ? "bg-emerald-500/10 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/20"
+              : "bg-orange-500/10 dark:bg-orange-500/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500/20";
+          const flameColor = signalStreakDanger ? "#ef4444" : goalMet ? "#22c55e" : "#f97316";
+          const glowColor = signalStreakDanger ? "#fca5a5" : goalMet ? "#86efac" : "#fde047";
+          return (
+            <span
+              onClick={() => window.dispatchEvent(new CustomEvent("openStreakScreen"))}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${pillClass}`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1.5C12 1.5 5 8.5 5 14C5 18.1 8.1 21.5 12 21.5C15.9 21.5 19 18.1 19 14C19 8.5 12 1.5 12 1.5Z" fill={flameColor} />
+                <path d="M12 9C12 9 8.5 12.5 8.5 15.2C8.5 17.3 10.1 19 12 19C13.9 19 15.5 17.3 15.5 15.2C15.5 12.5 12 9 12 9Z" fill={glowColor} />
+              </svg>
+              <span className="tabular-nums">{signalStreak}</span>
+            </span>
+          );
+        })()}
       </div>
       <div className="p-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

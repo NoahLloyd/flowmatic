@@ -20,7 +20,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     // Check localStorage for saved preference, default to "system"
     const saved = localStorage.getItem("themeMode") as ThemeMode | null;
-    return saved && ["light", "dark", "system"].includes(saved) ? saved : "system";
+    return saved && ["light", "dark", "system"].includes(saved) ? saved : "dark";
   });
 
   const [systemPrefersDark, setSystemPrefersDark] = useState(getSystemPreference);

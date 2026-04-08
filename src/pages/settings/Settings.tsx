@@ -15,6 +15,9 @@ import {
   Globe,
   ClipboardList,
   Keyboard,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useTimezone } from "../../context/TimezoneContext";
@@ -78,7 +81,7 @@ const getUserTimezone = () => {
 
 const Settings = () => {
   const { user, updateUserPreferences, logout } = useAuth();
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, themeMode, setThemeMode } = useTheme();
   const {
     timezone: currentTimezone,
     setTimezone: updateAppTimezone,
@@ -700,6 +703,34 @@ const Settings = () => {
             </h2>
           </div>
           <div className="p-5 space-y-4">
+            {/* Theme Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Theme
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: "light" as const, label: "Light", Icon: Sun },
+                  { value: "dark" as const, label: "Dark", Icon: Moon },
+                  { value: "system" as const, label: "System", Icon: Monitor },
+                ]).map(({ value, label, Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => setThemeMode(value)}
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm transition-colors ${
+                      themeMode === value
+                        ? "bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900"
+                        : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color Scheme */}
             <div>
               <div className="flex justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
