@@ -264,6 +264,9 @@ const PageContent = () => {
     // Current task
     currentTask,
     setCurrentTask,
+    // DND toggle
+    dndEnabled,
+    toggleDnd,
   } = useTimer(directNavigate); // Pass the direct navigation function
 
   const {
@@ -428,14 +431,67 @@ const PageContent = () => {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex h-screen overflow-hidden p-4 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-800 dark:to-slate-900">
+        {/* Skeleton sidebar */}
+        <div className="w-48 flex-shrink-0 mr-4 flex flex-col gap-3 py-4 px-3">
+          {/* Logo */}
+          <div className="h-8 w-24 rounded-lg bg-white/30 dark:bg-white/5 animate-pulse mb-4" />
+          {/* Nav items */}
+          {[...Array(7)].map((_, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <div className="w-5 h-5 rounded bg-white/20 dark:bg-white/5 animate-pulse" />
+              <div
+                className="h-4 rounded bg-white/20 dark:bg-white/5 animate-pulse"
+                style={{ width: `${60 + (i * 13) % 40}px`, animationDelay: `${i * 80}ms` }}
+              />
+            </div>
+          ))}
+          {/* Score card skeleton */}
+          <div className="mt-auto h-20 rounded-xl bg-white/20 dark:bg-white/5 animate-pulse" />
+        </div>
+
+        {/* Skeleton main content */}
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg p-6 flex flex-col gap-5 overflow-hidden">
+          {/* Top bar */}
+          <div className="flex items-center justify-between">
+            <div className="h-5 w-32 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-5 w-16 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+              <div className="h-5 w-5 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            </div>
+          </div>
+
+          {/* Timer area skeleton */}
+          <div className="h-48 rounded-lg bg-slate-50 dark:bg-slate-800/50 animate-pulse" style={{ animationDelay: "100ms" }} />
+
+          {/* Signal cards row */}
+          <div className="grid grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="h-20 rounded-lg bg-slate-50 dark:bg-slate-800/50 animate-pulse"
+                style={{ animationDelay: `${150 + i * 80}ms` }}
+              />
+            ))}
+          </div>
+
+          {/* Tasks area */}
+          <div className="flex gap-3 flex-1 min-h-0">
+            <div className="flex-1 rounded-lg bg-slate-50 dark:bg-slate-800/50 animate-pulse" style={{ animationDelay: "450ms" }} />
+            <div className="flex-1 rounded-lg bg-slate-50 dark:bg-slate-800/50 animate-pulse" style={{ animationDelay: "530ms" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Auth />;
   }
 
   let content;
-  if (!isAuthenticated) {
-    content = <Auth />;
-  } else {
-    switch (selected) {
+  switch (selected) {
       case "Compass":
         content = (
           <Compass
@@ -459,6 +515,8 @@ const PageContent = () => {
             sessionMinutes={sessionMinutes}
             currentTask={currentTask}
             onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
+            dndEnabled={dndEnabled}
+            onToggleDnd={toggleDnd}
           />
         );
         break;
@@ -501,7 +559,6 @@ const PageContent = () => {
       default:
         content = <div>Select a page from the sidebar</div>;
     }
-  }
 
   return (
     <Layout selected={selected} setSelected={setSelected}>

@@ -40,12 +40,38 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const defaultMinutes = user?.preferences?.defaultMinutes || 60;
   const defaultSeconds = defaultMinutes * 60;
 
-  // Get auto Do Not Disturb preference
-  const autoDoNotDisturb = user?.preferences?.autoDoNotDisturb || false;
+  // DND toggle — persisted in localStorage, independent of settings preference
+  const [dndEnabled, setDndEnabled] = useState<boolean>(() => {
+    const stored = localStorage.getItem("timerDndEnabled");
+    if (stored !== null) return stored === "true";
+    // Default to the user preference
+    return user?.preferences?.autoDoNotDisturb || false;
+  });
+
+  // Sync default when user prefs load for the first time
+  useEffect(() => {
+    if (localStorage.getItem("timerDndEnabled") === null && user?.preferences?.autoDoNotDisturb !== undefined) {
+      setDndEnabled(user.preferences.autoDoNotDisturb);
+    }
+  }, [user?.preferences?.autoDoNotDisturb]);
+
+  const toggleDnd = () => {
+    setDndEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("timerDndEnabled", String(next));
+      // Immediately turn off system DND when disabling
+      if (!next && window.electron?.setDoNotDisturb) {
+        window.electron.setDoNotDisturb(false).catch((error: Error) => {
+          console.error("Failed to disable Do Not Disturb:", error);
+        });
+      }
+      return next;
+    });
+  };
 
   // Helper function to set Do Not Disturb
   const setDoNotDisturb = (enabled: boolean) => {
-    if (autoDoNotDisturb && window.electron?.setDoNotDisturb) {
+    if (dndEnabled && window.electron?.setDoNotDisturb) {
       window.electron.setDoNotDisturb(enabled).catch((error: Error) => {
         console.error("Failed to set Do Not Disturb:", error);
       });
@@ -984,5 +1010,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Current task
     currentTask,
     setCurrentTask,
+    // DND toggle
+    dndEnabled,
+    toggleDnd,
   };
 };

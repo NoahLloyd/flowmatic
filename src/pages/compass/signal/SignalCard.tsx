@@ -437,6 +437,17 @@ const SignalCard = ({
   };
 
   const renderNumber = () => {
+    const hasValue = typeof value === "number" && value > 0;
+    const displayUnit = unit || "";
+
+    // For minutesToOffice, use time-based coloring. For others with goals, use goal-based. Otherwise neutral.
+    const getNumberColor = () => {
+      if (!hasValue) return "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-500";
+      if (metric === "minutesToOffice") return getTimeColor(value as number);
+      if (goalValue) return getColorBasedOnGoal(value, type);
+      return "bg-gray-900 dark:bg-white text-white dark:text-gray-900";
+    };
+
     return (
       <div
         onClick={() => {
@@ -446,7 +457,7 @@ const SignalCard = ({
         className={`w-full text-center py-1.5 px-2 text-sm font-medium rounded-md cursor-pointer ${
           isEditing
             ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-gray-200"
-            : getTimeColor(value as number)
+            : getNumberColor()
         }`}
       >
         {isEditing ? (
@@ -465,7 +476,7 @@ const SignalCard = ({
           />
         ) : (
           <div className="h-6 flex items-center justify-center">
-            {value} min
+            {hasValue ? `${value}${displayUnit ? ` ${displayUnit}` : ""}` : `-- ${displayUnit}`.trim()}
           </div>
         )}
       </div>

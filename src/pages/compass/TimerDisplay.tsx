@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pause, Play, RefreshCw, Save } from "lucide-react";
+import { Moon, Pause, Play, RefreshCw, Save } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -14,6 +14,8 @@ interface TimerDisplayProps {
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
   stopwatchAlertMinutes?: number;
+  dndEnabled?: boolean;
+  onToggleDnd?: () => void;
 }
 
 const WaveComponent = ({
@@ -84,6 +86,8 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   isStopwatchMode = false,
   onToggleStopwatchMode = () => {},
   stopwatchAlertMinutes = 60,
+  dndEnabled = false,
+  onToggleDnd = () => {},
 }) => {
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
@@ -165,13 +169,24 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center">
+      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center justify-between">
         <h2
           className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
           onClick={onToggleStopwatchMode}
         >
           {isStopwatchMode ? "Stopwatch" : "Timer"}
         </h2>
+        <button
+          onClick={onToggleDnd}
+          className={`p-1 rounded-md transition-colors ${
+            dndEnabled
+              ? "text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+              : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+          }`}
+          title={dndEnabled ? "Do Not Disturb: on" : "Do Not Disturb: off"}
+        >
+          <Moon size={16} fill={dndEnabled ? "currentColor" : "none"} />
+        </button>
       </div>
       <div
         className="relative flex flex-col w-full items-center justify-center overflow-hidden flex-1"
