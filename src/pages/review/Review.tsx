@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
   Flame,
   Check,
   Loader,
@@ -8,6 +9,7 @@ import {
   Inbox,
   Plus,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
@@ -63,6 +65,14 @@ const serializeInboxItems = (items: InboxItem[]): string[] =>
   items.map((item) =>
     JSON.stringify({ id: item.id, text: item.text, checked: item.checked })
   );
+
+// Format a Date as YYYY-MM-DD in local time (avoids UTC shift from toISOString)
+const toLocalDateString = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
 
 // Helper to format a date as YYYY-MM-DD in a specific timezone
 const formatDateInTimezone = (date: Date, timezone: string): string => {
@@ -139,41 +149,41 @@ const getReviewWeekStart = (date: Date, timezone: string): string => {
     const monday = new Date(
       date.getTime() - daysToSubtract * 24 * 60 * 60 * 1000
     );
-    return monday.toISOString().split("T")[0];
+    return toLocalDateString(monday);
   }
 };
 
 // Helper to get the Sunday (end of the review week)
 const getWeekEnd = (weekStart: string): string => {
-  const monday = new Date(weekStart);
+  const monday = new Date(weekStart + "T00:00:00");
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  return sunday.toISOString().split("T")[0];
+  return toLocalDateString(sunday);
 };
 
 // Check if the review is currently in its editable window (Friday of the week through Tuesday after)
 const isInEditableWindow = (weekStart: string, date: Date, timezone: string): boolean => {
   const day = getDayOfWeekInTimezone(date, timezone);
   const todayStr = formatDateInTimezone(date, timezone);
-  const monday = new Date(weekStart);
+  const monday = new Date(weekStart + "T00:00:00");
 
   // Friday of the review week (day 4 after Monday)
   const friday = new Date(monday);
   friday.setDate(monday.getDate() + 4);
-  const fridayStr = friday.toISOString().split("T")[0];
+  const fridayStr = toLocalDateString(friday);
 
   // Tuesday after the review week (day 8 after Monday)
   const tuesday = new Date(monday);
   tuesday.setDate(monday.getDate() + 8);
-  const tuesdayStr = tuesday.toISOString().split("T")[0];
+  const tuesdayStr = toLocalDateString(tuesday);
 
   return todayStr >= fridayStr && todayStr <= tuesdayStr;
 };
 
 // Format week range for display
 const formatWeekRange = (weekStart: string, weekEnd: string): string => {
-  const start = new Date(weekStart);
-  const end = new Date(weekEnd);
+  const start = new Date(weekStart + "T00:00:00");
+  const end = new Date(weekEnd + "T00:00:00");
   const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
@@ -189,15 +199,53 @@ const Review: React.FC = () => {
   const { timezone } = useTimezone();
   const { showToast } = useToast();
 
-  // Current week dates
-  const [weekStart, setWeekStart] = useState(() =>
-    getReviewWeekStart(new Date(), timezone)
-  );
+  // The "home" week is the one getReviewWeekStart picks for today
+  const homeWeekStart = getReviewWeekStart(new Date(), timezone);
+
+  // Current week dates (may be navigated to a past week)
+  const [weekStart, setWeekStart] = useState(() => homeWeekStart);
   const [weekEnd, setWeekEnd] = useState(() => getWeekEnd(weekStart));
 
+  // Whether viewing a past (non-home) week — always read-only
+  const isViewingPast = weekStart !== homeWeekStart;
+
   // Whether the current date falls in the review focus window (Fri-Tue).
-  // Used only for sidebar urgency badge — editing is always allowed.
   const inReviewWindow = isInEditableWindow(weekStart, new Date(), timezone);
+
+  // Collapsible sections (questionHistory collapsed by default)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    new Set(["questionHistory"])
+  );
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Week navigation
+  const goToPreviousWeek = () => {
+    const monday = new Date(weekStart + "T00:00:00");
+    monday.setDate(monday.getDate() - 7);
+    const newStart = toLocalDateString(monday);
+    setWeekStart(newStart);
+    setWeekEnd(getWeekEnd(newStart));
+  };
+  const goToNextWeek = () => {
+    const monday = new Date(weekStart + "T00:00:00");
+    monday.setDate(monday.getDate() + 7);
+    const newStart = toLocalDateString(monday);
+    // Don't go past the home week
+    if (newStart > homeWeekStart) return;
+    setWeekStart(newStart);
+    setWeekEnd(getWeekEnd(newStart));
+  };
+  const goToCurrentWeek = () => {
+    setWeekStart(homeWeekStart);
+    setWeekEnd(getWeekEnd(homeWeekStart));
+  };
 
   // Review state
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -236,30 +284,52 @@ const Review: React.FC = () => {
 
   // Initialize checklist and questions with saved data or defaults
   const initializeForm = useCallback(
-    (savedReview: WeeklyReview | null) => {
+    (savedReview: WeeklyReview | null, viewOnly: boolean) => {
       const checklistConfig = getChecklistConfig();
       const questionsConfig = getQuestionsConfig();
 
       if (savedReview) {
-        // Merge saved data with config (in case config has new items)
-        const mergedChecklist = checklistConfig.map((item) => {
-          const saved = savedReview.checklist.find((c) => c.id === item.id);
-          return {
-            ...item,
-            checked: saved?.checked || false,
-          };
-        });
+        if (viewOnly) {
+          // For past reviews, always prefer saved data directly so that
+          // answers / checked state are displayed even if config has changed.
+          const savedChecklist = savedReview.checklist ?? [];
+          const savedQuestions = savedReview.questions ?? [];
 
-        const mergedQuestions = questionsConfig.map((item) => {
-          const saved = savedReview.questions.find((q) => q.id === item.id);
-          return {
-            ...item,
-            answer: saved?.answer || "",
-          };
-        });
+          setChecklist(
+            savedChecklist.length > 0
+              ? savedChecklist
+              : checklistConfig.map((item) => ({ ...item, checked: false }))
+          );
+          setQuestions(
+            savedQuestions.length > 0
+              ? savedQuestions
+              : questionsConfig.map((item) => ({ ...item, answer: "" }))
+          );
+        } else {
+          // For current week, merge saved data with latest config
+          const savedChecklist = savedReview.checklist ?? [];
+          const savedQuestions = savedReview.questions ?? [];
 
-        setChecklist(mergedChecklist);
-        setQuestions(mergedQuestions);
+          const mergedChecklist = checklistConfig.map((item) => {
+            const saved = savedChecklist.find((c) => c.id === item.id);
+            return {
+              ...item,
+              checked: saved?.checked || false,
+            };
+          });
+
+          const mergedQuestions = questionsConfig.map((item) => {
+            const saved = savedQuestions.find((q) => q.id === item.id);
+            return {
+              ...item,
+              answer: saved?.answer || "",
+            };
+          });
+
+          setChecklist(mergedChecklist);
+          setQuestions(mergedQuestions);
+        }
+
         setIsCompleted(savedReview.is_completed);
         setIsEditing(!savedReview.is_completed);
         // Load inbox items if they exist
@@ -283,8 +353,17 @@ const Review: React.FC = () => {
     [getChecklistConfig, getQuestionsConfig]
   );
 
-  // Load review data
+  // Load review data — only re-run when weekStart changes.
+  // We deliberately exclude initializeForm from deps to avoid
+  // re-fetching every time user prefs settle (which recreates
+  // getChecklistConfig → initializeForm). Instead we use a ref.
+  const initializeFormRef = React.useRef(initializeForm);
+  initializeFormRef.current = initializeForm;
+
+
   useEffect(() => {
+    let cancelled = false;
+
     const loadReview = async () => {
       setIsLoading(true);
       try {
@@ -293,18 +372,29 @@ const Review: React.FC = () => {
           api.getReviewStreak(),
         ]);
 
-        initializeForm(review);
+        if (cancelled) return;
+
+        const viewOnly = weekStart !== homeWeekStart;
+        initializeFormRef.current(review, viewOnly);
         setStreak(streakData);
       } catch (error) {
         console.error("Failed to load review:", error);
-        initializeForm(null);
+        if (!cancelled) {
+          initializeFormRef.current(null, false);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadReview();
-  }, [weekStart, initializeForm]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [weekStart, homeWeekStart]);
 
   // Update week start when timezone changes
   useEffect(() => {
@@ -346,9 +436,9 @@ const Review: React.FC = () => {
     []
   );
 
-  // Auto-save when data changes
+  // Auto-save when data changes (only for the current/home week)
   useEffect(() => {
-    if (!isLoading && (checklist.length > 0 || questions.length > 0)) {
+    if (!isLoading && !isViewingPast && (checklist.length > 0 || questions.length > 0)) {
       debouncedSave(weekStart, checklist, questions, isCompleted, inboxItems);
     }
   }, [
@@ -357,6 +447,7 @@ const Review: React.FC = () => {
     isCompleted,
     weekStart,
     isLoading,
+    isViewingPast,
     debouncedSave,
     inboxItems,
   ]);
@@ -480,236 +571,279 @@ const Review: React.FC = () => {
     (checklistProgress + questionsProgress) / 2
   );
 
+  // Effective editing state: can't edit past weeks
+  const canEdit = isEditing && !isViewingPast;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader className="w-8 h-8 animate-spin text-slate-400" />
+        <Loader className="w-6 h-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
+  const nextWeekDisabled = weekStart >= homeWeekStart;
+
   return (
     <div className="max-w-4xl mx-auto p-8">
-      {/* Header - no title, just info bar */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <Calendar className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-              <span className="text-slate-700 dark:text-slate-200 font-medium">
-                {formatWeekRange(weekStart, weekEnd)}
-              </span>
-            </div>
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Week navigation */}
+          <button
+            onClick={goToPreviousWeek}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={goToCurrentWeek}
+            className="text-sm font-medium text-slate-800 dark:text-slate-100 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+          >
+            {formatWeekRange(weekStart, weekEnd)}
+          </button>
+          <button
+            onClick={goToNextWeek}
+            disabled={nextWeekDisabled}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
 
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <span className="text-slate-700 dark:text-slate-200">
-                {streak.current_streak} week streak
-              </span>
-            </div>
-
-            {/* Progress indicator */}
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="w-24 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-300"
-                  style={{ width: `${overallProgress}%` }}
-                />
-              </div>
-              <span className="text-sm text-slate-600 dark:text-slate-300">
-                {overallProgress}%
-              </span>
-            </div>
-
-            {isCompleted && (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                <CheckCircle2 className="w-4 h-4 mr-1" />
-                Done
-              </span>
-            )}
-
-            {!inReviewWindow && !isCompleted && (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                Review window: Fri-Tue
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400 min-w-[80px] justify-end">
-            <span
-              className={`flex items-center transition-opacity duration-200 ${
-                isSaving ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              <Loader className="w-4 h-4 animate-spin mr-1" />
-              Saving...
+          {isViewingPast && (
+            <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
+              View only
             </span>
+          )}
+
+          {isCompleted && (
+            <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Done
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {streak.current_streak > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <Flame className="w-3.5 h-3.5 text-orange-400" />
+              {streak.current_streak}w
+            </span>
+          )}
+          <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+            {overallProgress}%
+          </span>
+          <div className="w-16 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-slate-400 dark:bg-slate-500 transition-all duration-300 rounded-full"
+              style={{ width: `${overallProgress}%` }}
+            />
           </div>
+          <span
+            className={`flex items-center text-xs text-slate-400 transition-opacity duration-200 ${
+              isSaving ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <Loader className="w-3 h-3 animate-spin mr-1" />
+            Saving
+          </span>
         </div>
       </div>
 
-      {/* Week in Review - Look Back */}
-      <WeekInReview weekStart={weekStart} weekEnd={weekEnd} />
+      {/* Week in Review - collapsible */}
+      <CollapsibleSection
+        title="Week in Review"
+        collapsed={collapsedSections.has("weekInReview")}
+        onToggle={() => toggleSection("weekInReview")}
+      >
+        <WeekInReview weekStart={weekStart} weekEnd={weekEnd} />
+      </CollapsibleSection>
 
-      {/* Quick Capture Inbox */}
-      <div className="mb-8">
-        <div className="flex items-center space-x-2 mb-3">
-          <Inbox className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          <h2 className="text-lg font-medium text-slate-800 dark:text-slate-100">
-            Inbox
-          </h2>
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            Quick capture throughout the week
-          </span>
-        </div>
+      {/* Quick Capture Inbox - collapsible */}
+      <CollapsibleSection
+        title={`Inbox${inboxItems.length > 0 ? ` (${inboxItems.length})` : ""}`}
+        collapsed={collapsedSections.has("inbox")}
+        onToggle={() => toggleSection("inbox")}
+      >
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+          {!isViewingPast && (
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="text"
+                value={newInboxItem}
+                onChange={(e) => setNewInboxItem(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddInboxItem();
+                  if (e.key === "Escape") (e.target as HTMLInputElement).blur();
+                }}
+                placeholder="Capture something..."
+                disabled={!canEdit}
+                className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-md text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              />
+              <button
+                onClick={handleAddInboxItem}
+                disabled={!canEdit}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-30"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-          {/* Add new item */}
-          <div className="flex items-center space-x-2 mb-3">
-            <input
-              type="text"
-              value={newInboxItem}
-              onChange={(e) => setNewInboxItem(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddInboxItem();
-                if (e.key === "Escape") (e.target as HTMLInputElement).blur();
-              }}
-              placeholder="Drop something here to process during review..."
-              disabled={!isEditing}
-              className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-            />
-            <button
-              onClick={handleAddInboxItem}
-              disabled={!isEditing}
-              className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-            </button>
-          </div>
-
-          {/* Inbox items list */}
           {inboxItems.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {inboxItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-900/50 rounded-lg"
+                  className="flex items-center justify-between py-1.5 px-2 rounded-md group"
                 >
                   <button
                     onClick={() => handleToggleInboxItem(item.id)}
-                    disabled={!isEditing}
+                    disabled={!canEdit}
                     className="flex items-center flex-1 text-left"
                   >
                     <div
-                      className={`
-                        w-5 h-5 rounded-md border-2 flex items-center justify-center mr-3 transition-all
-                        ${
-                          item.checked
-                            ? "bg-emerald-500 border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
-                            : "border-slate-300 dark:border-slate-600"
-                        }
-                      `}
+                      className={`w-4 h-4 rounded border flex items-center justify-center mr-2.5 transition-all flex-shrink-0 ${
+                        item.checked
+                          ? "bg-slate-500 border-slate-500 dark:bg-slate-400 dark:border-slate-400"
+                          : "border-slate-300 dark:border-slate-600"
+                      }`}
                     >
-                      {item.checked && (
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      )}
+                      {item.checked && <Check className="w-3 h-3 text-white dark:text-slate-900" />}
                     </div>
                     <span
-                      className={`
-                        text-slate-700 dark:text-slate-200 transition-all
-                        ${
-                          item.checked
-                            ? "text-slate-400 dark:text-slate-500 line-through"
-                            : ""
-                        }
-                      `}
+                      className={`text-sm ${
+                        item.checked
+                          ? "text-slate-400 dark:text-slate-500 line-through"
+                          : "text-slate-700 dark:text-slate-200"
+                      }`}
                     >
                       {item.text}
                     </span>
                   </button>
-                  <button
-                    onClick={() => handleRemoveInboxItem(item.id)}
-                    disabled={!isEditing}
-                    className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1 ml-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                    aria-label="Delete inbox item"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => handleRemoveInboxItem(item.id)}
+                      className="text-slate-300 hover:text-red-400 dark:text-slate-600 dark:hover:text-red-400 p-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-2">
-              Empty inbox - add items throughout the week
+            <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-2">
+              No items
             </p>
           )}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* Checklist Section */}
+      {/* Checklist Section - always visible (core) */}
       <ChecklistSection
         items={checklist}
         onToggle={handleChecklistToggle}
         progress={checklistProgress}
-        disabled={!isEditing}
+        disabled={!canEdit}
       />
 
-      {/* Questions Section */}
+      {/* Questions Section - always visible (core) */}
       <QuestionsSection
         questions={questions}
         onChange={handleQuestionChange}
         progress={questionsProgress}
-        disabled={!isEditing}
+        disabled={!canEdit}
       />
 
-      {/* Question History - See past responses */}
-      <QuestionHistory />
+      {/* Question History - collapsible */}
+      <CollapsibleSection
+        title="Question History"
+        collapsed={collapsedSections.has("questionHistory")}
+        onToggle={() => toggleSection("questionHistory")}
+      >
+        <QuestionHistory />
+      </CollapsibleSection>
 
-      {/* Plan Next Week - Task management */}
-      <WeeklyTaskPlanner disabled={!isEditing} />
+      {/* Plan Next Week - collapsible */}
+      {!isViewingPast && (
+        <CollapsibleSection
+          title="Plan Next Week"
+          collapsed={collapsedSections.has("taskPlanner")}
+          onToggle={() => toggleSection("taskPlanner")}
+        >
+          <WeeklyTaskPlanner disabled={!canEdit} />
+        </CollapsibleSection>
+      )}
 
-      {/* Complete Button - minimal modern style */}
-      <div className="mt-10 flex justify-center">
-        <div className="flex items-center space-x-3">
-          {isCompleted && (
+      {/* Complete / Edit buttons - only for current week */}
+      {!isViewingPast && (
+        <div className="mt-10 flex justify-center">
+          <div className="flex items-center gap-3">
+            {isCompleted && (
+              <button
+                onClick={handleEditAgain}
+                className="px-5 py-2.5 rounded-md text-sm font-medium transition-colors border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                Edit again
+              </button>
+            )}
+
             <button
-              onClick={handleEditAgain}
-              className="px-6 py-3 rounded-lg font-medium transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              Edit again
-            </button>
-          )}
-
-          <button
-            onClick={handleCompleteReview}
-            disabled={isCompleting || isCompleted || !isReviewReadyToComplete}
-            className={`
-              px-6 py-3 rounded-lg font-medium transition-all
-              ${
+              onClick={handleCompleteReview}
+              disabled={isCompleting || isCompleted || !isReviewReadyToComplete}
+              className={`px-5 py-2.5 rounded-md text-sm font-medium transition-colors ${
                 isCompleted
                   ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-default"
                   : isReviewReadyToComplete
                   ? "bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900"
-                  : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-              }
-            `}
-          >
-            {isCompleting ? (
-              <span className="flex items-center">
-                <Loader className="w-4 h-4 animate-spin mr-2" />
-                Completing...
-              </span>
-            ) : isCompleted ? (
-              <span className="flex items-center">
-                <Check className="w-4 h-4 mr-2" />
-                Completed
-              </span>
-            ) : (
-              "Complete Review"
-            )}
-          </button>
+                  : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed"
+              }`}
+            >
+              {isCompleting ? (
+                <span className="flex items-center">
+                  <Loader className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  Completing...
+                </span>
+              ) : isCompleted ? (
+                <span className="flex items-center">
+                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                  Completed
+                </span>
+              ) : (
+                "Complete Review"
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+    </div>
+  );
+};
+
+// --- Collapsible section wrapper ---
+
+const CollapsibleSection: React.FC<{
+  title: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ title, collapsed, onToggle, children }) => {
+  return (
+    <div className="mb-6">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1.5 mb-3 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+      >
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${
+            collapsed ? "-rotate-90" : ""
+          }`}
+        />
+        {title}
+      </button>
+      {!collapsed && children}
     </div>
   );
 };

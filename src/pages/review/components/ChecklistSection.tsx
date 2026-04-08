@@ -25,17 +25,9 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
             Checklist
           </h2>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-slate-500 dark:text-slate-400">
-            {items.filter((i) => i.checked).length} / {items.length}
-          </span>
-          <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 dark:bg-emerald-400 transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+        <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+          {items.filter((i) => i.checked).length}/{items.length}
+        </span>
       </div>
 
       {/* Checklist Items */}
@@ -52,15 +44,15 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
           >
             <div
               className={`
-                w-6 h-6 rounded-md border-2 flex items-center justify-center mr-4 transition-all
+                w-5 h-5 rounded border flex items-center justify-center mr-3 transition-all
                 ${
                   item.checked
-                    ? "bg-emerald-500 border-emerald-500 dark:bg-emerald-600 dark:border-emerald-600"
+                    ? "bg-slate-500 border-slate-500 dark:bg-slate-400 dark:border-slate-400"
                     : "border-slate-300 dark:border-slate-600"
                 }
               `}
             >
-              {item.checked && <Check className="w-4 h-4 text-white" />}
+              {item.checked && <Check className="w-3.5 h-3.5 text-white dark:text-slate-900" />}
             </div>
             <span
               className={`
