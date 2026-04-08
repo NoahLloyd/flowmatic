@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("electron", {
       "global-quick-add-note",
       "task-added-from-overlay",
       "navigate-to-streak",
+      "open-current-task-picker",
     ];
     if (validChannels.includes(channel)) {
       const id = listenerId++;
@@ -47,6 +48,7 @@ contextBridge.exposeInMainWorld("electron", {
       "global-quick-add-note",
       "task-added-from-overlay",
       "navigate-to-streak",
+      "open-current-task-picker",
     ];
     if (validChannels.includes(channel)) {
       if (typeof idOrFunc === "number") {

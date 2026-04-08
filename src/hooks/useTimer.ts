@@ -220,9 +220,10 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         // Stopwatch: count up
         setTimeRemaining(elapsed);
 
-        // Update tray with elapsed time
-        const minutesElapsed = " " + Math.floor(elapsed / 60).toString() + "m";
-        window.electron.send("update-tray", minutesElapsed);
+        // Update tray with elapsed time + current task
+        const minutesElapsed = Math.floor(elapsed / 60).toString() + "m";
+        const taskSuffix = currentTask ? ` · ${currentTask.slice(0, 25)}` : "";
+        window.electron.send("update-tray", ` ${minutesElapsed}${taskSuffix}`);
 
         // Save state (no completion check for stopwatch)
         saveTimerState({
@@ -240,9 +241,10 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         const remaining = Math.max(0, duration - elapsed);
         setTimeRemaining(remaining);
 
-        // Update tray
-        const minutesLeft = " " + Math.ceil(remaining / 60).toString() + "m";
-        window.electron.send("update-tray", minutesLeft);
+        // Update tray with remaining time + current task
+        const minutesLeft = Math.ceil(remaining / 60).toString() + "m";
+        const taskSuffix = currentTask ? ` · ${currentTask.slice(0, 25)}` : "";
+        window.electron.send("update-tray", ` ${minutesLeft}${taskSuffix}`);
 
         // Save state
         saveTimerState({
@@ -296,7 +298,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         minimized: showInSidebar,
       });
     }
-  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode]);
+  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode, currentTask]);
 
   // Break timer effect
   useEffect(() => {

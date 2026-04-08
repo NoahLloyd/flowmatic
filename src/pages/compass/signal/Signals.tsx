@@ -292,7 +292,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-2.5">
+      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-2.5">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
         </h2>

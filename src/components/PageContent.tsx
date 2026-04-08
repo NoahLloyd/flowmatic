@@ -20,6 +20,7 @@ import QuickAddNoteModal from "./note/QuickAddNoteModal";
 import GlobalQuickAddTask from "./global/GlobalQuickAddTask";
 import GlobalQuickAddNote from "./global/GlobalQuickAddNote";
 import ShortcutsHelpModal from "./global/ShortcutsHelpModal";
+import CurrentTaskPicker from "./global/CurrentTaskPicker";
 import StreakScreen from "./streak/StreakScreen";
 import { dispatchTaskAdded } from "../utils/taskEvents";
 
@@ -37,6 +38,8 @@ const PageContent = () => {
     useState(false);
   // State for Shortcuts Help Modal
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  // State for Current Task Picker
+  const [isCurrentTaskPickerOpen, setIsCurrentTaskPickerOpen] = useState(false);
   // Track previous selected page so we can return to it from Streak
   const [previousPage, setPreviousPage] = useState("Compass");
 
@@ -65,6 +68,11 @@ const PageContent = () => {
       showToast("Daily task added", "success");
     };
 
+    // Handle current task picker from global shortcut
+    const handleOpenCurrentTaskPicker = () => {
+      setIsCurrentTaskPickerOpen(true);
+    };
+
     // Handle streak screen open event
     const handleOpenStreakScreen = () => {
       setPreviousPage(selected);
@@ -77,11 +85,13 @@ const PageContent = () => {
     let quickNoteId: number | undefined;
     let overlayTaskId: number | undefined;
     let navigateStreakId: number | undefined;
+    let taskPickerId: number | undefined;
     if (window.electron?.on) {
       quickTaskId = window.electron.on("global-quick-add-task", handleGlobalQuickAddTask);
       quickNoteId = window.electron.on("global-quick-add-note", handleGlobalQuickAddNote);
       overlayTaskId = window.electron.on("task-added-from-overlay", handleTaskAddedFromOverlay);
       navigateStreakId = window.electron.on("navigate-to-streak", handleOpenStreakScreen);
+      taskPickerId = window.electron.on("open-current-task-picker", handleOpenCurrentTaskPicker);
     }
 
     // Cleanup listeners on unmount
@@ -92,6 +102,7 @@ const PageContent = () => {
         if (quickNoteId !== undefined) window.electron.removeListener("global-quick-add-note", quickNoteId);
         if (overlayTaskId !== undefined) window.electron.removeListener("task-added-from-overlay", overlayTaskId);
         if (navigateStreakId !== undefined) window.electron.removeListener("navigate-to-streak", navigateStreakId);
+        if (taskPickerId !== undefined) window.electron.removeListener("open-current-task-picker", taskPickerId);
       }
     };
   }, [showToast]);
@@ -118,6 +129,18 @@ const PageContent = () => {
         return;
       }
 
+      // Global "w" key to open current task picker
+      if (e.key === "w" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen && !isCurrentTaskPickerOpen) {
+        // Skip if task mode is active in DailyTasks (it uses "w" for moving to week)
+        if (document.body.dataset.taskMode === "true") {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        setIsCurrentTaskPickerOpen(true);
+        return;
+      }
+
       // Global "a" key to open quick add task modal (except on Tasks page where it focuses the input)
       if (e.key === "a" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen) {
         // On Tasks page, let the AddTaskForm handle the 'a' key to focus its input
@@ -139,7 +162,7 @@ const PageContent = () => {
       }
 
       // Skip other keyboard shortcuts if any quick add modal is open
-      if (isQuickAddModalOpen || isQuickAddNoteModalOpen) {
+      if (isQuickAddModalOpen || isQuickAddNoteModalOpen || isCurrentTaskPickerOpen) {
         return;
       }
 
@@ -211,7 +234,7 @@ const PageContent = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [isQuickAddModalOpen, isQuickAddNoteModalOpen, selected]);
+  }, [isQuickAddModalOpen, isQuickAddNoteModalOpen, isCurrentTaskPickerOpen, selected]);
 
   const {
     timeRemaining: time,
@@ -491,7 +514,7 @@ const PageContent = () => {
             onToggleStopwatchMode={toggleStopwatchMode}
             sessionMinutes={sessionMinutes}
             currentTask={currentTask}
-            onSetCurrentTask={setCurrentTask}
+            onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
             dndEnabled={dndEnabled}
             onToggleDnd={toggleDnd}
           />
@@ -561,6 +584,12 @@ const PageContent = () => {
         isOpen={isGlobalQuickAddNoteOpen}
         onClose={() => setIsGlobalQuickAddNoteOpen(false)}
         onAddNote={handleGlobalQuickAddNote}
+      />
+      <CurrentTaskPicker
+        isOpen={isCurrentTaskPickerOpen}
+        onClose={() => setIsCurrentTaskPickerOpen(false)}
+        currentTask={currentTask}
+        onSetCurrentTask={setCurrentTask}
       />
       <ShortcutsHelpModal
         isOpen={isShortcutsHelpOpen}
