@@ -100,6 +100,41 @@ CREATE TABLE weekly_reviews (
   UNIQUE(user_id, week_start)
 );
 
+-- Signal configuration (shared across all platforms)
+CREATE TABLE signal_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('binary', 'number', 'water', 'scale')),
+  max_value NUMERIC,
+  has_goal BOOLEAN DEFAULT false,
+  is_computed BOOLEAN DEFAULT false,
+  unit TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Seed built-in signals
+INSERT INTO signal_configs (key, label, type, has_goal, is_computed) VALUES
+  ('focusHours', 'Focus Hours', 'binary', false, true),
+  ('journaling', 'Journaling', 'binary', false, false);
+INSERT INTO signal_configs (key, label, type, max_value, has_goal) VALUES
+  ('minutesToOffice', 'Minutes to Office', 'number', 180, true),
+  ('sleep', 'Sleep Hours', 'number', 12, true),
+  ('steps', 'Steps', 'number', 30000, true);
+INSERT INTO signal_configs (key, label, type, max_value, has_goal) VALUES
+  ('waterIntake', 'Water', 'water', 5000, true);
+INSERT INTO signal_configs (key, label, type) VALUES
+  ('energy', 'Energy', 'scale'),
+  ('mood', 'Routine', 'scale');
+INSERT INTO signal_configs (key, label, type) VALUES
+  ('exercise', 'Exercise', 'binary'),
+  ('breakfast', 'Breakfast', 'binary'),
+  ('lunch', 'Lunch', 'binary'),
+  ('shower', 'Shower', 'binary'),
+  ('meditation', 'Meditation', 'binary'),
+  ('reading', 'Reading', 'binary'),
+  ('vitamins', 'Vitamins', 'binary');
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
@@ -159,6 +194,10 @@ CREATE POLICY "Users can view own reviews" ON weekly_reviews FOR SELECT USING (a
 CREATE POLICY "Users can insert own reviews" ON weekly_reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own reviews" ON weekly_reviews FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own reviews" ON weekly_reviews FOR DELETE USING (auth.uid() = user_id);
+
+-- Signal configs: readable by all authenticated users
+ALTER TABLE signal_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Signal configs are readable by authenticated users" ON signal_configs FOR SELECT USING (auth.role() = 'authenticated');
 
 -- ============================================================
 -- TRIGGERS

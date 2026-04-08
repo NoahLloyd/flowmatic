@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
+import { api } from "../../../utils/api";
 import { AlertCircle, Plus, X } from "lucide-react";
 
 // Signal configuration type
@@ -42,11 +43,13 @@ export const AVAILABLE_SIGNALS: Record<string, SignalConfig> = {
   steps: { label: "Steps", type: "number", max: 30000, hasGoal: true },
 };
 
-// Helper to merge built-in signals with custom signals from user preferences
+// Helper to merge built-in signals with custom signals from user preferences.
+// Also accepts DB-loaded configs which take precedence over hardcoded defaults.
 export const getAllSignals = (
-  customSignals?: Record<string, SignalConfig>
+  customSignals?: Record<string, SignalConfig>,
+  dbSignals?: Record<string, SignalConfig>,
 ): Record<string, SignalConfig> => {
-  return { ...AVAILABLE_SIGNALS, ...(customSignals || {}) };
+  return { ...AVAILABLE_SIGNALS, ...(dbSignals || {}), ...(customSignals || {}) };
 };
 
 const SIGNAL_TYPES: { value: SignalConfig["type"]; label: string; description: string }[] = [
@@ -97,8 +100,29 @@ const SignalSettings: React.FC = () => {
   const [newSignalUnit, setNewSignalUnit] = useState("");
   const [formError, setFormError] = useState("");
 
-  // Merged signals (built-in + custom)
-  const allSignals = getAllSignals(customSignals);
+  // DB-loaded signal configs (takes precedence over hardcoded AVAILABLE_SIGNALS)
+  const [dbSignals, setDbSignals] = useState<Record<string, SignalConfig>>({});
+
+  // Load signal configs from DB on mount
+  useEffect(() => {
+    api.getSignalConfigs().then((configs) => {
+      const mapped: Record<string, SignalConfig> = {};
+      for (const c of configs) {
+        mapped[c.key] = {
+          label: c.label,
+          type: c.type,
+          max: c.max_value ?? undefined,
+          hasGoal: c.has_goal,
+          isComputed: c.is_computed ?? undefined,
+          unit: c.unit ?? undefined,
+        };
+      }
+      setDbSignals(mapped);
+    }).catch((err) => console.error("Failed to load signal configs:", err));
+  }, []);
+
+  // Merged signals (DB configs > built-in > custom)
+  const allSignals = getAllSignals(customSignals, dbSignals);
 
   // Update state when user data changes
   useEffect(() => {

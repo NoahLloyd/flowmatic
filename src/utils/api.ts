@@ -520,6 +520,14 @@ export const api = {
     return data || [];
   },
 
+  // ─── Signal Configs ─────────────────────────────────────
+
+  getSignalConfigs: async (): Promise<Record<string, any>[]> => {
+    const { data, error } = await supabase.from("signal_configs").select("*");
+    if (error) throw error;
+    return data || [];
+  },
+
   // ─── User preferences ───────────────────────────────────
 
   updateUserPreferences: async (
