@@ -97,3 +97,4 @@ out/
 # Environment variables
 .env.local
 .env.production
+supabase/.temp/
