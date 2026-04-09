@@ -122,7 +122,7 @@ const SidebarStreakCard: React.FC<SidebarStreakCardProps> = ({
       <div className="px-4 pt-2 pb-3">
         <div className="flex items-baseline justify-between">
           <div className="flex items-baseline gap-0.5">
-            <span className={`text-base font-bold tabular-nums leading-none ${t.scoreText}`}>
+            <span className="text-base font-bold tabular-nums leading-none text-white">
               {signalScore}
             </span>
             <span className={`text-[11px] font-semibold ${t.scoreSub}`}>%</span>

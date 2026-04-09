@@ -168,7 +168,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   const simpleTimeDisplay = `${minutes}`;
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
       <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center justify-between">
         <h2
           className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"

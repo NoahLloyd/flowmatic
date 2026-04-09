@@ -141,6 +141,14 @@ const PageContent = () => {
         return;
       }
 
+      // Global "x" key to clear current task
+      if (e.key === "x" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen && !isCurrentTaskPickerOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent("clear-current-task"));
+        return;
+      }
+
       // Global "a" key to open quick add task modal (except on Tasks page where it focuses the input)
       if (e.key === "a" && !isQuickAddModalOpen && !isQuickAddNoteModalOpen) {
         // On Tasks page, let the AddTaskForm handle the 'a' key to focus its input
@@ -279,6 +287,13 @@ const PageContent = () => {
 
   const { isAuthenticated, isLoading } = useAuth();
 
+  // Listen for clear-current-task event from keyboard shortcut
+  useEffect(() => {
+    const handleClear = () => setCurrentTask("");
+    window.addEventListener("clear-current-task", handleClear);
+    return () => window.removeEventListener("clear-current-task", handleClear);
+  }, [setCurrentTask]);
+
   // Use refs so the IPC listener always calls the latest handler
   // without needing to re-register (which leaked listeners before)
   const handleStartPauseRef = React.useRef(handleStartPause);
@@ -306,17 +321,31 @@ const PageContent = () => {
       }
     };
 
+    // Finish session: pause timer + open record modal
+    const handleFinishSession = () => {
+      setSelected("Compass");
+      if (isRunningRef.current) {
+        handleStartPauseRef.current();
+      }
+      if (!isModalOpenRef.current) {
+        handleCloseModalRef.current();
+      }
+    };
+
     let timerId: number | undefined;
     let recordId: number | undefined;
+    let finishId: number | undefined;
     if (window.electron?.on) {
       timerId = window.electron.on("toggle-timer", handleToggleTimer);
       recordId = window.electron.on("open-record-modal", handleOpenRecordModal);
+      finishId = window.electron.on("finish-session", handleFinishSession);
     }
 
     return () => {
       if (window.electron?.removeListener) {
         if (timerId !== undefined) window.electron.removeListener("toggle-timer", timerId);
         if (recordId !== undefined) window.electron.removeListener("open-record-modal", recordId);
+        if (finishId !== undefined) window.electron.removeListener("finish-session", finishId);
       }
     };
   }, []); // Register once, refs keep handlers fresh

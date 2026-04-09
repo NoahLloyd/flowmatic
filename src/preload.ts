@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("electron", {
       "task-added-from-overlay",
       "navigate-to-streak",
       "open-current-task-picker",
+      "finish-session",
     ];
     if (validChannels.includes(channel)) {
       const id = listenerId++;
@@ -49,6 +50,7 @@ contextBridge.exposeInMainWorld("electron", {
       "task-added-from-overlay",
       "navigate-to-streak",
       "open-current-task-picker",
+      "finish-session",
     ];
     if (validChannels.includes(channel)) {
       if (typeof idOrFunc === "number") {

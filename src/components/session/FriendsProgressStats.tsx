@@ -278,6 +278,7 @@ const DailySessionBar = ({
           );
         })}
       </div>
+
     </div>
   );
 };
@@ -1227,6 +1228,12 @@ const FriendsProgressStats: React.FC = () => {
                             })()}
                           </div>
                           <div className="flex-grow border-t border-gray-200 dark:border-gray-800"></div>
+                          <div className="hidden task-hours-label text-xs font-medium text-gray-600 dark:text-gray-300 px-2 tabular-nums">
+                            {statsData[user?.id || "you"].todayHours
+                              .toFixed(1)
+                              .replace(/\.0$/, "")}h
+                          </div>
+                          <div className="hidden task-hours-line flex-grow border-t border-gray-200 dark:border-gray-800"></div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 pl-1">
                             {(() => {
                               const sessions =

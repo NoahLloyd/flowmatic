@@ -62,10 +62,10 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
 
   const label = isBreakTimer ? "Break" : isStopwatchMode ? "Stopwatch" : "Focus";
   const labelColor = isBreakTimer
-    ? "text-sky-400"
+    ? "text-sky-400/60"
     : isStopwatchMode
-      ? "text-amber-400"
-      : "text-slate-400";
+      ? "text-amber-400/60"
+      : "text-slate-500";
 
   if (!isVisible) return null;
 
@@ -86,10 +86,10 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
           className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-white/[0.04] dark:bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all group"
           title="Show timer"
         >
-          <span className={`text-[11px] font-semibold uppercase tracking-wider ${labelColor}`}>
+          <span className={`text-[10px] font-medium uppercase tracking-wider ${labelColor}`}>
             {label}
           </span>
-          <span className="text-sm font-bold tabular-nums text-slate-300">
+          <span className="text-sm font-medium tabular-nums text-slate-300">
             {formatTimeMinutesOnly(time)}
           </span>
           <ChevronDown className="w-3 h-3 text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -120,10 +120,10 @@ const SidebarTimer: React.FC<SidebarTimerProps> = ({
       </button>
 
       <div className="flex flex-col items-center gap-1">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${labelColor}`}>
+        <span className={`text-[10px] font-medium uppercase tracking-wider ${labelColor}`}>
           {label}
         </span>
-        <span className="text-3xl font-black tabular-nums tracking-tight text-slate-200">
+        <span className="text-2xl font-semibold tabular-nums tracking-tight text-slate-300">
           {isSimpleMode ? formatTimeMinutesOnly(time) : formatTime(time)}
         </span>
       </div>

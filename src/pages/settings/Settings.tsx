@@ -111,6 +111,13 @@ const Settings = () => {
   const [signalPercentageGoal, setSignalPercentageGoal] = useState<number>(
     user?.preferences?.signalPercentageGoal || 75
   );
+  // Menu bar settings (localStorage only, not synced to server)
+  const [menuBarShowTask, setMenuBarShowTask] = useState<boolean>(
+    localStorage.getItem("menuBarShowTask") !== "false"
+  );
+  const [menuBarTaskCutoff, setMenuBarTaskCutoff] = useState<number>(
+    parseInt(localStorage.getItem("menuBarTaskCutoff") || "25", 10)
+  );
   const [lightModeFromColor, setLightModeFromColor] = useState<string>(
     user?.preferences?.lightModeFromColor || defaultLightFromColor
   );
@@ -486,6 +493,66 @@ const Settings = () => {
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Background turns red after this many minutes in stopwatch mode
               </p>
+            </div>
+            {/* Menu Bar Settings */}
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Show Task in Menu Bar
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Display current task name next to timer in menu bar
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = localStorage.getItem("menuBarShowTask") !== "false";
+                    localStorage.setItem("menuBarShowTask", String(!current));
+                    // Force re-render
+                    setMenuBarShowTask(!current);
+                  }}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 ${
+                    menuBarShowTask
+                      ? "bg-gray-900 dark:bg-white"
+                      : "bg-gray-200 dark:bg-gray-700"
+                  }`}
+                  role="switch"
+                  aria-checked={menuBarShowTask}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-900 shadow ring-0 transition duration-200 ease-in-out ${
+                      menuBarShowTask ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Menu Bar Task Character Limit
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={menuBarTaskCutoff}
+                    onChange={(e) => {
+                      const val = Math.max(5, Math.min(80, Number(e.target.value)));
+                      setMenuBarTaskCutoff(val);
+                      localStorage.setItem("menuBarTaskCutoff", String(val));
+                    }}
+                    min={5}
+                    max={80}
+                    className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500 pr-16"
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">
+                    chars
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Max characters for task name in the menu bar (5-80)
+                </p>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
