@@ -159,7 +159,7 @@ const registerGlobalShortcuts = () => {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
-      mainWindow.webContents.send("open-record-modal");
+      mainWindow.webContents.send("finish-session");
     }
   });
 

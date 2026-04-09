@@ -55,6 +55,7 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
         { key: "A", label: "Quick add task" },
         { key: "O", label: "Quick add note" },
         { key: "W / ⌥W", label: "Set current task" },
+        { key: "⌥F", label: "Finish session (global)" },
         { key: "?", label: "Show this help" },
       ],
     },

@@ -435,7 +435,9 @@ const Compass: React.FC<CompassProps> = ({
       {...(hasTask ? { "data-task-active": "true" } : {})}
     >
       {hasTask && (
-        <style>{`[data-task-active="true"] .card-header { display: none; }`}</style>
+        <style>{`[data-task-active="true"] .card-header { display: none; }
+[data-task-active="true"] .task-hours-label { display: block; }
+[data-task-active="true"] .task-hours-line { display: block; }`}</style>
       )}
 
       <ContextReminder isRunning={isRunning} />

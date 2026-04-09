@@ -16,7 +16,7 @@ interface SignalConfig {
 
 // ── Constants ──────────────────────────────────────────────────
 
-const STREAK_ALGO_VERSION = 5;
+const STREAK_ALGO_VERSION = 6;
 const STREAK_MILESTONES = [7, 14, 30, 60, 100, 200, 365];
 const JOURNALING_MIN_CHARS = 1000;
 
@@ -436,21 +436,30 @@ Deno.serve(async (req: Request) => {
     };
 
     if (storedCount === -1 || !storedDate || needsMigration) {
-      // Full backfill from history
+      // Full backfill from history (paginated to avoid 1000-row default limit)
       const backfillStart = daysBeforeDate(date, 365);
-      const { data: historyData } = await supabaseUser
-        .from("signals")
-        .select("date, metric, value")
-        .eq("user_id", userId)
-        .gte("date", backfillStart)
-        .lte("date", yesterday);
+      const PAGE_SIZE = 1000;
+      let allHistory: { date: string; metric: string; value: unknown }[] = [];
+      let offset = 0;
+      while (true) {
+        const { data: page, error: fetchErr } = await supabaseUser
+          .from("signals")
+          .select("date, metric, value")
+          .eq("user_id", userId)
+          .gte("date", backfillStart)
+          .lte("date", yesterday)
+          .order("date", { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (fetchErr) break;
+        allHistory = allHistory.concat(page || []);
+        if (!page || page.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
 
       const byDate: Record<string, Record<string, unknown>> = {};
-      if (historyData) {
-        for (const item of historyData) {
-          if (!byDate[item.date]) byDate[item.date] = {};
-          byDate[item.date][item.metric] = item.value;
-        }
+      for (const item of allHistory) {
+        if (!byDate[item.date]) byDate[item.date] = {};
+        byDate[item.date][item.metric] = item.value;
       }
       applyShower3DayWindow(byDate);
 
@@ -490,21 +499,30 @@ Deno.serve(async (req: Request) => {
       lastProcessed = yesterday;
       needsSave = true;
     } else if (lastProcessed < yesterday) {
-      // Catch up on unprocessed past days
+      // Catch up on unprocessed past days (paginated)
       const showerPaddedStart = daysBeforeDate(lastProcessed, 2);
-      const { data: historyData } = await supabaseUser
-        .from("signals")
-        .select("date, metric, value")
-        .eq("user_id", userId)
-        .gte("date", showerPaddedStart)
-        .lte("date", yesterday);
+      const PAGE_SIZE = 1000;
+      let catchupHistory: { date: string; metric: string; value: unknown }[] = [];
+      let catchupOffset = 0;
+      while (true) {
+        const { data: page, error: fetchErr } = await supabaseUser
+          .from("signals")
+          .select("date, metric, value")
+          .eq("user_id", userId)
+          .gte("date", showerPaddedStart)
+          .lte("date", yesterday)
+          .order("date", { ascending: true })
+          .range(catchupOffset, catchupOffset + PAGE_SIZE - 1);
+        if (fetchErr) break;
+        catchupHistory = catchupHistory.concat(page || []);
+        if (!page || page.length < PAGE_SIZE) break;
+        catchupOffset += PAGE_SIZE;
+      }
 
       const byDate: Record<string, Record<string, unknown>> = {};
-      if (historyData) {
-        for (const item of historyData) {
-          if (!byDate[item.date]) byDate[item.date] = {};
-          byDate[item.date][item.metric] = item.value;
-        }
+      for (const item of catchupHistory) {
+        if (!byDate[item.date]) byDate[item.date] = {};
+        byDate[item.date][item.metric] = item.value;
       }
       applyShower3DayWindow(byDate);
 

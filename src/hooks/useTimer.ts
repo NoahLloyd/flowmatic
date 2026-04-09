@@ -111,6 +111,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   const timerIntervalRef = useRef<number | null>(null);
   const breakTimerIntervalRef = useRef<number | null>(null);
 
+  // Ref to avoid jumpy tray updates — only send when text actually changes
+  const lastTrayTextRef = useRef<string>("");
+
   // Current task being worked on (persisted in localStorage)
   const [currentTask, setCurrentTaskState] = useState<string>(() => {
     return localStorage.getItem("currentTask") || "";
@@ -122,6 +125,44 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
       localStorage.setItem("currentTask", task);
     } else {
       localStorage.removeItem("currentTask");
+    }
+  };
+
+  // Menu bar settings
+  const menuBarShowTask = useRef(localStorage.getItem("menuBarShowTask") !== "false"); // default true
+  const menuBarTaskCutoff = useRef(parseInt(localStorage.getItem("menuBarTaskCutoff") || "25", 10));
+
+  // Listen for settings changes
+  useEffect(() => {
+    const sync = () => {
+      menuBarShowTask.current = localStorage.getItem("menuBarShowTask") !== "false";
+      menuBarTaskCutoff.current = parseInt(localStorage.getItem("menuBarTaskCutoff") || "25", 10);
+    };
+    window.addEventListener("storage", sync);
+    const interval = setInterval(sync, 2000);
+    return () => { window.removeEventListener("storage", sync); clearInterval(interval); };
+  }, []);
+
+  // Only the primary instance (PageContent, which passes directNavigate) should update the tray.
+  // Layout also instantiates useTimer for sidebar display — its stale currentTask would clobber the tray.
+  const isPrimary = Boolean(directNavigate);
+
+  // Clear the tray completely
+  const clearTray = () => {
+    if (!isPrimary) return;
+    clearTray();
+  };
+
+  // Helper: build tray text and only send if changed
+  const updateTray = (timeText: string, task?: string) => {
+    if (!isPrimary) return;
+    const showTask = menuBarShowTask.current;
+    const cutoff = menuBarTaskCutoff.current;
+    const taskSuffix = showTask && task ? ` · ${task.slice(0, cutoff)}` : "";
+    const text = ` ${timeText}${taskSuffix}`;
+    if (text !== lastTrayTextRef.current) {
+      lastTrayTextRef.current = text;
+      window.electron.send("update-tray", text);
     }
   };
 
@@ -222,8 +263,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
         // Update tray with elapsed time + current task
         const minutesElapsed = Math.floor(elapsed / 60).toString() + "m";
-        const taskSuffix = currentTask ? ` · ${currentTask.slice(0, 25)}` : "";
-        window.electron.send("update-tray", ` ${minutesElapsed}${taskSuffix}`);
+        updateTray(minutesElapsed, currentTask);
 
         // Save state (no completion check for stopwatch)
         saveTimerState({
@@ -243,8 +283,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
         // Update tray with remaining time + current task
         const minutesLeft = Math.ceil(remaining / 60).toString() + "m";
-        const taskSuffix = currentTask ? ` · ${currentTask.slice(0, 25)}` : "";
-        window.electron.send("update-tray", ` ${minutesLeft}${taskSuffix}`);
+        updateTray(minutesLeft, currentTask);
 
         // Save state
         saveTimerState({
@@ -404,9 +443,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setIsModalOpen(true);
     setShowInSidebar(false);
 
-    // Update tray
-    const totalTimePassed = Math.ceil(duration / 60).toString() + "m";
-    window.electron.send("update-tray", " " + totalTimePassed + " done!");
+    // Clear tray
+    clearTray();
 
     // Set timer completed flag
     setTimerJustCompleted(true);
@@ -447,7 +485,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Show notification
     showNotification("Break time is over!");
     window.electron.send("show-window");
-    window.electron.send("update-tray", " Break over!");
+    clearTray();
 
     // Update localStorage
     saveTimerState({
@@ -488,10 +526,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         setStartTime(null);
 
         // Update tray
-        const trayString = ` Paused ${Math.ceil(
-          timeRemaining / 60
-        ).toString()}m`;
-        window.electron.send("update-tray", trayString);
+        updateTray(`Paused ${Math.ceil(timeRemaining / 60)}m`, currentTask);
 
         // Disable DND when pausing
         setDoNotDisturb(false);
@@ -611,8 +646,8 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Clear from localStorage
     localStorage.removeItem("timerState");
 
-    // Clear current task on reset
-    setCurrentTask("");
+    // Clear tray
+    clearTray();
   };
 
   // Start a break timer
@@ -646,7 +681,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     });
 
     // Update tray
-    window.electron.send("update-tray", ` Break: ${breakMinutes}m`);
+    updateTray(`Break: ${breakMinutes}m`);
   };
 
   // Restart work timer after a break
@@ -681,7 +716,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     });
 
     // Update tray
-    window.electron.send("update-tray", ` ${defaultMinutes}m`);
+    updateTray(`${defaultMinutes}m`, currentTask);
   };
 
   // Close modal but keep timer running in sidebar
@@ -706,11 +741,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
           breakIsRunning,
           minimized: true,
         });
-      } else if (!isRunning && isStopwatchMode) {
-        // In stopwatch mode, reset to 0 after session is done
-        setDuration(0);
-        setTimeRemaining(0);
-        setStartTime(null);
+      } else if (!isRunning) {
+        // Session is done — clear tray
+        lastTrayTextRef.current = "";
+        window.electron.send("update-tray", "");
+
+        if (isStopwatchMode) {
+          // In stopwatch mode, reset to 0 after session is done
+          setDuration(0);
+          setTimeRemaining(0);
+          setStartTime(null);
+        }
         localStorage.removeItem("timerState");
       }
     }
