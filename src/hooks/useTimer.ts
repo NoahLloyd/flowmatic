@@ -143,8 +143,19 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     return () => { window.removeEventListener("storage", sync); clearInterval(interval); };
   }, []);
 
+  // Only the primary instance (PageContent, which passes directNavigate) should update the tray.
+  // Layout also instantiates useTimer for sidebar display — its stale currentTask would clobber the tray.
+  const isPrimary = Boolean(directNavigate);
+
+  // Clear the tray completely
+  const clearTray = () => {
+    if (!isPrimary) return;
+    clearTray();
+  };
+
   // Helper: build tray text and only send if changed
   const updateTray = (timeText: string, task?: string) => {
+    if (!isPrimary) return;
     const showTask = menuBarShowTask.current;
     const cutoff = menuBarTaskCutoff.current;
     const taskSuffix = showTask && task ? ` · ${task.slice(0, cutoff)}` : "";
@@ -433,8 +444,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     setShowInSidebar(false);
 
     // Clear tray
-    lastTrayTextRef.current = "";
-    window.electron.send("update-tray", "");
+    clearTray();
 
     // Set timer completed flag
     setTimerJustCompleted(true);
@@ -475,8 +485,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     // Show notification
     showNotification("Break time is over!");
     window.electron.send("show-window");
-    lastTrayTextRef.current = "";
-    window.electron.send("update-tray", "");
+    clearTray();
 
     // Update localStorage
     saveTimerState({
@@ -638,8 +647,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     localStorage.removeItem("timerState");
 
     // Clear tray
-    lastTrayTextRef.current = "";
-    window.electron.send("update-tray", "");
+    clearTray();
   };
 
   // Start a break timer
