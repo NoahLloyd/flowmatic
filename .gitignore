@@ -98,3 +98,19 @@ out/
 .env.local
 .env.production
 supabase/.temp/
+
+# Local Claude / editor state
+.claude/
+
+# Webpack standalone build artifact dropped at repo root
+/index.js
+/index.js.map
+
+# Personal sync scripts (may contain secrets / user-specific paths)
+scripts/anki-sync/
+scripts/garmin-sync/
+scripts/github-sync/
+scripts/obsidian-sync/
+scripts/sync-all.sh
+scripts/diagnose-streak.mjs
+scripts/restore-streak.mjs

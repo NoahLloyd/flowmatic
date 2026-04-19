@@ -453,9 +453,6 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
 
     // Remove from localStorage
     localStorage.removeItem("timerState");
-
-    // Clear current task when timer completes
-    setCurrentTask("");
   };
 
   // Handle break timer completion

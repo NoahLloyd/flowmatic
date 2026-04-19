@@ -173,8 +173,16 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
         }`}
       >
         <div
-          className={`flex-1 min-h-0 flex flex-col overflow-auto ${
-            isFocusMode ? "p-8" : "p-6"
+          className={`flex-1 min-h-0 flex flex-col ${
+            selected === "Insights" ? "overflow-hidden p-0" : "overflow-auto"
+          } ${
+            isFocusMode
+              ? "p-8"
+              : selected === "Insights"
+              ? ""
+              : selected === "Tasks"
+              ? "px-3 py-4"
+              : "p-6"
           }`}
         >
           {children}

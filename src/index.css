@@ -87,6 +87,17 @@ body {
   scrollbar-color: var(--scrollbar-color) transparent;
 }
 
+/* Hide scrollbars while preserving scroll behavior (wheel/trackpad) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Specific styling for components that need custom scrollbars */
 .custom-scrollbar {
   &::-webkit-scrollbar {

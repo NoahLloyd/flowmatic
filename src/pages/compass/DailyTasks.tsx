@@ -8,7 +8,7 @@ import {
   Droppable,
   Draggable,
   DropResult,
-} from "react-beautiful-dnd";
+} from "@hello-pangea/dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
 
 const DailyTasks: React.FC = () => {
@@ -159,6 +159,10 @@ const DailyTasks: React.FC = () => {
             "day",
             currentOrder.filter((taskId) => taskId !== id)
           );
+          const currentTask = localStorage.getItem("currentTask") || "";
+          if (currentTask && currentTask === taskToMove.title) {
+            window.dispatchEvent(new CustomEvent("clear-current-task"));
+          }
         }
       } else {
         const taskToMove = completedTasks.find((t) => t.id === id);
@@ -442,7 +446,7 @@ const DailyTasks: React.FC = () => {
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col h-full">
-      <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
+      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between shrink-0">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Tasks
         </h2>
@@ -459,17 +463,13 @@ const DailyTasks: React.FC = () => {
       </div>
       <div className="p-4 bg-white dark:bg-gray-900 flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="space-y-2 h-full overflow-y-auto">
+          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden scrollbar-hide">
             <Droppable droppableId="daily-active-tasks">
-              {(provided, snapshot) => (
+              {(provided) => (
                 <div
                   {...provided.droppableProps}
                   ref={provided.innerRef}
-                  className={`space-y-2 ${
-                    snapshot.isDraggingOver
-                      ? "bg-gray-100 dark:bg-gray-800/50 rounded-md p-1"
-                      : ""
-                  }`}
+                  className="space-y-2"
                 >
                   {activeTasks.map((task, index) => {
                     const numLabel = getNumberLabel(index);

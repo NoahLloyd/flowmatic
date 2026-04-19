@@ -7,7 +7,7 @@ import {
   DropResult,
   DroppableProvided,
   DraggableProvided,
-} from "react-beautiful-dnd";
+} from "@hello-pangea/dnd";
 import {
   PenLine,
   Eye,

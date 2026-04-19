@@ -91,4 +91,62 @@ contextBridge.exposeInMainWorld("electron", {
   requestShortcutsAccess: () => {
     return ipcRenderer.invoke("request-shortcuts-access");
   },
+
+  insights: {
+    prepare: () => ipcRenderer.invoke("insights:prepare"),
+    writeData: (files: Record<string, unknown>) =>
+      ipcRenderer.invoke("insights:write-data", files),
+    writeSchema: (schemaMd: string) =>
+      ipcRenderer.invoke("insights:write-schema", schemaMd),
+    send: (prompt: string) => ipcRenderer.invoke("insights:send", prompt),
+    cancel: () => ipcRenderer.invoke("insights:cancel"),
+    resetSession: () => ipcRenderer.invoke("insights:reset-session"),
+    readOutput: () => ipcRenderer.invoke("insights:read-output"),
+    setSessionId: (sessionId: string | null) =>
+      ipcRenderer.invoke("insights:set-session-id", sessionId),
+    writeOutput: (html: string) =>
+      ipcRenderer.invoke("insights:write-output", html),
+    onStream: (cb: (event: any) => void) => {
+      const wrapper = (_e: any, data: any) => cb(data);
+      ipcRenderer.on("insights:stream", wrapper);
+      return () => ipcRenderer.removeListener("insights:stream", wrapper);
+    },
+    onPreview: (cb: (html: string) => void) => {
+      const wrapper = (_e: any, html: string) => cb(html);
+      ipcRenderer.on("insights:preview", wrapper);
+      return () => ipcRenderer.removeListener("insights:preview", wrapper);
+    },
+    onDone: (cb: (info: { code: number; sessionId: string | null }) => void) => {
+      const wrapper = (_e: any, info: any) => cb(info);
+      ipcRenderer.on("insights:done", wrapper);
+      return () => ipcRenderer.removeListener("insights:done", wrapper);
+    },
+    onStderr: (cb: (text: string) => void) => {
+      const wrapper = (_e: any, text: string) => cb(text);
+      ipcRenderer.on("insights:stderr", wrapper);
+      return () => ipcRenderer.removeListener("insights:stderr", wrapper);
+    },
+    onError: (cb: (msg: string) => void) => {
+      const wrapper = (_e: any, msg: string) => cb(msg);
+      ipcRenderer.on("insights:error", wrapper);
+      return () => ipcRenderer.removeListener("insights:error", wrapper);
+    },
+  },
+
+  anki: {
+    readStats: () => ipcRenderer.invoke("anki:read-stats"),
+  },
+
+  obsidian: {
+    readTasks: () => ipcRenderer.invoke("obsidian:read-tasks"),
+    markComplete: (args: { vaultAbs: string; file: string; textHash: string }) =>
+      ipcRenderer.invoke("obsidian:mark-complete", args),
+    checkAccess: () => ipcRenderer.invoke("obsidian:check-access"),
+    openPrivacySettings: () =>
+      ipcRenderer.invoke("obsidian:open-privacy-settings"),
+    resetPermission: () => ipcRenderer.invoke("obsidian:reset-permission"),
+    listFiles: () => ipcRenderer.invoke("obsidian:list-files"),
+    openFile: (file: string) =>
+      ipcRenderer.invoke("obsidian:open-file", { file }),
+  },
 });

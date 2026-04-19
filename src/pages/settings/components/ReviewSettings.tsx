@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, GripVertical, Save } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, FileText, X } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import {
   DEFAULT_CHECKLIST_ITEMS,
   DEFAULT_QUESTIONS,
 } from "../../../types/Review";
+import ObsidianFilePicker from "../../../components/obsidian/ObsidianFilePicker";
 
 interface ChecklistItemConfig {
   id: string;
@@ -14,6 +15,7 @@ interface ChecklistItemConfig {
 interface QuestionConfig {
   id: string;
   question: string;
+  obsidianLinks?: string[];
 }
 
 const ReviewSettings: React.FC = () => {
@@ -104,6 +106,37 @@ const ReviewSettings: React.FC = () => {
     setQuestions(DEFAULT_QUESTIONS);
   };
 
+  // Obsidian picker state. We track which question is receiving an attachment
+  // so the modal can call back into the right row.
+  const [pickerForQuestionId, setPickerForQuestionId] = useState<string | null>(
+    null,
+  );
+
+  const handleAddLink = (questionId: string, file: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        const existing = q.obsidianLinks || [];
+        if (existing.includes(file)) return q;
+        return { ...q, obsidianLinks: [...existing, file] };
+      }),
+    );
+    setPickerForQuestionId(null);
+  };
+
+  const handleRemoveLink = (questionId: string, file: string) => {
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId
+          ? {
+              ...q,
+              obsidianLinks: (q.obsidianLinks || []).filter((f) => f !== file),
+            }
+          : q,
+      ),
+    );
+  };
+
   return (
     <div className="space-y-8">
       {/* Checklist Items Section */}
@@ -181,24 +214,70 @@ const ReviewSettings: React.FC = () => {
           {questions.map((q, index) => (
             <div
               key={q.id}
-              className="flex items-start space-x-2 p-2 bg-gray-50 dark:bg-gray-900/40 rounded-md border border-gray-200 dark:border-gray-700"
+              className="p-2 bg-gray-50 dark:bg-gray-900/40 rounded-md border border-gray-200 dark:border-gray-700"
             >
-              <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 cursor-grab mt-1" />
-              <textarea
-                value={q.question}
-                onChange={(e) => handleUpdateQuestion(q.id, e.target.value)}
-                rows={2}
-                className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 focus:outline-none resize-none"
-              />
-              <button
-                onClick={() => handleRemoveQuestion(q.id)}
-                className="p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-start space-x-2">
+                <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 cursor-grab mt-1" />
+                <textarea
+                  value={q.question}
+                  onChange={(e) => handleUpdateQuestion(q.id, e.target.value)}
+                  rows={2}
+                  className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 focus:outline-none resize-none"
+                />
+                <button
+                  onClick={() => handleRemoveQuestion(q.id)}
+                  className="p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Attached Obsidian notes */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 pl-6">
+                {(q.obsidianLinks || []).map((file) => (
+                  <span
+                    key={file}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span className="font-mono">
+                      {file.replace(/\.md$/, "")}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveLink(q.id, file)}
+                      className="text-gray-400 hover:text-red-500"
+                      aria-label="Remove link"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                <button
+                  onClick={() => setPickerForQuestionId(q.id)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 border border-dashed border-gray-300 dark:border-gray-600"
+                >
+                  <Plus className="w-3 h-3" />
+                  Attach note
+                </button>
+              </div>
             </div>
           ))}
         </div>
+
+        <ObsidianFilePicker
+          open={pickerForQuestionId !== null}
+          onClose={() => setPickerForQuestionId(null)}
+          onPick={(file) => {
+            if (pickerForQuestionId)
+              handleAddLink(pickerForQuestionId, file);
+          }}
+          excludeFiles={
+            pickerForQuestionId
+              ? questions.find((q) => q.id === pickerForQuestionId)
+                  ?.obsidianLinks || []
+              : []
+          }
+        />
 
         <div className="flex items-center space-x-2">
           <input

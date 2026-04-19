@@ -127,12 +127,43 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
       user?.preferences?.toColor ||
       defaultLightToColor;
 
-  // Check if stopwatch has exceeded the alert threshold
-  const isOverAlertThreshold = isStopwatchMode && time >= stopwatchAlertMinutes * 60;
+  // Smoothly blend toward red as the stopwatch approaches & passes the alert threshold.
+  // Ramp starts at 80% of threshold and completes at 120% of threshold for a soft transition.
+  const redTargetFrom = isDarkMode ? "#7F1D1D" : "#DC2626";
+  const redTargetTo = isDarkMode ? "#991B1B" : "#EF4444";
 
-  // Override colors to red when over threshold
-  const fromColor = isOverAlertThreshold ? (isDarkMode ? "#7F1D1D" : "#DC2626") : baseFromColor;
-  const toColor = isOverAlertThreshold ? (isDarkMode ? "#991B1B" : "#EF4444") : baseToColor;
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const h = hex.replace("#", "");
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  };
+  const rgbToHex = (r: number, g: number, b: number) =>
+    "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  const mixHex = (a: string, b: string, t: number) => {
+    const [ar, ag, ab] = hexToRgb(a);
+    const [br, bg, bb] = hexToRgb(b);
+    return rgbToHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t);
+  };
+
+  const redMix = useMemo(() => {
+    if (!isStopwatchMode) return 0;
+    const threshold = stopwatchAlertMinutes * 60;
+    if (threshold <= 0) return 0;
+    const start = threshold * 0.8;
+    const end = threshold * 1.2;
+    if (time <= start) return 0;
+    if (time >= end) return 1;
+    return (time - start) / (end - start);
+  }, [time, isStopwatchMode, stopwatchAlertMinutes]);
+
+  const isValidHex = (v: string) => /^#?[0-9a-fA-F]{6}$/.test(v);
+  const safeFrom = isValidHex(baseFromColor) ? baseFromColor : (isDarkMode ? defaultDarkFromColor : defaultLightFromColor);
+  const safeTo = isValidHex(baseToColor) ? baseToColor : (isDarkMode ? defaultDarkToColor : defaultLightToColor);
+  const fromColor = redMix > 0 ? mixHex(safeFrom, redTargetFrom, redMix) : baseFromColor;
+  const toColor = redMix > 0 ? mixHex(safeTo, redTargetTo, redMix) : baseToColor;
 
   useEffect(() => {
     if (!isRunning) {
@@ -169,7 +200,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full flex flex-col">
-      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3.5 flex items-center justify-between">
+      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between">
         <h2
           className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
           onClick={onToggleStopwatchMode}
@@ -178,7 +209,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
         </h2>
         <button
           onClick={onToggleDnd}
-          className={`p-1 rounded-md transition-colors ${
+          className={`p-1.5 rounded-md transition-colors ${
             dndEnabled
               ? "text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
               : "text-gray-400 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"

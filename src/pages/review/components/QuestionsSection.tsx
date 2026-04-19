@@ -1,5 +1,5 @@
 import React from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ExternalLink } from "lucide-react";
 import { QuestionItem } from "../../../types/Review";
 
 interface QuestionsSectionProps {
@@ -43,6 +43,29 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
             >
               {question.question}
             </label>
+
+            {/* Attached Obsidian notes — click to open in Obsidian */}
+            {question.obsidianLinks && question.obsidianLinks.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {question.obsidianLinks.map((file) => (
+                  <button
+                    key={file}
+                    type="button"
+                    onClick={() =>
+                      window.electron?.obsidian?.openFile?.(file)
+                    }
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 transition-colors"
+                    title={`Open ${file} in Obsidian`}
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span className="font-mono">
+                      {file.replace(/\.md$/, "").split("/").pop()}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <textarea
               id={`question-${question.id}`}
               value={question.answer}

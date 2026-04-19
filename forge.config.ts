@@ -7,6 +7,8 @@ import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-nati
 import { WebpackPlugin } from "@electron-forge/plugin-webpack";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
+import { execFileSync } from "child_process";
+import path from "path";
 
 import { mainConfig } from "./webpack.main.config";
 import { rendererConfig } from "./webpack.renderer.config";
@@ -17,9 +19,35 @@ const config: ForgeConfig = {
     asar: true,
     icon: "./src/assets/icons/mac/icon",
     name: "Flowmatic",
+    // A stable, unique bundle id. Without this we get the generic
+    // `com.electron.flowmatic`, which macOS TCC has been seen to silently
+    // deny and which doesn't match the app's signing identifier.
+    appBundleId: "com.flowmatic.app",
     extendInfo: {
       NSAppleEventsUsageDescription:
         "Flowmatic needs permission to control Focus mode (Do Not Disturb) via Shortcuts.",
+      NSDocumentsFolderUsageDescription:
+        "Flowmatic reads your Obsidian vault in Documents to show unfinished tasks.",
+    },
+  },
+  hooks: {
+    // Ad-hoc re-sign the bundle AFTER packager finalizes it (Info.plist is
+    // injected, bundle id applied). Without this, `codesign -dvvv` reports
+    // `Info.plist=not bound` and macOS TCC silently refuses to honor
+    // NSDocumentsFolderUsageDescription — the Documents prompt never appears
+    // and `tccutil reset` is a no-op. electron/osx-sign's auto path bails
+    // silently when no signing identity is installed, so we do it ourselves.
+    postPackage: async (_config, { platform, outputPaths }) => {
+      if (platform !== "darwin") return;
+      for (const out of outputPaths) {
+        const appPath = path.join(out, "Flowmatic.app");
+        execFileSync(
+          "/usr/bin/codesign",
+          ["--force", "--deep", "--sign", "-", appPath],
+          { stdio: "inherit" },
+        );
+        console.log(`[forge] ad-hoc signed ${appPath}`);
+      }
     },
   },
   rebuildConfig: {},

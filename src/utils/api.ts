@@ -378,6 +378,22 @@ export const api = {
       .select()
       .single();
     if (error) throw error;
+
+    // If this task originated from Obsidian and we're marking it complete,
+    // flip the corresponding `- [ ]` in the vault file.
+    if (updates.completed === true) {
+      try {
+        const raw = localStorage.getItem("obsidianTaskSources");
+        const map = raw ? JSON.parse(raw) : {};
+        const src = map[taskId];
+        if (src && window.electron?.obsidian?.markComplete) {
+          window.electron.obsidian.markComplete(src).catch(() => {});
+        }
+      } catch {
+        /* noop */
+      }
+    }
+
     return {
       ...data,
       completedAt: data.completed_at,
@@ -391,6 +407,19 @@ export const api = {
       .delete()
       .eq("id", taskId);
     if (error) throw error;
+    // Tidy up source mapping so stale entries don't pile up.
+    try {
+      const raw = localStorage.getItem("obsidianTaskSources");
+      if (raw) {
+        const map = JSON.parse(raw);
+        if (map[taskId]) {
+          delete map[taskId];
+          localStorage.setItem("obsidianTaskSources", JSON.stringify(map));
+        }
+      }
+    } catch {
+      /* noop */
+    }
   },
 
   // ─── Morning / Writing ──────────────────────────────────

@@ -57,6 +57,7 @@
   "dependencies": {
     "@electron/remote": "^2.1.2",
     "@emotion/is-prop-valid": "^1.3.1",
+    "@hello-pangea/dnd": "^18.0.1",
     "@hocuspocus/provider": "^2.15.2",
     "@supabase/supabase-js": "^2.97.0",
     "@tippy.js/react": "^3.1.1",
@@ -86,7 +87,6 @@
     "@tiptap/pm": "^2.11.5",
     "@tiptap/react": "^2.11.7",
     "@tiptap/starter-kit": "^2.11.7",
-    "@types/react-beautiful-dnd": "^13.1.8",
     "@types/uuid": "^10.0.0",
     "@yoopta/action-menu-list": "4.9.4",
     "@yoopta/blockquote": "4.9.4",
@@ -105,7 +105,6 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",
-    "react-beautiful-dnd": "^13.1.1",
     "react-datepicker": "^7.5.0",
     "react-dom": "^18.3.1",
     "react-icons": "^5.3.0",

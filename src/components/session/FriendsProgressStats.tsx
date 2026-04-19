@@ -2,13 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Session } from "../../types/Session";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/api";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-  Clock,
-  Brain,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import SessionEditModal from "./SessionEditModal";
 import { format, isToday, addDays, subDays, startOfDay } from "date-fns";
 
@@ -715,90 +709,6 @@ const FriendsProgressStats: React.FC = () => {
     });
   };
 
-  // Color functions for pills (matching SessionsOverview style)
-  const getFocusColor = (focus: number) => {
-    if (focus < 2)
-      return {
-        bg: "bg-red-100 dark:bg-red-900",
-        text: "text-red-700 dark:text-red-200",
-      };
-    if (focus < 3)
-      return {
-        bg: "bg-orange-100 dark:bg-orange-900",
-        text: "text-orange-700 dark:text-orange-200",
-      };
-    if (focus < 4)
-      return {
-        bg: "bg-yellow-100 dark:bg-yellow-900",
-        text: "text-yellow-700 dark:text-yellow-200",
-      };
-    if (focus < 4.5)
-      return {
-        bg: "bg-green-100 dark:bg-green-900",
-        text: "text-green-700 dark:text-green-200",
-      };
-    return {
-      bg: "bg-indigo-100 dark:bg-indigo-900",
-      text: "text-indigo-700 dark:text-indigo-200",
-    };
-  };
-
-  const getHoursColor = (hours: number, date: Date) => {
-    // Get the daily goal for this specific day
-    const getDailyGoalForDate = (date: Date) => {
-      const day = date.getDay();
-      const dayNames = [
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-      ];
-      const dayName = dayNames[day];
-
-      if (
-        user?.preferences?.dailyHoursGoals &&
-        dayName in user.preferences.dailyHoursGoals
-      ) {
-        return user.preferences.dailyHoursGoals[dayName];
-      }
-      return 4; // Default if not set
-    };
-
-    const dailyGoal = getDailyGoalForDate(date);
-
-    // Calculate percentage of goal achieved
-    const percentage = (hours / dailyGoal) * 100;
-
-    // Color based on percentage of goal
-    if (percentage < 25)
-      return {
-        bg: "bg-red-100 dark:bg-red-900",
-        text: "text-red-700 dark:text-red-200",
-      };
-    if (percentage < 50)
-      return {
-        bg: "bg-orange-100 dark:bg-orange-900",
-        text: "text-orange-700 dark:text-orange-200",
-      };
-    if (percentage < 75)
-      return {
-        bg: "bg-yellow-100 dark:bg-yellow-900",
-        text: "text-yellow-700 dark:text-yellow-200",
-      };
-    if (percentage < 100)
-      return {
-        bg: "bg-green-100 dark:bg-green-900",
-        text: "text-green-700 dark:text-green-200",
-      };
-    return {
-      bg: "bg-indigo-100 dark:bg-indigo-900",
-      text: "text-indigo-700 dark:text-indigo-200",
-    };
-  };
-
   const WeekYearProgress = ({ stats }: { stats: FriendStats }) => {
     return (
       <div className="grid grid-cols-2 gap-3">
@@ -1066,7 +976,7 @@ const FriendsProgressStats: React.FC = () => {
       {/* User's card */}
       {statsData[user?.id || "you"] && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden h-full">
-          <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-2.5 flex items-center justify-between">
+          <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-medium text-gray-900 dark:text-white">
                 Sessions
@@ -1075,67 +985,6 @@ const FriendsProgressStats: React.FC = () => {
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {format(selectedDate, "MMM d, yyyy")}
                 </span>
-              )}
-              {/* Hours and Focus pills */}
-              {!isLoading && (
-                <div className="flex gap-1.5 text-xs">
-                  <div
-                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
-                      getHoursColor(
-                        statsData[user?.id || "you"].todayHours,
-                        selectedDate
-                      ).bg
-                    }`}
-                  >
-                    <Clock
-                      className={`w-3 h-3 ${
-                        getHoursColor(
-                          statsData[user?.id || "you"].todayHours,
-                          selectedDate
-                        ).text
-                      }`}
-                    />
-                    <span
-                      className={`font-medium ${
-                        getHoursColor(
-                          statsData[user?.id || "you"].todayHours,
-                          selectedDate
-                        ).text
-                      }`}
-                    >
-                      {statsData[user?.id || "you"].todayHours
-                        .toFixed(1)
-                        .replace(".0", "")}
-                      h
-                    </span>
-                  </div>
-                  {statsData[user?.id || "you"].averageFocus > 0 && (
-                    <div
-                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${
-                        getFocusColor(
-                          statsData[user?.id || "you"].averageFocus
-                        ).bg
-                      }`}
-                    >
-                      <Brain
-                        className={`w-3 h-3 ${
-                          getFocusColor(
-                            statsData[user?.id || "you"].averageFocus
-                          ).text
-                        }`}
-                      />
-                      <span
-                        className={`font-medium ${
-                          getFocusColor(
-                            statsData[user?.id || "you"].averageFocus
-                          ).text
-                        }`}
-                      >
-                        {statsData[user?.id || "you"].averageFocus}
-                      </span>
-                    </div>
-                  )}
-                </div>
               )}
             </div>
             <div className="flex items-center gap-3">
@@ -1228,12 +1077,12 @@ const FriendsProgressStats: React.FC = () => {
                             })()}
                           </div>
                           <div className="flex-grow border-t border-gray-200 dark:border-gray-800"></div>
-                          <div className="hidden task-hours-label text-xs font-medium text-gray-600 dark:text-gray-300 px-2 tabular-nums">
+                          <div className="task-hours-label text-xs font-medium text-gray-600 dark:text-gray-300 px-2 tabular-nums">
                             {statsData[user?.id || "you"].todayHours
                               .toFixed(1)
                               .replace(/\.0$/, "")}h
                           </div>
-                          <div className="hidden task-hours-line flex-grow border-t border-gray-200 dark:border-gray-800"></div>
+                          <div className="task-hours-line flex-grow border-t border-gray-200 dark:border-gray-800"></div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 pl-1">
                             {(() => {
                               const sessions =
