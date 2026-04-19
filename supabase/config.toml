@@ -1,0 +1,11 @@
+# Supabase project config.
+# Only function-specific settings are declared here; everything else uses
+# defaults managed via the dashboard.
+
+# The Supabase Functions gateway only validates HS256 JWTs. This project
+# has been rotated to asymmetric (ES256) signing keys, so every request
+# hits the gateway and gets rejected with UNAUTHORIZED_UNSUPPORTED_TOKEN_ALGORITHM
+# before our code runs. Turn gateway verification off here; the function
+# itself authenticates the caller via supabase.auth.getUser(jwt).
+[functions.compute-daily-score]
+verify_jwt = false

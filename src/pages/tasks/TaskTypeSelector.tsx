@@ -1,30 +1,37 @@
 import React, { useEffect } from "react";
 import { TaskType } from "../../types/Task";
 
+export type TaskTab = TaskType | "obsidian";
+
 interface TaskTypeSelectorProps {
-  selectedType: TaskType;
-  onTypeSelect: (type: TaskType) => void;
+  selectedType: TaskTab;
+  onTypeSelect: (type: TaskTab) => void;
 }
 
 const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
   selectedType,
   onTypeSelect,
 }) => {
-  const types: TaskType[] = ["day", "week", "future", "blocked", "shopping"];
+  const types: TaskTab[] = [
+    "day",
+    "week",
+    "future",
+    "blocked",
+    "shopping",
+    "obsidian",
+  ];
 
-  // Keyboard shortcut mapping
-  const shortcuts: Record<TaskType, string> = {
+  const shortcuts: Record<TaskTab, string> = {
     day: "1",
     week: "2",
     future: "3",
     blocked: "4",
     shopping: "5",
+    obsidian: "6",
   };
 
-  // Add keyboard event listeners for simple number keys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if we're in an input field or textarea
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
@@ -33,7 +40,6 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
         return;
       }
 
-      // Simple number key shortcuts - no command/ctrl needed
       switch (e.key) {
         case "1":
           onTypeSelect("day");
@@ -49,6 +55,9 @@ const TaskTypeSelector: React.FC<TaskTypeSelectorProps> = ({
           break;
         case "5":
           onTypeSelect("shopping");
+          break;
+        case "6":
+          onTypeSelect("obsidian");
           break;
       }
     };

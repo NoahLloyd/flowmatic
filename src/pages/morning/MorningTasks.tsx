@@ -2,13 +2,17 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import { dispatchTaskAdded, subscribeToTaskAdded } from "../../utils/taskEvents";
+import ObsidianTasksPanel, {
+  ObsidianTask,
+  rememberObsidianSource,
+} from "../../components/obsidian/ObsidianTasksPanel";
 import {
   DragDropContext,
   Droppable,
   Draggable,
   DropResult,
-} from "react-beautiful-dnd";
+} from "@hello-pangea/dnd";
 
 // Only D, W, F are relevant for the morning view
 const MORNING_TYPES: TaskType[] = ["day", "week", "future"];
@@ -28,6 +32,47 @@ const MorningTasks: React.FC = () => {
   // Collapsible states
   const [showWeekly, setShowWeekly] = useState(true);
   const [showFuture, setShowFuture] = useState(false);
+  const [showObsidian, setShowObsidian] = useState(true);
+
+  const vaultAbsRef = useRef<string | null>(null);
+  const handleObsidianImport = useCallback(
+    async (obsidianTask: ObsidianTask, type: TaskType): Promise<string | null> => {
+      try {
+        // Pull the vault path from the latest sync so we can write back later.
+        if (!vaultAbsRef.current) {
+          const res = await window.electron?.obsidian?.readTasks();
+          if (res?.ok) vaultAbsRef.current = res.data.vault_abs;
+        }
+        const created = await api.createTask({
+          title: obsidianTask.display,
+          type,
+          completed: false,
+          completedAt: null,
+          createdAt: new Date(),
+        });
+        rememberObsidianSource(created.id, {
+          vaultAbs: vaultAbsRef.current || "",
+          file: obsidianTask.file,
+          textHash: obsidianTask.text_hash,
+        });
+        const setter =
+          type === "day"
+            ? setDayTasks
+            : type === "week"
+            ? setWeekTasks
+            : type === "future"
+            ? setFutureTasks
+            : null;
+        setter?.((prev) => [created, ...prev]);
+        dispatchTaskAdded(created);
+        return created.id;
+      } catch (e) {
+        console.error("Failed to import Obsidian task:", e);
+        return null;
+      }
+    },
+    [],
+  );
 
   // Keyboard focus state: which task is highlighted
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
@@ -317,8 +362,8 @@ const MorningTasks: React.FC = () => {
               className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500"
             />
 
-            {/* Title - full width, overflow hidden with no ellipsis */}
-            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 overflow-hidden whitespace-nowrap">
+            {/* Title - full text, row grows and column scrolls horizontally if needed */}
+            <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap pr-12">
               {task.title}
             </span>
 
@@ -419,7 +464,7 @@ const MorningTasks: React.FC = () => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`space-y-0.5 overflow-y-auto flex-1 min-h-0 rounded-md transition-colors ${
+                  className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 rounded-md transition-colors ${
                     snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                   }`}
                 >
@@ -433,10 +478,10 @@ const MorningTasks: React.FC = () => {
             </Droppable>
           </div>
 
-          {/* Right column: Weekly + Future */}
-          <div className="flex flex-col min-h-0 overflow-y-auto gap-3">
+          {/* Right column: Weekly + Future + Obsidian */}
+          <div className="flex flex-col min-w-0 min-h-0 overflow-y-auto gap-3">
             {/* Weekly section */}
-            <div className={showWeekly ? "flex flex-col flex-1 min-h-0" : ""}>
+            <div className={showWeekly ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
               <SectionHeader
                 title="Weekly"
                 count={weekTasks.length}
@@ -449,7 +494,7 @@ const MorningTasks: React.FC = () => {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`space-y-0.5 overflow-y-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
+                      className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
                         snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                       }`}
                     >
@@ -465,7 +510,7 @@ const MorningTasks: React.FC = () => {
             </div>
 
             {/* Future section */}
-            <div className={showFuture ? "flex flex-col flex-1 min-h-0" : ""}>
+            <div className={showFuture ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
               <SectionHeader
                 title="Future"
                 count={futureTasks.length}
@@ -478,7 +523,7 @@ const MorningTasks: React.FC = () => {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`space-y-0.5 overflow-y-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
+                      className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
                         snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                       }`}
                     >
@@ -491,6 +536,15 @@ const MorningTasks: React.FC = () => {
                   )}
                 </Droppable>
               )}
+            </div>
+
+            {/* Obsidian inbox */}
+            <div className="min-w-0">
+              <ObsidianTasksPanel
+                defaultType="day"
+                onImport={handleObsidianImport}
+                initiallyExpanded={showObsidian}
+              />
             </div>
           </div>
         </div>

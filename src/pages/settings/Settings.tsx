@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  FileText,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useTimezone } from "../../context/TimezoneContext";
@@ -144,6 +145,17 @@ const Settings = () => {
   const [dndTestMessage, setDndTestMessage] = useState("");
   const [accessStatus, setAccessStatus] = useState<"idle" | "requesting" | "granted" | "missing" | "error">("idle");
   const [missingShortcuts, setMissingShortcuts] = useState<string[]>([]);
+
+  // Obsidian Documents access state
+  const [obsidianStatus, setObsidianStatus] = useState<
+    "idle" | "checking" | "granted" | "denied" | "no-vault" | "error"
+  >("idle");
+  const [obsidianDetail, setObsidianDetail] = useState<string>("");
+  const [obsidianPath, setObsidianPath] = useState<string>("");
+  const [obsidianCounts, setObsidianCounts] = useState<{
+    fileCount: number;
+    mdCount: number;
+  } | null>(null);
 
   // Update state when user data changes
   useEffect(() => {
@@ -758,6 +770,138 @@ const Settings = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Obsidian Integration */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+            <FileText className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+            <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+              Obsidian Integration
+            </h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Flowmatic reads unfinished tasks from your Obsidian vault so
+                you can import them into your day. macOS needs to grant access
+                to the Documents folder before this works.
+              </p>
+              {obsidianPath && (
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  Vault path:{" "}
+                  <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono">
+                    {obsidianPath}
+                  </code>
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={async () => {
+                  if (!window.electron?.obsidian?.checkAccess) {
+                    setObsidianStatus("error");
+                    setObsidianDetail("Obsidian API unavailable in this build");
+                    return;
+                  }
+                  setObsidianStatus("checking");
+                  setObsidianDetail("");
+                  setObsidianCounts(null);
+                  const res = await window.electron.obsidian.checkAccess();
+                  if ("mdCount" in res) {
+                    setObsidianStatus("granted");
+                    setObsidianPath(res.path);
+                    setObsidianCounts({
+                      fileCount: res.fileCount,
+                      mdCount: res.mdCount,
+                    });
+                    return;
+                  }
+                  setObsidianPath(res.path);
+                  if (res.stage === "vault" && res.code === "ENOENT") {
+                    setObsidianStatus("no-vault");
+                  } else if (
+                    res.code === "EPERM" ||
+                    res.code === "EACCES" ||
+                    res.stage === "documents"
+                  ) {
+                    setObsidianStatus("denied");
+                  } else {
+                    setObsidianStatus("error");
+                  }
+                  setObsidianDetail(`${res.code}: ${res.error}`);
+                }}
+                disabled={obsidianStatus === "checking"}
+                className="text-xs px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 font-medium"
+              >
+                {obsidianStatus === "checking"
+                  ? "Checking..."
+                  : "Check access"}
+              </button>
+
+              {obsidianStatus === "denied" && (
+                <>
+                  <button
+                    onClick={() =>
+                      window.electron?.obsidian?.openPrivacySettings?.()
+                    }
+                    className="text-xs px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-medium"
+                  >
+                    Open Privacy Settings
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const res = await window.electron?.obsidian?.resetPermission?.();
+                      if (res?.ok) {
+                        setObsidianDetail(
+                          "Permission cache cleared. Quit Flowmatic fully and reopen, then click Check access again — macOS should now show the prompt.",
+                        );
+                      } else {
+                        setObsidianDetail(
+                          `tccutil failed: ${res && "error" in res ? res.error : "unknown"}`,
+                        );
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-medium"
+                  >
+                    Reset permission cache
+                  </button>
+                </>
+              )}
+            </div>
+
+            {obsidianStatus === "granted" && obsidianCounts && (
+              <div className="text-xs px-2 py-1.5 rounded-md bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                Access granted — {obsidianCounts.fileCount} item(s) in vault
+                root, {obsidianCounts.mdCount} markdown file(s).
+              </div>
+            )}
+            {obsidianStatus === "denied" && (
+              <div className="text-xs px-2 py-1.5 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 space-y-1">
+                <p className="font-medium">Access denied by macOS.</p>
+                <p>{obsidianDetail}</p>
+                <p>
+                  If Flowmatic doesn't appear under Privacy → Files and Folders
+                  → Documents, click <em>Reset permission cache</em>, quit
+                  Flowmatic completely (⌘Q), relaunch, then click{" "}
+                  <em>Check access</em> again. macOS only prompts on the first
+                  access after a reset.
+                </p>
+              </div>
+            )}
+            {obsidianStatus === "no-vault" && (
+              <div className="text-xs px-2 py-1.5 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                Couldn't find the vault folder at that path. Documents access
+                itself is fine.
+              </div>
+            )}
+            {obsidianStatus === "error" && (
+              <div className="text-xs px-2 py-1.5 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+                {obsidianDetail}
+              </div>
+            )}
           </div>
         </div>
 

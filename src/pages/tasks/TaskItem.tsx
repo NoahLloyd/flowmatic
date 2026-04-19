@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, TaskType } from "../../types/Task";
-import { Draggable } from "react-beautiful-dnd";
+import { Draggable } from "@hello-pangea/dnd";
 
 interface TaskItemProps {
   task: Task;

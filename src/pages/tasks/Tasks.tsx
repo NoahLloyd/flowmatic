@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Task, TaskType } from "../../types/Task";
 import TaskList from "./TaskList";
 import AddTaskForm from "./AddTaskForm";
-import TaskTypeSelector from "./TaskTypeSelector";
+import TaskTypeSelector, { TaskTab } from "./TaskTypeSelector";
+import ObsidianTasksPanel, {
+  ObsidianTask,
+  rememberObsidianSource,
+} from "../../components/obsidian/ObsidianTasksPanel";
 import CompletedTasks from "./CompletedTasks";
 import { api } from "../../utils/api";
 import { useNavigation } from "../../hooks/useNavigation";
@@ -12,7 +16,7 @@ import {
   Droppable,
   Draggable,
   DropResult,
-} from "react-beautiful-dnd";
+} from "@hello-pangea/dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
 
 /**
@@ -102,7 +106,41 @@ const Tasks: React.FC<TasksProps> = ({
   // Task state
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState<TaskType>("day");
+  const [selectedType, setSelectedType] = useState<TaskTab>("day");
+  const isObsidian = selectedType === "obsidian";
+  // Narrow back to TaskType for code paths that only work with real tasks
+  // (ordering, filtering, add-task form). Obsidian rendering branches before
+  // these are used.
+  const activeTaskType: TaskType = isObsidian ? "day" : selectedType;
+
+  // Import handler for the Obsidian tab — mirrors MorningTasks behavior
+  // so Obsidian items land in the normal task store and get remembered.
+  const vaultAbsRef = useRef<string | null>(null);
+  const handleObsidianImport = useCallback(
+    async (
+      obsidianTask: ObsidianTask,
+      type: TaskType,
+    ): Promise<string | null> => {
+      try {
+        if (!vaultAbsRef.current) {
+          const res = await window.electron?.obsidian?.readTasks();
+          if (res?.ok) vaultAbsRef.current = res.data.vault_abs;
+        }
+        const created = await onAddTask(obsidianTask.display, type);
+        if (!created) return null;
+        rememberObsidianSource(created.id, {
+          vaultAbs: vaultAbsRef.current || "",
+          file: obsidianTask.file,
+          textHash: obsidianTask.text_hash,
+        });
+        return created.id;
+      } catch (e) {
+        console.error("Failed to import Obsidian task:", e);
+        return null;
+      }
+    },
+    [onAddTask],
+  );
 
   // Search state
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
@@ -463,7 +501,7 @@ const Tasks: React.FC<TasksProps> = ({
 
   // Filter active tasks by selected type and search
   const activeTasks = tasks
-    .filter((task) => !task.completed && task.type === selectedType)
+    .filter((task) => !task.completed && task.type === activeTaskType)
     .filter((task) => {
       if (activeSearchQuery) {
         return task.title
@@ -474,7 +512,7 @@ const Tasks: React.FC<TasksProps> = ({
     });
 
   // Apply stored order to the currently filtered active tasks
-  const currentTaskOrder = getTaskOrderFromStorage(selectedType);
+  const currentTaskOrder = getTaskOrderFromStorage(activeTaskType);
   const orderedActiveTasks = currentTaskOrder
     ? [...activeTasks].sort((a, b) => {
         // Sort a copy
@@ -559,7 +597,7 @@ const Tasks: React.FC<TasksProps> = ({
     // Ensure drop happened within the same list type
     if (
       source.droppableId !== destination.droppableId ||
-      destination.droppableId !== `active-tasks-${selectedType}`
+      destination.droppableId !== `active-tasks-${activeTaskType}`
     ) {
       console.warn(
         "Drag and drop across different lists or types is not supported."
@@ -575,17 +613,17 @@ const Tasks: React.FC<TasksProps> = ({
     // Update the main 'tasks' state
     const completedTasks = tasks.filter((t) => t.completed);
     const otherActiveTasks = tasks.filter(
-      (t) => !t.completed && t.type !== selectedType
+      (t) => !t.completed && t.type !== activeTaskType
     );
     setTasks([...items, ...otherActiveTasks, ...completedTasks]);
 
     // Save the new order to localStorage
     const newOrder = items.map((task) => task.id);
-    saveTaskOrderToStorage(selectedType, newOrder);
+    saveTaskOrderToStorage(activeTaskType, newOrder);
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="w-full space-y-6 pb-12">
       {/* Task type selector */}
       <div className="mb-2">
         <TaskTypeSelector
@@ -594,6 +632,20 @@ const Tasks: React.FC<TasksProps> = ({
         />
       </div>
 
+      {isObsidian ? (
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-gray-900 shadow-sm">
+          <h2 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+            Obsidian
+          </h2>
+          <ObsidianTasksPanel
+            defaultType="day"
+            onImport={handleObsidianImport}
+            initiallyExpanded={true}
+            title="Unfinished tasks in vault"
+          />
+        </div>
+      ) : (
+        <>
       {/* Task form with card styling */}
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-gray-900 shadow-sm">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center justify-between">
@@ -606,7 +658,7 @@ const Tasks: React.FC<TasksProps> = ({
         </h2>
         <AddTaskForm
           onAddTask={handleAddTaskAndUpdateLocal}
-          currentType={selectedType}
+          currentType={activeTaskType}
         />
       </div>
 
@@ -687,7 +739,7 @@ const Tasks: React.FC<TasksProps> = ({
                   onDelete={handleDeleteAndUpdateLocal}
                   onChangeTaskType={handleChangeTaskTypeAndUpdateLocal}
                   onUpdateTitle={handleUpdateTitleAndUpdateLocal}
-                  droppableId={`active-tasks-${selectedType}`}
+                  droppableId={`active-tasks-${activeTaskType}`}
                 />
                 {orderedActiveTasks.length === 0 && (
                   <div className="text-center py-8">
@@ -922,6 +974,8 @@ const Tasks: React.FC<TasksProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

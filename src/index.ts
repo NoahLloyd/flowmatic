@@ -11,6 +11,7 @@ import {
 import path from "path";
 import * as fs from "fs";
 import { exec, execFile, spawn } from "child_process";
+import { registerInsightsIPC, disposeInsights } from "./main/insights";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -565,6 +566,11 @@ ipcMain.handle("request-shortcuts-access", async () => {
 
 app.whenReady().then(() => {
   createWindow();
+  registerInsightsIPC(() => mainWindow);
+});
+
+app.on("before-quit", () => {
+  disposeInsights();
 });
 
 app.on("window-all-closed", () => {

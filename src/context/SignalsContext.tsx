@@ -115,7 +115,7 @@ const computeDayScore = (
         const goal = signalGoals[key];
         if (typeof value === "number") {
           if (key === "minutesToOffice") {
-            score = value <= goal ? 100 : Math.max(0, 100 - ((value - goal) / goal) * 100);
+            score = value <= goal ? 100 : 100 * Math.exp(-(value - goal) / 90);
           } else {
             score = value >= goal ? 100 : (value / goal) * 100;
           }
@@ -648,7 +648,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
                 const goal = signalGoals[key];
                 if (typeof value === "number") {
                   if (key === "minutesToOffice") {
-                    signalScore = value <= goal ? 100 : Math.max(0, 100 - ((value - goal) / goal) * 100);
+                    signalScore = value <= goal ? 100 : 100 * Math.exp(-(value - goal) / 90);
                   } else {
                     signalScore = value >= goal ? 100 : (value / goal) * 100;
                   }
@@ -829,6 +829,111 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       refreshSignals();
     }
   }, [timezone, user]);
+
+  // Streak-at-risk notifications: alert the user during the evening if the
+  // day's signal goal isn't met. Aggressive when truly in danger (no points
+  // banked); gentler single nudge when they have a save-point cushion.
+  useEffect(() => {
+    if (signalStreak <= 0) return;
+
+    const percentageGoal = (user?.preferences?.signalPercentageGoal as number) || 75;
+    const todayMeets = signalScore >= percentageGoal;
+    if (todayMeets) return;
+
+    // No save banked → full danger. Save banked → cushioned, single late nudge.
+    const aggressive = signalStreakDanger;
+    const thresholds = aggressive
+      ? [
+          { hour: 21, key: "21", label: "3 hours" },
+          { hour: 23, key: "23", label: "1 hour" },
+          { hour: 23.75, key: "2345", label: "15 minutes" },
+        ]
+      : [{ hour: 21, key: "21-save", label: "3 hours" }];
+
+    const todayKey = (() => {
+      try {
+        return new Intl.DateTimeFormat("en-CA", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+      } catch {
+        return new Date().toISOString().split("T")[0];
+      }
+    })();
+
+    const check = () => {
+      const now = new Date();
+      const localHour = now.getHours() + now.getMinutes() / 60;
+      for (const t of thresholds) {
+        if (localHour < t.hour) continue;
+        const storageKey = `streakDangerNotified:${todayKey}:${t.key}`;
+        if (localStorage.getItem(storageKey) === "true") continue;
+        const title = aggressive ? "Streak in danger" : "Signal goal not yet met";
+        const body = aggressive
+          ? `Your ${signalStreak}-day streak is at risk — ${t.label} left to hit today's signal goal.`
+          : `You've got a save banked, but try to hit today's signal goal — ${t.label} left.`;
+        if (typeof Notification !== "undefined") {
+          if (Notification.permission === "granted") {
+            new Notification(title, { body });
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((permission) => {
+              if (permission === "granted") {
+                new Notification(title, { body });
+              }
+            });
+          }
+        }
+        localStorage.setItem(storageKey, "true");
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [signalStreakDanger, signalStreak, signalScore, user, timezone]);
+
+  // Auto-flip the Anki signal when local Anki data shows the day's queue is
+  // cleared. One-way only: we never flip back to false, so manual toggles and
+  // prior completions are preserved even if the queue grows again later.
+  useEffect(() => {
+    if (!user) return;
+    const ankiApi = window.electron?.anki;
+    if (!ankiApi?.readStats) return;
+
+    const availableSignals = getAvailableSignals(user);
+    const activeSignals = (user.preferences?.activeSignals || []) as string[];
+    const ankiKey = activeSignals.find((k) => {
+      const cfg = availableSignals[k];
+      return /anki/i.test(k) || (cfg?.label && /anki/i.test(cfg.label));
+    });
+    if (!ankiKey) return;
+
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const stats = await ankiApi.readStats();
+        if (cancelled || !stats?.ok) return;
+        if (stats.reviewsToday > 0 && stats.dueRemaining === 0 && signals[ankiKey] !== true) {
+          updateSignal(ankiKey, true);
+        }
+      } catch {
+        /* noop */
+      }
+    };
+
+    check();
+    const onFocus = () => check();
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(check, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, signals]);
 
   return (
     <SignalsContext.Provider

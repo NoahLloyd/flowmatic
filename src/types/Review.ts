@@ -10,6 +10,9 @@ export interface QuestionItem {
   id: string;
   question: string;
   answer: string;
+  // Vault-relative .md paths the user has attached to this question. Clicking
+  // the pill below the question in the review UI opens the file in Obsidian.
+  obsidianLinks?: string[];
 }
 
 export interface WeeklyReview {

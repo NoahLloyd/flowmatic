@@ -11,6 +11,10 @@ import { api } from "../../../utils/api";
 import { Task, TaskType } from "../../../types/Task";
 import { useToast } from "../../../context/ToastContext";
 import { dispatchTaskAdded } from "../../../utils/taskEvents";
+import ObsidianTasksPanel, {
+  ObsidianTask,
+  rememberObsidianSource,
+} from "../../../components/obsidian/ObsidianTasksPanel";
 
 interface WeeklyTaskPlannerProps {
   disabled?: boolean;
@@ -105,6 +109,36 @@ const WeeklyTaskPlanner: React.FC<WeeklyTaskPlannerProps> = ({
     }
   };
 
+  const handleObsidianImport = async (
+    obsidianTask: ObsidianTask,
+    type: TaskType,
+  ): Promise<string | null> => {
+    try {
+      const res = await window.electron?.obsidian?.readTasks();
+      const vaultAbs = res?.ok ? res.data.vault_abs : "";
+      const task = await api.createTask({
+        title: obsidianTask.display,
+        type,
+        completed: false,
+        completedAt: null,
+        createdAt: new Date(),
+      });
+      rememberObsidianSource(task.id, {
+        vaultAbs,
+        file: obsidianTask.file,
+        textHash: obsidianTask.text_hash,
+      });
+      setTasks((prev) => [task, ...prev]);
+      dispatchTaskAdded(task);
+      showToast("Added from Obsidian", "success");
+      return task.id;
+    } catch (e) {
+      console.error("Failed to import Obsidian task:", e);
+      showToast("Import failed", "error");
+      return null;
+    }
+  };
+
   const handleDeleteTask = async (taskId: string) => {
     if (disabled) return;
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
@@ -139,6 +173,12 @@ const WeeklyTaskPlanner: React.FC<WeeklyTaskPlannerProps> = ({
 
   return (
     <div className="space-y-3">
+      <ObsidianTasksPanel
+        defaultType="week"
+        onImport={handleObsidianImport}
+        initiallyExpanded={false}
+      />
+
       {/* Quick add */}
       <div className="flex items-center gap-2">
         <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { api } from "../../../utils/api";
-import { AlertCircle, Plus, X } from "lucide-react";
+import { AlertCircle, Plus, X, ChevronUp, ChevronDown } from "lucide-react";
 
 // Signal configuration type
 export interface SignalConfig {
@@ -144,6 +144,20 @@ const SignalSettings: React.FC = () => {
       } else {
         return [...prev, signalKey];
       }
+    });
+  };
+
+  // Move an active signal up or down. The order of `activeSignals` directly
+  // controls how signals are rendered on the Compass page.
+  const moveSignal = (signalKey: string, direction: "up" | "down") => {
+    setActiveSignals((prev) => {
+      const idx = prev.indexOf(signalKey);
+      if (idx === -1) return prev;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[swapIdx]] = [next[swapIdx], next[idx]];
+      return next;
     });
   };
 
@@ -440,44 +454,89 @@ const SignalSettings: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {Object.entries(allSignals).map(([key, signal]) => (
-            <div
-              key={key}
-              className={`p-3 border rounded-md transition-colors ${
-                activeSignals.includes(key)
-                  ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20"
-                  : "border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={activeSignals.includes(key)}
-                    onChange={() => toggleSignal(key)}
-                    className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400"
-                  />
-                  {signal.label}
-                </label>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">
-                    {signal.type}
-                  </span>
-                  {signal.isCustom && (
-                    <button
-                      onClick={() => handleDeleteCustomSignal(key)}
-                      className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                      title="Delete custom signal"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
+          {/*
+            Order active signals by the user's chosen sequence (activeSignals
+            array order), then append inactive ones. The up/down arrows on
+            active rows rewrite activeSignals, which in turn changes the
+            render order on the Compass page.
+          */}
+          {(() => {
+            const activeEntries = activeSignals
+              .map((key) => [key, allSignals[key]] as const)
+              .filter(([, signal]) => signal);
+            const inactiveEntries = Object.entries(allSignals).filter(
+              ([key]) => !activeSignals.includes(key),
+            );
+            const ordered: ReadonlyArray<readonly [string, any]> = [
+              ...activeEntries,
+              ...inactiveEntries,
+            ];
+            return ordered.map(([key, signal], displayIdx) => {
+              const isActive = activeSignals.includes(key);
+              const activeIdx = activeSignals.indexOf(key);
+              const canMoveUp = isActive && activeIdx > 0;
+              const canMoveDown =
+                isActive && activeIdx < activeSignals.length - 1;
+              return (
+                <div
+                  key={key}
+                  className={`p-3 border rounded-md transition-colors ${
+                    isActive
+                      ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={() => toggleSignal(key)}
+                        className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 dark:text-indigo-500 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                      />
+                      {signal.label}
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {isActive && (
+                        <>
+                          <button
+                            onClick={() => moveSignal(key, "up")}
+                            disabled={!canMoveUp}
+                            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Move up"
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => moveSignal(key, "down")}
+                            disabled={!canMoveDown}
+                            className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Move down"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">
+                        {signal.type}
+                      </span>
+                      {signal.isCustom && (
+                        <button
+                          onClick={() => handleDeleteCustomSignal(key)}
+                          className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                          title="Delete custom signal"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-              {activeSignals.includes(key) && renderGoalInput(key)}
-            </div>
-          ))}
+                  {isActive && renderGoalInput(key)}
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
 

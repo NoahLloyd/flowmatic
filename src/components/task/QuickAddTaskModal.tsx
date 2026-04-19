@@ -44,6 +44,19 @@ const QuickAddTaskModal: React.FC<QuickAddTaskModalProps> = ({
     }
   }, [isOpen]);
 
+  // Flag body so global capture-phase keydown handlers (e.g. Compass)
+  // can skip their shortcuts while this modal is handling keys.
+  useEffect(() => {
+    if (isOpen) {
+      document.body.dataset.quickAddOpen = "true";
+    } else {
+      delete document.body.dataset.quickAddOpen;
+    }
+    return () => {
+      delete document.body.dataset.quickAddOpen;
+    };
+  }, [isOpen]);
+
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
     // Prevent these keypress events from propagating to avoid navigation conflicts
     e.stopPropagation();

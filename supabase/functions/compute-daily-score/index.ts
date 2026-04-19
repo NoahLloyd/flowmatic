@@ -54,8 +54,8 @@ function scoreSignal(
     if (typeof value !== "number") return 0;
 
     if (key === "minutesToOffice") {
-      // Lower is better
-      return value <= goal ? 100 : Math.max(0, 100 - ((value - goal) / goal) * 100);
+      // Lower is better; reverse-exponential decay past goal (~90min half-e)
+      return value <= goal ? 100 : 100 * Math.exp(-(value - goal) / 90);
     }
     // Higher is better
     return value >= goal ? 100 : (value / goal) * 100;
@@ -215,13 +215,20 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Validate the JWT explicitly. Passing the token to getUser() avoids
+    // relying on supabase-js resolving it from global.headers, which newer
+    // SDK versions no longer do reliably and was returning 401 to every
+    // caller (both desktop and mobile).
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(jwt);
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid auth" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Invalid auth", detail: userError?.message }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
     const userId = user.id;
 

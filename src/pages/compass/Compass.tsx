@@ -175,6 +175,11 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
+      // Skip shortcuts when a quick-add modal is handling its own keys
+      if (document.body.dataset.quickAddOpen === "true") {
+        return;
+      }
+
       // Space key to start/pause timer
       if (e.code === "Space") {
         e.preventDefault();
