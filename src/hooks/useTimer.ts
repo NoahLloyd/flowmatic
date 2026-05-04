@@ -114,18 +114,106 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   // Ref to avoid jumpy tray updates — only send when text actually changes
   const lastTrayTextRef = useRef<string>("");
 
-  // Current task being worked on (persisted in localStorage)
-  const [currentTask, setCurrentTaskState] = useState<string>(() => {
-    return localStorage.getItem("currentTask") || "";
-  });
-
-  const setCurrentTask = (task: string) => {
-    setCurrentTaskState(task);
-    if (task) {
-      localStorage.setItem("currentTask", task);
-    } else {
-      localStorage.removeItem("currentTask");
+  // Active tasks the user is working on. Persisted in localStorage as a
+  // JSON array of task titles, newest first. `currentTask` (singular)
+  // remains available as a derived value (= first entry) so the existing
+  // session/tray code can keep using it without changes.
+  //
+  // Migration: legacy `currentTask` (string) is hoisted into the array on
+  // first load; the legacy key is left in place to keep older instances
+  // of the app readable, but the new key takes precedence.
+  const readInitialTasks = (): string[] => {
+    try {
+      const raw = localStorage.getItem("currentTasks");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((s) => typeof s === "string" && s.length > 0);
+        }
+      }
+    } catch {
+      /* fall through to legacy migration */
     }
+    const legacy = localStorage.getItem("currentTask");
+    return legacy ? [legacy] : [];
+  };
+
+  const [currentTasks, setCurrentTasksState] = useState<string[]>(readInitialTasks);
+  const currentTask = currentTasks[0] || "";
+
+  const persistTasks = (tasks: string[]) => {
+    if (tasks.length === 0) {
+      localStorage.removeItem("currentTasks");
+      localStorage.removeItem("currentTask");
+    } else {
+      localStorage.setItem("currentTasks", JSON.stringify(tasks));
+      // Keep singular key in sync so anything still reading it directly
+      // (e.g. DailyTasks completion check) sees the primary task.
+      localStorage.setItem("currentTask", tasks[0]);
+    }
+  };
+
+  const setCurrentTasks = (tasks: string[]) => {
+    // Dedupe + drop empties, preserving order.
+    const cleaned: string[] = [];
+    for (const t of tasks) {
+      const trimmed = (t || "").trim();
+      if (!trimmed) continue;
+      if (cleaned.includes(trimmed)) continue;
+      cleaned.push(trimmed);
+    }
+    setCurrentTasksState(cleaned);
+    persistTasks(cleaned);
+  };
+
+  // Backwards-compat: single-task setter replaces the whole list.
+  const setCurrentTask = (task: string) => {
+    setCurrentTasks(task ? [task] : []);
+  };
+
+  // Toggle a task in the active set. New selections go to the front so the
+  // most recently picked task is the "primary" (used for tray + sessions).
+  const toggleCurrentTask = (task: string) => {
+    const trimmed = (task || "").trim();
+    if (!trimmed) return;
+    setCurrentTasksState((prev) => {
+      const exists = prev.includes(trimmed);
+      const next = exists
+        ? prev.filter((t) => t !== trimmed)
+        : [trimmed, ...prev];
+      persistTasks(next);
+      return next;
+    });
+  };
+
+  // Always add (or promote-to-front) — used when typing a freeform task in
+  // the picker, where Enter should never remove an existing selection.
+  const addCurrentTask = (task: string) => {
+    const trimmed = (task || "").trim();
+    if (!trimmed) return;
+    setCurrentTasksState((prev) => {
+      const next = [trimmed, ...prev.filter((t) => t !== trimmed)];
+      persistTasks(next);
+      return next;
+    });
+  };
+
+  // Remove a single task by exact title match (used when DailyTasks marks
+  // a task complete — we drop it from the active set without disturbing
+  // the others).
+  const removeCurrentTask = (task: string) => {
+    const trimmed = (task || "").trim();
+    if (!trimmed) return;
+    setCurrentTasksState((prev) => {
+      const next = prev.filter((t) => t !== trimmed);
+      persistTasks(next);
+      return next;
+    });
+  };
+
+  const clearCurrentTasks = () => {
+    setCurrentTasksState([]);
+    persistTasks([]);
   };
 
   // Menu bar settings
@@ -153,12 +241,20 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     clearTray();
   };
 
-  // Helper: build tray text and only send if changed
+  // Helper: build tray text and only send if changed.
+  // For multi-task: shows the primary task plus a "+N" badge for the rest,
+  // truncating only the primary title to fit the user's cutoff.
   const updateTray = (timeText: string, task?: string) => {
     if (!isPrimary) return;
     const showTask = menuBarShowTask.current;
     const cutoff = menuBarTaskCutoff.current;
-    const taskSuffix = showTask && task ? ` · ${task.slice(0, cutoff)}` : "";
+    const extraCount = currentTasks.length > 1 ? currentTasks.length - 1 : 0;
+    let taskSuffix = "";
+    if (showTask && task) {
+      const primary = task.slice(0, cutoff);
+      const extra = extraCount > 0 ? ` +${extraCount}` : "";
+      taskSuffix = ` · ${primary}${extra}`;
+    }
     const text = ` ${timeText}${taskSuffix}`;
     if (text !== lastTrayTextRef.current) {
       lastTrayTextRef.current = text;
@@ -337,7 +433,9 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
         minimized: showInSidebar,
       });
     }
-  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode, currentTask]);
+  // Note currentTasks.length in deps so the tray "+N" suffix updates when
+  // tasks are added/removed without changing the primary.
+  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode, currentTask, currentTasks.length]);
 
   // Break timer effect
   useEffect(() => {
@@ -1045,9 +1143,16 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     isStopwatchMode,
     toggleStopwatchMode,
     sessionMinutes,
-    // Current task
+    // Current task(s) — `currentTask` is the primary (first) for backward
+    // compatibility; `currentTasks` is the full ordered list.
     currentTask,
+    currentTasks,
     setCurrentTask,
+    setCurrentTasks,
+    toggleCurrentTask,
+    addCurrentTask,
+    removeCurrentTask,
+    clearCurrentTasks,
     // DND toggle
     dndEnabled,
     toggleDnd,

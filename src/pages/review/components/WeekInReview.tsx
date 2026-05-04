@@ -8,7 +8,8 @@ import { api } from "../../../utils/api";
 import { Task } from "../../../types/Task";
 import { Session } from "../../../types/Session";
 import { useAuth } from "../../../context/AuthContext";
-import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../../settings/components/SignalSettings";
+import { getAllSignals, SignalConfig } from "../../settings/components/SignalSettings";
+import { computeDayScore } from "../../../context/SignalsContext";
 
 interface WeekInReviewProps {
   weekStart: string; // YYYY-MM-DD
@@ -57,7 +58,9 @@ const WeekInReview: React.FC<WeekInReviewProps> = ({ weekStart, weekEnd }) => {
         );
 
         if (Array.isArray(signalsRaw)) {
-          const byDate = new Map<string, Record<string, number | boolean>>();
+          // Bucket raw rows (one per metric per day) into per-day records.
+          // _dailyScore lives alongside regular metrics in the signals table.
+          const byDate = new Map<string, Record<string, any>>();
           (signalsRaw as any[]).forEach((item) => {
             if (!byDate.has(item.date)) {
               byDate.set(item.date, {});
@@ -71,26 +74,30 @@ const WeekInReview: React.FC<WeekInReviewProps> = ({ weekStart, weekEnd }) => {
           while (current <= end) {
             const dateStr = current.toISOString().split("T")[0];
             const daySignals = byDate.get(dateStr) || {};
-            const completed = activeSignals.filter((key) => {
-              const val = daySignals[key];
-              if (val === undefined) return false;
-              const config = allSignals[key];
-              if (!config) return false;
-              if (config.type === "binary") return val === true;
-              if (config.type === "scale") return typeof val === "number" && val >= 4;
-              if (config.hasGoal && signalGoals[key]) {
-                return typeof val === "number" && val >= signalGoals[key];
-              }
-              return typeof val === "number" && val > 0;
-            });
-            const rate =
-              activeSignals.length > 0
-                ? Math.round((completed.length / activeSignals.length) * 100)
-                : 0;
+            // Use the same scorer the rest of the app uses: persisted
+            // _dailyScore wins, otherwise weighted client-side computation
+            // (binary 0/100, scale value/5*100, number value/goal*100). The
+            // old simple-threshold logic disagreed with the Compass score
+            // and was the reason this view "didn't work".
+            const rate = computeDayScore(
+              daySignals,
+              activeSignals,
+              allSignals,
+              signalGoals,
+              true, // historical mode: only count signals with data
+            );
+
+            // Strip _dailyScore from the public DaySignals.signals so
+            // downstream rendering (if any) doesn't see it as a metric.
+            const cleanSignals: Record<string, number | boolean> = {};
+            for (const [k, v] of Object.entries(daySignals)) {
+              if (k.startsWith("_")) continue;
+              cleanSignals[k] = v as number | boolean;
+            }
 
             dailySignals.push({
               date: dateStr,
-              signals: daySignals,
+              signals: cleanSignals,
               completionRate: rate,
             });
             current.setDate(current.getDate() + 1);

@@ -28,7 +28,8 @@ import ChecklistSection from "./components/ChecklistSection";
 import QuestionsSection from "./components/QuestionsSection";
 import WeekInReview from "./components/WeekInReview";
 import QuestionHistory from "./components/QuestionHistory";
-import WeeklyTaskPlanner from "./components/WeeklyTaskPlanner";
+import InlineTaskList from "./components/InlineTaskList";
+import LastWeekTasks from "./components/LastWeekTasks";
 
 type ChecklistConfigItem = Omit<ChecklistItem, "checked">;
 type QuestionConfigItem = Omit<QuestionItem, "answer">;
@@ -741,12 +742,41 @@ const Review: React.FC = () => {
         </div>
       </CollapsibleSection>
 
-      {/* Checklist Section - always visible (core) */}
+      {/* Checklist Section - always visible (core).
+          Each task-related checklist item exposes the relevant task list
+          inline via the chevron, so the user can review/edit that list
+          right where the to-do prompts them to do it. */}
       <ChecklistSection
         items={checklist}
         onToggle={handleChecklistToggle}
         progress={checklistProgress}
         disabled={!canEdit}
+        renderDetail={(id) => {
+          if (id === "last-todos") {
+            return <LastWeekTasks weekStart={weekStart} />;
+          }
+          if (id === "weekly-tasks") {
+            return (
+              <InlineTaskList
+                type="week"
+                emptyText="No weekly tasks yet"
+                addPlaceholder="Add a weekly task..."
+                disabled={!canEdit}
+              />
+            );
+          }
+          if (id === "future-tasks") {
+            return (
+              <InlineTaskList
+                type="future"
+                emptyText="No future tasks"
+                addPlaceholder="Add a future task..."
+                disabled={!canEdit}
+              />
+            );
+          }
+          return null;
+        }}
       />
 
       {/* Questions Section - always visible (core) */}
@@ -765,17 +795,6 @@ const Review: React.FC = () => {
       >
         <QuestionHistory />
       </CollapsibleSection>
-
-      {/* Plan Next Week - collapsible */}
-      {!isViewingPast && (
-        <CollapsibleSection
-          title="Plan Next Week"
-          collapsed={collapsedSections.has("taskPlanner")}
-          onToggle={() => toggleSection("taskPlanner")}
-        >
-          <WeeklyTaskPlanner disabled={!canEdit} />
-        </CollapsibleSection>
-      )}
 
       {/* Complete / Edit buttons - only for current week */}
       {!isViewingPast && (

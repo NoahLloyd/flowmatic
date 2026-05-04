@@ -30,6 +30,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useTimezone } from "../../context/TimezoneContext";
 import MorningTasks from "./MorningTasks";
+import { pickNextPrompt, recordPromptShown } from "../../utils/promptPicker";
 
 const Morning = () => {
   const { user } = useAuth();
@@ -605,6 +606,40 @@ const Morning = () => {
   // Current activity
   const currentActivity = activities[currentActivityIndex];
 
+  // Currently displayed writing prompt for this activity, if any. Picked
+  // once per (activity-id, date) so the user gets a stable prompt within
+  // the session but a fresh one tomorrow.
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
+  useEffect(() => {
+    if (
+      currentActivity?.type === "writing" &&
+      currentActivity.prompts &&
+      currentActivity.prompts.length > 0
+    ) {
+      const key = `${currentActivity.id}:${selectedDate}`;
+      const stored = localStorage.getItem("activePromptByKey:" + key);
+      if (stored && currentActivity.prompts.includes(stored)) {
+        setActivePrompt(stored);
+        return;
+      }
+      const pick = pickNextPrompt(currentActivity.prompts, currentActivity.id);
+      if (pick) {
+        recordPromptShown(pick, currentActivity.id);
+        localStorage.setItem("activePromptByKey:" + key, pick);
+        setActivePrompt(pick);
+      } else {
+        setActivePrompt(null);
+      }
+    } else {
+      setActivePrompt(null);
+    }
+  }, [
+    currentActivity?.id,
+    currentActivity?.type,
+    currentActivity?.prompts,
+    selectedDate,
+  ]);
+
   // Handle click event on next button
   const handleNextButtonClick = () => {
     nextActivity();
@@ -714,8 +749,17 @@ const Morning = () => {
     setSelectedDate(newToday);
   }, [timezone]);
 
+  // The tasks activity needs the full window width so users can see daily,
+  // weekly, future, and Obsidian buckets side-by-side without horizontal
+  // cramping. Other activities stay at the readable max-w-4xl text width.
+  const isTasksActivity = currentActivity?.type === "tasks";
+
   return (
-    <div className="max-w-4xl mx-auto p-8 dark:bg-slate-900">
+    <div
+      className={`mx-auto dark:bg-slate-900 ${
+        isTasksActivity ? "max-w-none px-4 py-4" : "max-w-4xl p-8"
+      }`}
+    >
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -926,17 +970,31 @@ const Morning = () => {
       <div className="w-full mt-4">
         {/* Stream of Consciousness Writing */}
         {currentActivity.type === "writing" && (
-          <textarea
-            ref={writingTextareaRef}
-            value={currentEntry}
-            onChange={handleTextChange}
-            onKeyDown={handleTextareaKeyDown}
-            placeholder="Write your morning entry here..."
-            className={`w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 ${
-              isTextBlurred ? "blur-sm" : ""
-            }`}
-            spellCheck="true"
-          />
+          <div className="flex flex-col gap-3 h-[calc(100vh-16rem)]">
+            {activePrompt && (
+              <div className="px-5 py-3 rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-200/70 dark:border-amber-800/40 text-amber-900 dark:text-amber-100 text-base leading-snug shrink-0">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400 mr-2">
+                  Prompt
+                </span>
+                {activePrompt}
+              </div>
+            )}
+            <textarea
+              ref={writingTextareaRef}
+              value={currentEntry}
+              onChange={handleTextChange}
+              onKeyDown={handleTextareaKeyDown}
+              placeholder={
+                activePrompt
+                  ? "Write in response to the prompt..."
+                  : "Write your morning entry here..."
+              }
+              className={`w-full flex-1 min-h-0 p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:focus:ring-slate-600 resize-none font-sans text-slate-700 dark:text-slate-200 text-lg leading-relaxed placeholder-slate-400 dark:placeholder-slate-500 ${
+                isTextBlurred ? "blur-sm" : ""
+              }`}
+              spellCheck="true"
+            />
+          </div>
         )}
 
         {/* Visualization */}

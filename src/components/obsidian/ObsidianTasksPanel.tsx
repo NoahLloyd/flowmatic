@@ -53,6 +53,15 @@ interface Props {
   allowedTypes?: TaskType[]; // which buckets to offer; defaults to ["day","week","future"]
   title?: string;
   initiallyExpanded?: boolean;
+  // "default" = panel-style header (sentence case, medium weight).
+  // "section" = matches a sibling SectionHeader (uppercase tracking-wider,
+  // slate palette) so the panel can sit alongside other source buckets.
+  headerVariant?: "default" | "section";
+  // Optional controlled expand state — when both are provided, the parent
+  // owns expand/collapse so the panel can size itself with `flex-1` like
+  // its siblings instead of relying on its internal state.
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 const PRIORITY_MARK: Record<string, string> = {
@@ -71,10 +80,18 @@ const ObsidianTasksPanel: React.FC<Props> = ({
   allowedTypes = ["day", "week", "future"],
   title = "From Obsidian",
   initiallyExpanded = true,
+  headerVariant = "default",
+  expanded: controlledExpanded,
+  onExpandedChange,
 }) => {
   const [tasks, setTasks] = useState<ObsidianTask[]>([]);
   const [importedHashes, setImportedHashes] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(initiallyExpanded);
+  const expanded = controlledExpanded ?? internalExpanded;
+  const setExpanded = (next: boolean) => {
+    if (onExpandedChange) onExpandedChange(next);
+    else setInternalExpanded(next);
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -150,21 +167,42 @@ const ObsidianTasksPanel: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col min-h-0">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors mb-1.5 shrink-0"
-      >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5" />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5" />
-        )}
-        <FileText className="w-3.5 h-3.5" />
-        <span>{title}</span>
-        <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
-          {visible.length}
-        </span>
-      </button>
+      {headerVariant === "section" ? (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 w-full text-left mb-1.5 group/sh shrink-0"
+        >
+          <span className="text-slate-400 dark:text-slate-500 group-hover/sh:text-slate-600 dark:group-hover/sh:text-slate-300 transition-colors">
+            {expanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-hover/sh:text-slate-700 dark:group-hover/sh:text-slate-200 transition-colors">
+            {title}
+          </span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
+            {visible.length}
+          </span>
+        </button>
+      ) : (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors mb-1.5 shrink-0"
+        >
+          {expanded ? (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5" />
+          )}
+          <FileText className="w-3.5 h-3.5" />
+          <span>{title}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
+            {visible.length}
+          </span>
+        </button>
+      )}
 
       {expanded && (
         <div className="space-y-0.5 overflow-y-auto flex-1 min-h-0 pl-1">

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import Sidebar from "./Sidebar";
 import { useTheme } from "../../context/ThemeContext";
 import { useTimer } from "../../hooks/useTimer";
 import { useAuth } from "../../context/AuthContext";
+import { useFocusMode } from "../../context/FocusModeContext";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ type LayoutProps = {
 const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
-  const [isFocusMode, setIsFocusMode] = useState(false);
+  const { isFocusMode } = useFocusMode();
 
   // Theme-based default colors for dark/light mode
   const defaultLightFromColor = "#E8CBC0";
@@ -82,32 +83,8 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
     };
   }, [synchronizeTimerState]);
 
-  // Focus mode keyboard shortcut (backslash to toggle)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if focused on input elements
-      if (
-        document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement ||
-        document.activeElement instanceof HTMLSelectElement ||
-        (document.activeElement &&
-          document.activeElement.hasAttribute("contenteditable"))
-      ) {
-        return;
-      }
-
-      // Toggle focus mode with backslash
-      if (e.key === "\\") {
-        e.preventDefault();
-        setIsFocusMode((prev) => !prev);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
+  // Focus mode shortcut (backslash) lives in FocusModeContext so any page
+  // — not just Layout — can react to it.
 
   // Determine if we should show the timer in the sidebar
   // - Show only if timer is actually running (not paused)

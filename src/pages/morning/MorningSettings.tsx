@@ -145,6 +145,21 @@ const MorningSettings = () => {
     }));
   };
 
+  // Update writing-activity prompt list. We preserve the user's exact
+  // typing — including trailing spaces and blank lines — and only split
+  // on newlines for storage. Trimming/filtering happens lazily at the
+  // picker site (utils/promptPicker.ts) so an in-progress empty new line
+  // doesn't immediately disappear out from under the cursor.
+  const updateActivityPrompts = (id: string, raw: string) => {
+    const prompts = raw.split("\n");
+    setWeeklySchedule((prev) => ({
+      ...prev,
+      [selectedDay]: prev[selectedDay].map((activity) =>
+        activity.id === id ? { ...activity, prompts } : activity
+      ),
+    }));
+  };
+
   // Remove an activity
   const removeActivity = (id: string) => {
     // Remove the restriction on deleting the writing activity
@@ -416,6 +431,36 @@ const MorningSettings = () => {
                                 placeholder="Enter breathwork instructions..."
                                 className="w-full h-24 px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md dark:bg-slate-800 text-slate-800 dark:text-slate-200 resize-none"
                               />
+                            </div>
+                          )}
+
+                          {/* Optional rotating prompts for journaling. The
+                              picker shows a least-recently-seen prompt each
+                              morning; leave empty for a freeform entry. */}
+                          {activity.type === "writing" && (
+                            <div>
+                              <label className="block text-sm text-slate-600 dark:text-slate-400 mb-2">
+                                Journaling Prompts (one per line, optional):
+                              </label>
+                              <textarea
+                                value={(activity.prompts || []).join("\n")}
+                                onChange={(e) =>
+                                  updateActivityPrompts(
+                                    activity.id,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={
+                                  "What would make today great?\nWhat are you avoiding?\nWho do you want to be today?"
+                                }
+                                rows={5}
+                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md dark:bg-slate-800 text-slate-800 dark:text-slate-200 resize-y text-sm leading-relaxed"
+                              />
+                              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-500">
+                                Each line is a prompt. The morning page picks
+                                the least-recently-seen one. Leave empty to
+                                journal without a prompt.
+                              </p>
                             </div>
                           )}
                         </div>

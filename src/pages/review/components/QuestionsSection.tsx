@@ -31,12 +31,9 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
       </div>
 
       {/* Questions List */}
-      <div className="space-y-6">
+      <div className="space-y-5">
         {questions.map((question) => (
-          <div
-            key={question.id}
-            className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5"
-          >
+          <div key={question.id}>
             <label
               htmlFor={`question-${question.id}`}
               className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2"
@@ -46,7 +43,7 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
 
             {/* Attached Obsidian notes — click to open in Obsidian */}
             {question.obsidianLinks && question.obsidianLinks.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
+              <div className="flex flex-wrap gap-1.5 mb-2">
                 {question.obsidianLinks.map((file) => (
                   <button
                     key={file}
@@ -81,7 +78,7 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
               disabled={disabled}
               className="
                 w-full px-4 py-3 rounded-lg
-                bg-slate-50 dark:bg-slate-900/50
+                bg-white dark:bg-slate-800
                 border border-slate-200 dark:border-slate-700
                 text-slate-700 dark:text-slate-200
                 placeholder-slate-400 dark:placeholder-slate-500

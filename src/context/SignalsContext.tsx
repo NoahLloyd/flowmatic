@@ -68,13 +68,13 @@ const SignalsContext = createContext<SignalsContextType>({
 
 // ── Helpers for heatmap (client-side historical scoring) ───────
 
-function isTruthy(v: unknown): boolean {
+export function isTruthy(v: unknown): boolean {
   return v === true || v === "true" || v === 1 || v === "1";
 }
 
 /** Compute a signal score for a single day's worth of signal data.
  *  Used by fetchHeatmapData for days without a persisted _dailyScore. */
-const computeDayScore = (
+export const computeDayScore = (
   daySignals: Record<string, any>,
   activeSignals: string[],
   availableSignals: Record<string, SignalConfig>,
@@ -180,10 +180,58 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const { timezone } = useTimezone();
-  const [signals, setSignals] = useState<Record<string, number | boolean>>({});
-  const [signalScore, setSignalScore] = useState(0);
-  const [totalSignals, setTotalSignals] = useState(0);
-  const [completedSignals, setCompletedSignals] = useState(0);
+  // Hydrate today's signal state from the previous session's snapshot so
+  // the sidebar/score card don't flash from 0% → real on every cold boot.
+  // We only restore when the cached date matches today (in user TZ); a
+  // stale day's data would mislead until the fresh fetch lands.
+  const todayKeyForCache = (() => {
+    try {
+      return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(
+        new Date()
+      );
+    } catch {
+      return new Date().toISOString().split("T")[0];
+    }
+  })();
+  const [signals, setSignals] = useState<Record<string, number | boolean>>(
+    () => {
+      try {
+        const raw = localStorage.getItem("cachedSignalsToday");
+        if (!raw) return {};
+        const parsed = JSON.parse(raw) as {
+          day: string;
+          signals: Record<string, number | boolean>;
+        };
+        return parsed.day === todayKeyForCache ? parsed.signals : {};
+      } catch {
+        return {};
+      }
+    }
+  );
+  const [signalScore, setSignalScore] = useState(() => {
+    try {
+      const raw = localStorage.getItem("cachedSignalScoreToday");
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { day: string; score: number };
+      return parsed.day === todayKeyForCache ? parsed.score : 0;
+    } catch {
+      return 0;
+    }
+  });
+  const [totalSignals, setTotalSignals] = useState(() => {
+    const cached = localStorage.getItem("cachedTotalSignals");
+    return cached ? parseInt(cached, 10) : 0;
+  });
+  const [completedSignals, setCompletedSignals] = useState(() => {
+    try {
+      const raw = localStorage.getItem("cachedCompletedSignalsToday");
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { day: string; count: number };
+      return parsed.day === todayKeyForCache ? parsed.count : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [signalStreak, setSignalStreak] = useState(() => {
     const cached = localStorage.getItem("signalStreak");
     return cached ? parseInt(cached, 10) : 0;
@@ -472,8 +520,12 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const today = getTodayInUserTimezone();
 
-      // Try the edge function first
-      const { data: sessionData } = await supabase.auth.refreshSession();
+      // Read the existing access token from local session. We do NOT call
+      // supabase.auth.refreshSession() here: refresh tokens are single-use, so
+      // concurrent refreshes (rapid signal toggles) race and invalidate the
+      // session, logging the user out. Auto-refresh in the supabase client
+      // handles token rotation safely.
+      const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
       let edgeSuccess = false;
 
@@ -527,6 +579,31 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
               localStorage.setItem("signalStreakPoints", String(data.streak.points));
               localStorage.setItem("signalStreakLongest", String(data.streak.longest));
               localStorage.setItem("signalStreakMilestones", JSON.stringify(data.streak.milestones));
+
+              // Cache today's per-signal values + score so the next cold
+              // boot can render the UI in its prior state instead of
+              // flashing 0% / empty cards before the fetch returns.
+              const dayKey = today;
+              try {
+                localStorage.setItem(
+                  "cachedSignalsToday",
+                  JSON.stringify({ day: dayKey, signals: data.signals })
+                );
+                localStorage.setItem(
+                  "cachedSignalScoreToday",
+                  JSON.stringify({ day: dayKey, score: data.score })
+                );
+                localStorage.setItem(
+                  "cachedCompletedSignalsToday",
+                  JSON.stringify({ day: dayKey, count: data.completedSignals })
+                );
+                localStorage.setItem(
+                  "cachedTotalSignals",
+                  String(data.totalSignals)
+                );
+              } catch {
+                /* quota error, ignore */
+              }
             }
           }
         } catch (e) {

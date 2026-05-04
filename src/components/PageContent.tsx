@@ -40,6 +40,21 @@ const PageContent = () => {
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   // State for Current Task Picker
   const [isCurrentTaskPickerOpen, setIsCurrentTaskPickerOpen] = useState(false);
+
+  // Mirror the picker-open state to a body data attribute so global
+  // keyboard handlers in other components (e.g. Compass's signal
+  // shortcuts, which don't have access to this React state) can bail out
+  // and stop hijacking number keys while the picker is open.
+  useEffect(() => {
+    if (isCurrentTaskPickerOpen) {
+      document.body.dataset.taskPickerOpen = "true";
+    } else {
+      delete document.body.dataset.taskPickerOpen;
+    }
+    return () => {
+      delete document.body.dataset.taskPickerOpen;
+    };
+  }, [isCurrentTaskPickerOpen]);
   // Track previous selected page so we can return to it from Streak
   const [previousPage, setPreviousPage] = useState("Compass");
 
@@ -269,9 +284,14 @@ const PageContent = () => {
     isStopwatchMode,
     toggleStopwatchMode,
     sessionMinutes,
-    // Current task
+    // Current task(s)
     currentTask,
+    currentTasks,
     setCurrentTask,
+    toggleCurrentTask,
+    addCurrentTask,
+    removeCurrentTask,
+    clearCurrentTasks,
     // DND toggle
     dndEnabled,
     toggleDnd,
@@ -287,12 +307,22 @@ const PageContent = () => {
 
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Listen for clear-current-task event from keyboard shortcut
+  // Listen for clear-current-task event from keyboard shortcut.
+  // Also listen for "remove-current-task" (one specific title) so DailyTasks
+  // can drop a single completed task without wiping the rest.
   useEffect(() => {
-    const handleClear = () => setCurrentTask("");
+    const handleClear = () => clearCurrentTasks();
+    const handleRemove = (e: Event) => {
+      const detail = (e as CustomEvent<{ title: string }>).detail;
+      if (detail?.title) removeCurrentTask(detail.title);
+    };
     window.addEventListener("clear-current-task", handleClear);
-    return () => window.removeEventListener("clear-current-task", handleClear);
-  }, [setCurrentTask]);
+    window.addEventListener("remove-current-task", handleRemove as EventListener);
+    return () => {
+      window.removeEventListener("clear-current-task", handleClear);
+      window.removeEventListener("remove-current-task", handleRemove as EventListener);
+    };
+  }, [clearCurrentTasks, removeCurrentTask]);
 
   // Use refs so the IPC listener always calls the latest handler
   // without needing to re-register (which leaked listeners before)
@@ -543,7 +573,9 @@ const PageContent = () => {
             onToggleStopwatchMode={toggleStopwatchMode}
             sessionMinutes={sessionMinutes}
             currentTask={currentTask}
+            currentTasks={currentTasks}
             onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
+            onRemoveTask={removeCurrentTask}
             dndEnabled={dndEnabled}
             onToggleDnd={toggleDnd}
           />
@@ -617,8 +649,11 @@ const PageContent = () => {
       <CurrentTaskPicker
         isOpen={isCurrentTaskPickerOpen}
         onClose={() => setIsCurrentTaskPickerOpen(false)}
-        currentTask={currentTask}
-        onSetCurrentTask={setCurrentTask}
+        currentTasks={currentTasks}
+        onToggleTask={toggleCurrentTask}
+        onAddTask={addCurrentTask}
+        onRemoveTask={removeCurrentTask}
+        onClearAll={clearCurrentTasks}
       />
       <ShortcutsHelpModal
         isOpen={isShortcutsHelpOpen}

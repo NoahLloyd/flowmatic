@@ -30,6 +30,11 @@ export interface MorningActivity {
   timerMinutes: number;
   text?: string;
   title: string;
+  // Optional rotating prompts for the writing/journaling activity. When
+  // non-empty, the activity displays one prompt at a time chosen via a
+  // least-recently-seen rotation (see utils/promptPicker.ts). Empty / undef
+  // = no prompt (current behaviour).
+  prompts?: string[];
 }
 
 export type DayOfWeek =
