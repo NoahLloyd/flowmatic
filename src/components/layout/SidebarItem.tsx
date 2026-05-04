@@ -19,10 +19,11 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 }) => {
   const getClasses = () => {
     if (highlight === "urgent") {
+      // Always show the muted red wash (same as the old "selected" state)
+      // so the item reads as urgent whether or not it's the current page —
+      // visible from across the sidebar without becoming a stoplight.
       return {
-        bg: isSelected
-          ? "bg-red-500/20 dark:bg-red-500/15"
-          : "hover:bg-red-500/10 dark:hover:bg-red-500/10",
+        bg: "bg-red-500/20 dark:bg-red-500/15 hover:bg-red-500/30 dark:hover:bg-red-500/25",
         accent: "bg-red-500",
         icon: "text-red-600 dark:text-red-400",
         text: "text-red-700 dark:text-red-300 font-semibold",

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Sun, Sparkles } from "lucide-react";
 import { dispatchTaskAdded, subscribeToTaskAdded } from "../../utils/taskEvents";
 import ObsidianTasksPanel, {
   ObsidianTask,
@@ -23,6 +23,20 @@ const TYPE_LABELS: Record<string, string> = {
   future: "F",
 };
 
+const TYPE_TITLES: Record<string, string> = {
+  day: "Move to Today",
+  week: "Move to Weekly",
+  future: "Move to Future",
+};
+
+const formatTodayLabel = () => {
+  return new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+};
+
 const MorningTasks: React.FC = () => {
   const [dayTasks, setDayTasks] = useState<Task[]>([]);
   const [weekTasks, setWeekTasks] = useState<Task[]>([]);
@@ -32,7 +46,7 @@ const MorningTasks: React.FC = () => {
   // Collapsible states
   const [showWeekly, setShowWeekly] = useState(true);
   const [showFuture, setShowFuture] = useState(false);
-  const [showObsidian, setShowObsidian] = useState(true);
+  const [showObsidian, setShowObsidian] = useState(false);
 
   const vaultAbsRef = useRef<string | null>(null);
   const handleObsidianImport = useCallback(
@@ -329,10 +343,12 @@ const MorningTasks: React.FC = () => {
     task,
     type,
     index,
+    primary = false,
   }: {
     task: Task;
     type: TaskType;
     index: number;
+    primary?: boolean;
   }) => {
     const isFocused = focusedTaskId === task.id;
     const otherTypes = MORNING_TYPES.filter((t) => t !== type);
@@ -345,52 +361,74 @@ const MorningTasks: React.FC = () => {
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             onClick={() => setFocusedTaskId(task.id)}
-            className={`flex items-center gap-2.5 py-1 relative cursor-pointer rounded-sm px-1 -mx-1 transition-colors ${
+            className={`group relative flex items-center gap-3 cursor-pointer rounded-md px-2 transition-colors ${
+              primary ? "py-2" : "py-1.5"
+            } ${
               snapshot.isDragging
                 ? "bg-blue-50 dark:bg-blue-900/30 shadow-md ring-1 ring-blue-300 dark:ring-blue-700"
                 : isFocused
-                ? "bg-gray-100 dark:bg-gray-700/50"
-                : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                ? "bg-slate-100 dark:bg-slate-700/60"
+                : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
             }`}
           >
+            {/* Focus accent — subtle left edge bar when focused */}
+            {isFocused && (
+              <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-blue-500 dark:bg-blue-400" />
+            )}
+
             {/* Checkbox */}
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 handleToggleComplete(task.id, type);
               }}
-              className="w-3.5 h-3.5 shrink-0 rounded flex items-center justify-center cursor-pointer border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500"
+              role="checkbox"
+              aria-checked="false"
+              tabIndex={-1}
+              className="w-4 h-4 shrink-0 rounded border border-slate-300 dark:border-slate-500 bg-white dark:bg-slate-800 hover:border-slate-500 dark:hover:border-slate-300 transition-colors"
             />
 
-            {/* Title - full text, row grows and column scrolls horizontally if needed */}
-            <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap pr-12">
+            {/* Title */}
+            <span
+              className={`flex-1 min-w-0 truncate ${
+                primary
+                  ? "text-[15px] text-slate-800 dark:text-slate-100"
+                  : "text-sm text-slate-600 dark:text-slate-300"
+              }`}
+              title={task.title}
+            >
               {task.title}
             </span>
 
-            {/* Type switch buttons - overlaid on the right, over the text */}
-            {(isFocused || snapshot.isDragging) && (
-              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-gray-100/90 dark:bg-gray-700/90 rounded px-0.5 py-0.5 backdrop-blur-sm">
-                {otherTypes.map((t) => (
-                  <button
-                    key={t}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleChangeType(task, type, t);
-                    }}
-                    className="w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-600 transition-colors"
-                  >
-                    {TYPE_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Type switch — subtle badges, always present, brighter on hover/focus */}
+            <div
+              className={`flex items-center gap-0.5 shrink-0 transition-opacity ${
+                isFocused || snapshot.isDragging
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100"
+              }`}
+            >
+              {otherTypes.map((t) => (
+                <button
+                  key={t}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleChangeType(task, type, t);
+                  }}
+                  title={TYPE_TITLES[t]}
+                  className="w-5 h-5 flex items-center justify-center rounded text-[10px] font-semibold text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-600 border border-transparent hover:border-slate-200 dark:hover:border-slate-500 transition-colors"
+                >
+                  {TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </Draggable>
     );
   };
 
-  // Section header for collapsible sections
+  // Section header for collapsible side sections
   const SectionHeader = ({
     title,
     count,
@@ -404,35 +442,51 @@ const MorningTasks: React.FC = () => {
   }) => (
     <button
       onClick={onToggle}
-      className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors mb-1.5 shrink-0"
+      className="flex items-center gap-2 w-full text-left mb-1.5 group/sh"
     >
-      {isExpanded ? (
-        <ChevronDown className="w-3.5 h-3.5" />
-      ) : (
-        <ChevronRight className="w-3.5 h-3.5" />
-      )}
-      <span>{title}</span>
-      <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">
+      <span className="text-slate-400 dark:text-slate-500 group-hover/sh:text-slate-600 dark:group-hover/sh:text-slate-300 transition-colors">
+        {isExpanded ? (
+          <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5" />
+        )}
+      </span>
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 group-hover/sh:text-slate-700 dark:group-hover/sh:text-slate-200 transition-colors">
+        {title}
+      </span>
+      <span className="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
         {count}
       </span>
     </button>
   );
 
-  const EmptyState = () => (
-    <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1 pl-1">
-      No tasks
+  const PrimaryEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-10 px-6 rounded-md border border-dashed border-slate-200 dark:border-slate-700">
+      <Sparkles className="w-5 h-5 text-slate-300 dark:text-slate-600 mb-2" />
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        Nothing planned yet
+      </p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+        Drag tasks from the right or press <kbd className="px-1 py-0.5 rounded border border-slate-200 dark:border-slate-600 text-[10px] font-mono">D</kbd>
+      </p>
+    </div>
+  );
+
+  const SecondaryEmptyState = ({ label }: { label: string }) => (
+    <p className="text-xs text-slate-400 dark:text-slate-500 italic px-2 py-1.5">
+      {label}
     </p>
   );
 
   if (isLoading) {
     return (
-      <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700">
-        <div className="grid grid-cols-2 gap-8">
+      <div className="w-full h-[calc(100vh-16rem)] px-6 py-5 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700">
+        <div className="grid grid-cols-[1.2fr_1fr] gap-10">
           {[0, 1].map((col) => (
             <div key={col} className="space-y-3">
-              <div className="h-5 w-24 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-6 w-32 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-6 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+                <div key={i} className="h-7 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
               ))}
             </div>
           ))}
@@ -445,32 +499,49 @@ const MorningTasks: React.FC = () => {
     <div
       ref={containerRef}
       tabIndex={0}
-      className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden outline-none"
+      className="w-full h-[calc(100vh-16rem)] px-6 py-5 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden outline-none"
     >
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-2 gap-8 flex-1 min-h-0 overflow-hidden">
-          {/* Left column: Daily */}
+        <div className="grid grid-cols-[1.2fr_1fr] gap-10 flex-1 min-h-0 overflow-hidden">
+          {/* Left column: Today (primary) */}
           <div className="flex flex-col min-w-0 min-h-0">
-            <div className="flex items-center justify-between mb-3 shrink-0">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Daily
-              </h3>
-              <span className="text-xs text-gray-400 dark:text-gray-500">
-                {dayTasks.length}
+            <div className="flex items-baseline justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <Sun className="w-5 h-5 text-amber-400 dark:text-amber-300" />
+                <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 leading-none">
+                  Today
+                </h3>
+                <span className="text-sm text-slate-400 dark:text-slate-500 tabular-nums">
+                  {dayTasks.length}
+                </span>
+              </div>
+              <span className="text-xs text-slate-400 dark:text-slate-500">
+                {formatTodayLabel()}
               </span>
             </div>
+
             <Droppable droppableId="day">
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 rounded-md transition-colors ${
-                    snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
+                  className={`space-y-1 overflow-y-auto overflow-x-hidden flex-1 min-h-0 rounded-md transition-colors ${
+                    snapshot.isDraggingOver
+                      ? "bg-blue-50/50 dark:bg-blue-900/10 ring-1 ring-blue-200 dark:ring-blue-800"
+                      : ""
                   }`}
                 >
-                  {dayTasks.length === 0 && !snapshot.isDraggingOver && <EmptyState />}
+                  {dayTasks.length === 0 && !snapshot.isDraggingOver && (
+                    <PrimaryEmptyState />
+                  )}
                   {dayTasks.map((task, index) => (
-                    <TaskRow key={task.id} task={task} type="day" index={index} />
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      type="day"
+                      index={index}
+                      primary
+                    />
                   ))}
                   {provided.placeholder}
                 </div>
@@ -478,73 +549,91 @@ const MorningTasks: React.FC = () => {
             </Droppable>
           </div>
 
-          {/* Right column: Weekly + Future + Obsidian */}
-          <div className="flex flex-col min-w-0 min-h-0 overflow-y-auto gap-3">
-            {/* Weekly section */}
-            <div className={showWeekly ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
-              <SectionHeader
-                title="Weekly"
-                count={weekTasks.length}
-                isExpanded={showWeekly}
-                onToggle={() => setShowWeekly(!showWeekly)}
-              />
-              {showWeekly && (
-                <Droppable droppableId="week">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
-                        snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
-                      }`}
-                    >
-                      {weekTasks.length === 0 && !snapshot.isDraggingOver && <EmptyState />}
-                      {weekTasks.map((task, index) => (
-                        <TaskRow key={task.id} task={task} type="week" index={index} />
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              )}
-            </div>
+          {/* Right column: Sources (Weekly + Future + Obsidian) */}
+          <div className="flex flex-col min-w-0 min-h-0 overflow-y-auto border-l border-slate-100 dark:border-slate-700/60 pl-6">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 shrink-0">
+              Pull from
+            </p>
 
-            {/* Future section */}
-            <div className={showFuture ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
-              <SectionHeader
-                title="Future"
-                count={futureTasks.length}
-                isExpanded={showFuture}
-                onToggle={() => setShowFuture(!showFuture)}
-              />
-              {showFuture && (
-                <Droppable droppableId="future">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`space-y-0.5 overflow-y-auto overflow-x-auto flex-1 min-h-0 pl-1 rounded-md transition-colors ${
-                        snapshot.isDraggingOver ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
-                      }`}
-                    >
-                      {futureTasks.length === 0 && !snapshot.isDraggingOver && <EmptyState />}
-                      {futureTasks.map((task, index) => (
-                        <TaskRow key={task.id} task={task} type="future" index={index} />
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              )}
-            </div>
+            <div className="flex flex-col gap-5 flex-1 min-h-0">
+              {/* Weekly section */}
+              <div className={showWeekly ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
+                <SectionHeader
+                  title="Weekly"
+                  count={weekTasks.length}
+                  isExpanded={showWeekly}
+                  onToggle={() => setShowWeekly(!showWeekly)}
+                />
+                {showWeekly && (
+                  <Droppable droppableId="week">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`space-y-0.5 overflow-y-auto overflow-x-hidden flex-1 min-h-0 rounded-md transition-colors ${
+                          snapshot.isDraggingOver
+                            ? "bg-blue-50/50 dark:bg-blue-900/10 ring-1 ring-blue-200 dark:ring-blue-800"
+                            : ""
+                        }`}
+                      >
+                        {weekTasks.length === 0 && !snapshot.isDraggingOver && (
+                          <SecondaryEmptyState label="No weekly tasks" />
+                        )}
+                        {weekTasks.map((task, index) => (
+                          <TaskRow key={task.id} task={task} type="week" index={index} />
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                )}
+              </div>
 
-            {/* Obsidian inbox */}
-            <div className="min-w-0">
-              <ObsidianTasksPanel
-                defaultType="day"
-                onImport={handleObsidianImport}
-                initiallyExpanded={showObsidian}
-              />
+              {/* Future section */}
+              <div className={showFuture ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
+                <SectionHeader
+                  title="Future"
+                  count={futureTasks.length}
+                  isExpanded={showFuture}
+                  onToggle={() => setShowFuture(!showFuture)}
+                />
+                {showFuture && (
+                  <Droppable droppableId="future">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`space-y-0.5 overflow-y-auto overflow-x-hidden flex-1 min-h-0 rounded-md transition-colors ${
+                          snapshot.isDraggingOver
+                            ? "bg-blue-50/50 dark:bg-blue-900/10 ring-1 ring-blue-200 dark:ring-blue-800"
+                            : ""
+                        }`}
+                      >
+                        {futureTasks.length === 0 && !snapshot.isDraggingOver && (
+                          <SecondaryEmptyState label="No future tasks" />
+                        )}
+                        {futureTasks.map((task, index) => (
+                          <TaskRow key={task.id} task={task} type="future" index={index} />
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                )}
+              </div>
+
+              {/* Obsidian inbox — controlled-expand so it shares vertical
+                  flex sizing with Weekly/Future identically. */}
+              <div className={showObsidian ? "flex flex-col flex-1 min-h-0 min-w-0" : ""}>
+                <ObsidianTasksPanel
+                  defaultType="day"
+                  onImport={handleObsidianImport}
+                  title="Obsidian"
+                  headerVariant="section"
+                  expanded={showObsidian}
+                  onExpandedChange={setShowObsidian}
+                />
+              </div>
             </div>
           </div>
         </div>

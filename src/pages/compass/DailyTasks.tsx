@@ -11,10 +11,49 @@ import {
 } from "@hello-pangea/dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
 
+// Hydrate daily task lists from a localStorage snapshot of the previous
+// fetch. Eliminates the boot-time skeleton flash — if today's data is
+// already cached, we render it immediately and only re-render if the
+// background fetch returns something different.
+const TODAY_KEY = () => new Date().toDateString();
+const ACTIVE_CACHE_KEY = "cachedDailyActive";
+const COMPLETED_CACHE_KEY = "cachedDailyCompleted";
+
+const readCachedTasks = (key: string): Task[] | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { day: string; tasks: Task[] };
+    if (parsed.day !== TODAY_KEY()) return null;
+    return parsed.tasks;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedTasks = (key: string, tasks: Task[]) => {
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ day: TODAY_KEY(), tasks })
+    );
+  } catch {
+    /* quota error etc, ignore */
+  }
+};
+
 const DailyTasks: React.FC = () => {
-  const [activeTasks, setActiveTasks] = useState<Task[]>([]);
-  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedActive = readCachedTasks(ACTIVE_CACHE_KEY);
+  const cachedCompleted = readCachedTasks(COMPLETED_CACHE_KEY);
+  const [activeTasks, setActiveTasks] = useState<Task[]>(cachedActive ?? []);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>(
+    cachedCompleted ?? []
+  );
+  // Skip the skeleton if we have cached data for today — the background
+  // fetch will quietly update the list if anything changed.
+  const [isLoading, setIsLoading] = useState(
+    cachedActive === null && cachedCompleted === null
+  );
   const { selected } = useNavigation();
   const { handleDeleteTask, handleChangeTaskType } = useTasks();
 
@@ -48,8 +87,12 @@ const DailyTasks: React.FC = () => {
   };
 
   const fetchTasks = async () => {
+    // Only show the skeleton if we have nothing on screen — once we have
+    // hydrated content, fetching runs silently in the background.
+    setIsLoading((prev) =>
+      activeTasks.length === 0 && completedTasks.length === 0 ? true : prev
+    );
     try {
-      setIsLoading(true);
       const allTasks = await api.getTasksByType("day");
 
       let active = allTasks.filter((task) => !task.completed);
@@ -72,6 +115,8 @@ const DailyTasks: React.FC = () => {
 
       setActiveTasks(active);
       setCompletedTasks(completed);
+      writeCachedTasks(ACTIVE_CACHE_KEY, active);
+      writeCachedTasks(COMPLETED_CACHE_KEY, completed);
     } catch (error) {
       console.error("Failed to fetch daily tasks:", error);
     } finally {
@@ -159,9 +204,26 @@ const DailyTasks: React.FC = () => {
             "day",
             currentOrder.filter((taskId) => taskId !== id)
           );
-          const currentTask = localStorage.getItem("currentTask") || "";
-          if (currentTask && currentTask === taskToMove.title) {
-            window.dispatchEvent(new CustomEvent("clear-current-task"));
+          // Drop just this title from the active "working on" set rather
+          // than clearing the whole set — multi-tasking users may have
+          // other tasks selected they don't want wiped.
+          let activeTitles: string[] = [];
+          try {
+            const raw = localStorage.getItem("currentTasks");
+            if (raw) activeTitles = JSON.parse(raw) || [];
+          } catch {
+            /* fall through */
+          }
+          if (activeTitles.length === 0) {
+            const legacy = localStorage.getItem("currentTask");
+            if (legacy) activeTitles = [legacy];
+          }
+          if (activeTitles.includes(taskToMove.title)) {
+            window.dispatchEvent(
+              new CustomEvent("remove-current-task", {
+                detail: { title: taskToMove.title },
+              })
+            );
           }
         }
       } else {
@@ -270,6 +332,11 @@ const DailyTasks: React.FC = () => {
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
+        return;
+      }
+
+      // Skip when the working-on picker is open so number keys go to it.
+      if (document.body.dataset.taskPickerOpen === "true") {
         return;
       }
 

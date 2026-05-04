@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import TimerDisplay from "./TimerDisplay";
 import FriendsProgressStats from "../../components/session/FriendsProgressStats";
 import Signals from "./signal/Signals";
@@ -8,7 +8,9 @@ import { useAuth } from "../../context/AuthContext";
 import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../settings/components/SignalSettings";
 import DailyTasks from "./DailyTasks";
 import BlockedTasks from "./BlockedTasks";
+import CompassStreakPanel from "./CompassStreakPanel";
 import ContextReminder from "./ContextReminder";
+import { useFocusMode } from "../../context/FocusModeContext";
 
 // Define the session form data interface
 interface SessionFormData {
@@ -43,9 +45,12 @@ interface CompassProps {
   isStopwatchMode?: boolean;
   onToggleStopwatchMode?: () => void;
   sessionMinutes?: number;
-  // Current task
+  // Current task(s) — primary is the most recently selected and is what
+  // gets pre-filled when recording a session.
   currentTask?: string;
+  currentTasks?: string[];
   onOpenTaskPicker?: () => void;
+  onRemoveTask?: (title: string) => void;
   // DND toggle
   dndEnabled?: boolean;
   onToggleDnd?: () => void;
@@ -73,12 +78,15 @@ const Compass: React.FC<CompassProps> = ({
   onToggleStopwatchMode = () => {},
   sessionMinutes = 60,
   currentTask = "",
+  currentTasks = [],
   onOpenTaskPicker = () => {},
+  onRemoveTask = () => {},
   dndEnabled = false,
   onToggleDnd = () => {},
 }) => {
   const [submittingSession, setSubmittingSession] = useState(false);
   const { user } = useAuth();
+  const { isFocusMode } = useFocusMode();
 
   // Refs for keyboard shortcuts
   const signalsRef = useRef<HTMLDivElement>(null);
@@ -177,6 +185,12 @@ const Compass: React.FC<CompassProps> = ({
 
       // Skip shortcuts when a quick-add modal is handling its own keys
       if (document.body.dataset.quickAddOpen === "true") {
+        return;
+      }
+
+      // Skip when the global "working on" task picker is open — its
+      // 1-9 toggles must not bleed through to the signal cards.
+      if (document.body.dataset.taskPickerOpen === "true") {
         return;
       }
 
@@ -423,16 +437,15 @@ const Compass: React.FC<CompassProps> = ({
     isModalOpen,
   ]);
 
-  const hasTask = Boolean(currentTask);
-
-  const taskTextClass = useMemo(() => {
-    if (!currentTask) return "";
-    const len = currentTask.length;
-    if (len <= 15) return "text-5xl";
-    if (len <= 30) return "text-4xl";
-    if (len <= 50) return "text-3xl";
-    return "text-2xl";
-  }, [currentTask]);
+  // Source of truth for the displayed working-on list. Falls back to the
+  // singular `currentTask` for older callers that pass only that.
+  const tasksToShow = currentTasks.length > 0
+    ? currentTasks
+    : currentTask
+    ? [currentTask]
+    : [];
+  const hasTask = tasksToShow.length > 0;
+  const isSingle = tasksToShow.length === 1;
 
   return (
     <div
@@ -447,14 +460,62 @@ const Compass: React.FC<CompassProps> = ({
 
       <ContextReminder isRunning={isRunning} />
 
-      {/* Current task */}
+      {/* Current task(s). Single and multi share the same shape (left
+          accent bar, "Working on" header, indigo pills). With one task
+          we omit the count and bump the pill text up so it still feels
+          like a hero element; with many we show the count. */}
       {hasTask && (
-        <div
-          onClick={onOpenTaskPicker}
-          className="cursor-pointer border-l-4 border-indigo-500 dark:border-indigo-400 pl-4 py-1 hover:opacity-70 transition-opacity"
-        >
-          <div className={`${taskTextClass} font-semibold text-gray-900 dark:text-white leading-tight break-words`}>
-            {currentTask}
+        <div className="border-l-4 border-indigo-500 dark:border-indigo-400 pl-4 py-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-400">
+              Working on
+            </span>
+            {!isSingle && (
+              <span className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+                {tasksToShow.length}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {tasksToShow.map((title, idx) => (
+              <div
+                key={title + idx}
+                onClick={onOpenTaskPicker}
+                className={`group flex items-center gap-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${
+                  isSingle ? "px-5 py-3" : "px-3.5 py-2"
+                }`}
+              >
+                {/* Primary indicator: filled dot for the most recently
+                    selected task (the one sessions pre-fill with), dimmer
+                    for the rest. Hidden when there's only one. */}
+                {!isSingle && (
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      idx === 0
+                        ? "bg-indigo-500 dark:bg-indigo-400"
+                        : "bg-indigo-300/60 dark:bg-indigo-500/40"
+                    }`}
+                  />
+                )}
+                <span
+                  className={`flex-1 font-semibold text-gray-900 dark:text-white truncate ${
+                    isSingle ? "text-3xl leading-tight" : "text-base"
+                  }`}
+                >
+                  {title}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveTask(title);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 text-xs transition-opacity"
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -504,13 +565,16 @@ const Compass: React.FC<CompassProps> = ({
         </div>
       </div>
 
-      {/* Bottom section: Daily Tasks and Blocked Tasks */}
+      {/* Bottom section: Daily Tasks + (Blocked Tasks | Streak Panel).
+          In focus mode the sidebar is hidden, so we replace the right slot
+          with a Compass-styled streak panel — the user keeps eyes on the
+          streak/score without giving up the distraction-free layout. */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
         <div className="lg:col-span-3 flex flex-col min-h-0">
           <DailyTasks />
         </div>
         <div className="lg:col-span-2 flex flex-col min-h-0">
-          <BlockedTasks />
+          {isFocusMode ? <CompassStreakPanel /> : <BlockedTasks />}
         </div>
       </div>
     </div>
