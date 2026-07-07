@@ -12,6 +12,7 @@ import path from "path";
 import * as fs from "fs";
 import { exec, execFile, spawn } from "child_process";
 import { registerInsightsIPC, disposeInsights } from "./main/insights";
+import { registerDayflowIPC } from "./main/dayflow";
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -567,6 +568,7 @@ ipcMain.handle("request-shortcuts-access", async () => {
 app.whenReady().then(() => {
   createWindow();
   registerInsightsIPC(() => mainWindow);
+  registerDayflowIPC();
 });
 
 app.on("before-quit", () => {
