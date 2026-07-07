@@ -19,6 +19,7 @@ import {
   Moon,
   Monitor,
   FileText,
+  Compass,
 } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { useTimezone } from "../../context/TimezoneContext";
@@ -137,6 +138,12 @@ const Settings = () => {
     !COMMON_TIMEZONES.includes(currentTimezone)
   );
 
+  // Which Compass layout to show: the classic timer/session view, or the
+  // Dayflow-powered variant that pulls focus hours from the Dayflow app.
+  const [compassVariant, setCompassVariant] = useState<string>(
+    user?.preferences?.compassVariant || "classic"
+  );
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState({ type: "", text: "" });
 
@@ -163,6 +170,7 @@ const Settings = () => {
       setDefaultProject(user.preferences.defaultProject || "");
       setDefaultMinutes(user.preferences.defaultMinutes || 60);
       setAutoDoNotDisturb(user.preferences.autoDoNotDisturb || false);
+      setCompassVariant(user.preferences.compassVariant || "classic");
       setStopwatchAlertMinutes(user.preferences.stopwatchAlertMinutes || 60);
       setSignalPercentageGoal(user.preferences.signalPercentageGoal || 75);
       setLightModeFromColor(
@@ -267,6 +275,7 @@ const Settings = () => {
         fromColor: isDarkMode ? darkModeFromColor : lightModeFromColor,
         toColor: isDarkMode ? darkModeToColor : lightModeToColor,
         timezone: finalTimezone,
+        compassVariant,
 
         // Working hours settings
         ...(workingHoursSettings.dailyHoursGoals
@@ -434,6 +443,40 @@ const Settings = () => {
               <div className="p-2.5 bg-gray-50 dark:bg-gray-900/40 rounded-md border border-gray-200 dark:border-gray-800 text-gray-800 dark:text-gray-200 text-sm">
                 {user?.email || "No email set"}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Compass Layout Settings */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
+            <Compass className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+            <h2 className="text-sm font-medium text-gray-900 dark:text-white">
+              Compass Layout
+            </h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Version
+              </label>
+              <select
+                value={compassVariant}
+                onChange={(e) => setCompassVariant(e.target.value)}
+                className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+              >
+                <option value="classic">
+                  Classic — timer, session details & blocked tasks
+                </option>
+                <option value="dayflow">
+                  Dayflow — focus hours pulled from Dayflow
+                </option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                The Dayflow version reads your focus hours straight from the
+                Dayflow app, hides the timer and blocked tasks, and shows just
+                the number with weekly &amp; yearly progress.
+              </p>
             </div>
           </div>
         </div>

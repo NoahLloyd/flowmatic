@@ -149,4 +149,8 @@ contextBridge.exposeInMainWorld("electron", {
     openFile: (file: string) =>
       ipcRenderer.invoke("obsidian:open-file", { file }),
   },
+
+  dayflow: {
+    getFocus: () => ipcRenderer.invoke("dayflow:get-focus"),
+  },
 });

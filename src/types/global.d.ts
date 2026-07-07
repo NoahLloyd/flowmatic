@@ -76,5 +76,15 @@ interface Window {
         file: string,
       ) => Promise<{ ok: true } | { ok: false; error: string }>;
     };
+    dayflow?: {
+      getFocus: () => Promise<
+        | {
+            ok: true;
+            dbPath: string;
+            days: Array<{ day: string; focusHours: number }>;
+          }
+        | { ok: false; dbPath: string; error: string }
+      >;
+    };
   };
 }

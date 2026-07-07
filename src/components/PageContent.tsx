@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Layout from "./layout/Layout";
 import Friends from "../pages/friends/Friends";
 import Compass from "../pages/compass/Compass";
+import CompassDayflow from "../pages/compass/CompassDayflow";
 import Tasks from "../pages/tasks/Tasks";
 import Insights from "../pages/insights/Insights";
 import Settings from "../pages/settings/Settings";
@@ -305,7 +306,7 @@ const PageContent = () => {
     handleUpdateTitle,
   } = useTasks();
 
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Listen for clear-current-task event from keyboard shortcut.
   // Also listen for "remove-current-task" (one specific title) so DailyTasks
@@ -552,7 +553,14 @@ const PageContent = () => {
   let content;
   switch (selected) {
       case "Compass":
-        content = (
+        content = user?.preferences?.compassVariant === "dayflow" ? (
+          <CompassDayflow
+            currentTask={currentTask}
+            currentTasks={currentTasks}
+            onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
+            onRemoveTask={removeCurrentTask}
+          />
+        ) : (
           <Compass
             time={time}
             isRunning={isRunning}
