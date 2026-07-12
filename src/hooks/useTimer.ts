@@ -33,8 +33,14 @@ const saveTimerState = (state: TimerState) => {
 };
 
 export const useTimer = (directNavigate?: (page: string) => void) => {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { setSelected } = useNavigation();
+
+  // Dayflow is the timer-free Compass variant. Wait for preferences to load
+  // before publishing timer text so a restored timer cannot briefly appear in
+  // the menu bar during startup for Dayflow users.
+  const shouldShowTimerInMenuBar =
+    !isAuthLoading && user?.preferences?.compassVariant !== "dayflow";
 
   // Get default minutes from user preferences, or use 60 minutes as fallback
   const defaultMinutes = user?.preferences?.defaultMinutes || 60;
@@ -238,14 +244,23 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
   // Clear the tray completely
   const clearTray = () => {
     if (!isPrimary) return;
-    clearTray();
+    lastTrayTextRef.current = "";
+    window.electron.send("update-tray", "");
   };
+
+  // Remove a timer title that was already present as soon as Dayflow becomes
+  // active (including when preferences finish loading or are changed).
+  useEffect(() => {
+    if (isPrimary && !shouldShowTimerInMenuBar) {
+      clearTray();
+    }
+  }, [isPrimary, shouldShowTimerInMenuBar]);
 
   // Helper: build tray text and only send if changed.
   // For multi-task: shows the primary task plus a "+N" badge for the rest,
   // truncating only the primary title to fit the user's cutoff.
   const updateTray = (timeText: string, task?: string) => {
-    if (!isPrimary) return;
+    if (!isPrimary || !shouldShowTimerInMenuBar) return;
     const showTask = menuBarShowTask.current;
     const cutoff = menuBarTaskCutoff.current;
     const extraCount = currentTasks.length > 1 ? currentTasks.length - 1 : 0;
@@ -435,7 +450,7 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     }
   // Note currentTasks.length in deps so the tray "+N" suffix updates when
   // tasks are added/removed without changing the primary.
-  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode, currentTask, currentTasks.length]);
+  }, [isRunning, startTime, duration, isBreakMode, isStopwatchMode, currentTask, currentTasks.length, shouldShowTimerInMenuBar]);
 
   // Break timer effect
   useEffect(() => {
