@@ -10,6 +10,7 @@ import {
   DropResult,
 } from "@hello-pangea/dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import TaskContextMenu from "../../components/task/TaskContextMenu";
 
 // Hydrate daily task lists from a localStorage snapshot of the previous
 // fetch. Eliminates the boot-time skeleton flash — if today's data is
@@ -60,6 +61,10 @@ const DailyTasks: React.FC = () => {
   // Editing state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
+  const [contextMenu, setContextMenu] = useState<{
+    task: Task;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Task shortcut mode state
   const [taskMode, setTaskMode] = useState(false);
@@ -294,9 +299,47 @@ const DailyTasks: React.FC = () => {
   };
 
   const startEditing = useCallback((task: Task) => {
+    setContextMenu(null);
     setEditingTaskId(task.id);
     setEditedTitle(task.title);
   }, []);
+
+  const openContextMenu = (event: React.MouseEvent, task: Task) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      task,
+      position: { x: event.clientX, y: event.clientY },
+    });
+  };
+
+  const moveTaskFromMenu = (task: Task, type: TaskType) => {
+    if (task.completed || task.type === type) return;
+    setActiveTasks((current) => current.filter((item) => item.id !== task.id));
+    const currentOrder = getTaskOrderFromStorage("day") || [];
+    saveTaskOrderToStorage(
+      "day",
+      currentOrder.filter((taskId) => taskId !== task.id),
+    );
+    handleChangeTaskType(task.id, type).then((success) => {
+      if (!success) fetchTasks();
+    });
+  };
+
+  const deleteTaskFromMenu = (task: Task) => {
+    setActiveTasks((current) => current.filter((item) => item.id !== task.id));
+    setCompletedTasks((current) =>
+      current.filter((item) => item.id !== task.id),
+    );
+    const currentOrder = getTaskOrderFromStorage("day") || [];
+    saveTaskOrderToStorage(
+      "day",
+      currentOrder.filter((taskId) => taskId !== task.id),
+    );
+    handleDeleteTask(task.id).then((success) => {
+      if (!success) fetchTasks();
+    });
+  };
 
   // Sync taskMode to DOM so Compass handler can check it
   useEffect(() => {
@@ -553,6 +596,9 @@ const DailyTasks: React.FC = () => {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
+                            onContextMenu={(event) =>
+                              openContextMenu(event, task)
+                            }
                             className={`flex items-center gap-3 py-1 rounded-sm px-1 -mx-1 transition-colors ${
                               snapshot.isDragging
                                 ? "bg-gray-200 dark:bg-gray-700 rounded shadow-md"
@@ -639,7 +685,11 @@ const DailyTasks: React.FC = () => {
               <hr className="border-gray-200 dark:border-gray-700 my-2" />
             )}
             {completedTasks.map((task) => (
-              <div key={task.id} className="flex items-center gap-3 py-1">
+              <div
+                key={task.id}
+                onContextMenu={(event) => openContextMenu(event, task)}
+                className="flex items-center gap-3 py-1"
+              >
                 <div onClick={() => handleToggleComplete(task.id)}>
                   <CompletedCheckbox />
                 </div>
@@ -672,6 +722,17 @@ const DailyTasks: React.FC = () => {
           </div>
         </DragDropContext>
       </div>
+      {contextMenu && (
+        <TaskContextMenu
+          task={contextMenu.task}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onToggleComplete={(task) => handleToggleComplete(task.id)}
+          onEdit={startEditing}
+          onMove={moveTaskFromMenu}
+          onDelete={deleteTaskFromMenu}
+        />
+      )}
     </div>
   );
 };

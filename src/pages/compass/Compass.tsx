@@ -194,6 +194,10 @@ const Compass: React.FC<CompassProps> = ({
         return;
       }
 
+      if (document.body.dataset.taskContextMenuOpen === "true") {
+        return;
+      }
+
       // Space key to start/pause timer
       if (e.code === "Space") {
         e.preventDefault();

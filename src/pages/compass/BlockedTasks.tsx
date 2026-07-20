@@ -8,16 +8,24 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import {
+  dispatchTaskAdded,
+  subscribeToTaskAdded,
+} from "../../utils/taskEvents";
+import TaskContextMenu from "../../components/task/TaskContextMenu";
 
 const BlockedTasks: React.FC = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { selected } = useNavigation();
-  
+
   // Editing state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
+  const [contextMenu, setContextMenu] = useState<{
+    task: Task;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Function to get task order from localStorage for a specific type
   const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
@@ -109,7 +117,7 @@ const BlockedTasks: React.FC = () => {
 
       // Optimistically update the UI
       setActiveTasks((prev) => prev.filter((t) => t.id !== id));
-      
+
       // Remove from stored order
       const currentOrder = getTaskOrderFromStorage("blocked") || [];
       saveTaskOrderToStorage(
@@ -155,8 +163,39 @@ const BlockedTasks: React.FC = () => {
   };
 
   const startEditing = (task: Task) => {
+    setContextMenu(null);
     setEditingTaskId(task.id);
     setEditedTitle(task.title);
+  };
+
+  const moveTaskFromMenu = (task: Task, type: TaskType) => {
+    if (task.type === type || task.completed) return;
+    setActiveTasks((current) => current.filter((item) => item.id !== task.id));
+    const currentOrder = getTaskOrderFromStorage("blocked") || [];
+    saveTaskOrderToStorage(
+      "blocked",
+      currentOrder.filter((taskId) => taskId !== task.id),
+    );
+    api
+      .updateTask(task.id, { type })
+      .then(() => dispatchTaskAdded({ ...task, type }))
+      .catch((error) => {
+        console.error("Failed to move blocked task:", error);
+        fetchTasks();
+      });
+  };
+
+  const deleteTaskFromMenu = (task: Task) => {
+    setActiveTasks((current) => current.filter((item) => item.id !== task.id));
+    const currentOrder = getTaskOrderFromStorage("blocked") || [];
+    saveTaskOrderToStorage(
+      "blocked",
+      currentOrder.filter((taskId) => taskId !== task.id),
+    );
+    api.deleteTask(task.id).catch((error) => {
+      console.error("Failed to delete blocked task:", error);
+      fetchTasks();
+    });
   };
 
   // Drag and Drop Handler
@@ -268,6 +307,17 @@ const BlockedTasks: React.FC = () => {
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setContextMenu({
+                              task,
+                              position: {
+                                x: event.clientX,
+                                y: event.clientY,
+                              },
+                            });
+                          }}
                           className={`flex items-center gap-3 py-1 ${
                             snapshot.isDragging
                               ? "bg-gray-200 dark:bg-gray-700 rounded shadow-md"
@@ -313,9 +363,19 @@ const BlockedTasks: React.FC = () => {
           </div>
         </DragDropContext>
       </div>
+      {contextMenu && (
+        <TaskContextMenu
+          task={contextMenu.task}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onToggleComplete={(task) => handleToggleComplete(task.id)}
+          onEdit={startEditing}
+          onMove={moveTaskFromMenu}
+          onDelete={deleteTaskFromMenu}
+        />
+      )}
     </div>
   );
 };
 
 export default BlockedTasks;
-
