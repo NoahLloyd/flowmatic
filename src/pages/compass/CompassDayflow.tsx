@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Signals from "./signal/Signals";
 import DayflowFocusStats from "./DayflowFocusStats";
-import DailyTasks from "./DailyTasks";
-import CompassWeekTasks from "./CompassWeekTasks";
+import DayflowTaskBoard from "./DayflowTaskBoard";
 import { useAuth } from "../../context/AuthContext";
 import {
   getAllSignals,
@@ -24,11 +23,15 @@ interface CompassDayflowProps {
   onRemoveTask?: (title: string) => void;
 }
 
+const noop = (): void => {
+  return;
+};
+
 const CompassDayflow: React.FC<CompassDayflowProps> = ({
   currentTask = "",
   currentTasks = [],
-  onOpenTaskPicker = () => {},
-  onRemoveTask = () => {},
+  onOpenTaskPicker = noop,
+  onRemoveTask = noop,
 }) => {
   const { user } = useAuth();
 
@@ -76,6 +79,7 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
       if (document.body.dataset.taskMode === "true") return;
       if (document.body.dataset.quickAddOpen === "true") return;
       if (document.body.dataset.taskPickerOpen === "true") return;
+      if (document.body.dataset.taskContextMenuOpen === "true") return;
 
       const keyNum = parseInt(e.key);
       if (isNaN(keyNum) || keyNum < 1 || keyNum > 9) return;
@@ -223,11 +227,8 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
       data-dayflow-compass="true"
       {...(hasTask ? { "data-task-active": "true" } : {})}
     >
-      {/* This stripped-down view drops the section headers — the Signals and
-          Tasks cards read fine without their "Signals" / "Tasks" titles here.
-          The full-width task list also gets larger, wrapping rows since there's
-          room to spare. All scoped to this variant so the classic view is
-          unaffected. */}
+      {/* This stripped-down view drops the outer Signals header. All styling is
+          scoped to this variant so the classic Compass view is unaffected. */}
       <style>{`
         [data-dayflow-compass="true"] .card-header { display: none; }
 
@@ -241,55 +242,6 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
         }
         [data-dayflow-signals="true"] > div > .p-5 { padding: 0; }
 
-        /* Roomy, top-aligned rows with a hover affordance. The negative
-           margins let the hover background breathe past the text without
-           shifting the text itself. */
-        [data-dayflow-tasks="true"] .gap-3 {
-          align-items: flex-start;
-          gap: 0.9rem;
-          padding: 0.6rem 0.75rem;
-          margin-left: -0.75rem;
-          margin-right: -0.75rem;
-          border-radius: 0.625rem;
-          transition: background-color 120ms ease;
-        }
-        [data-dayflow-tasks="true"] .gap-3:hover {
-          background-color: rgba(128, 128, 128, 0.09);
-        }
-
-        /* Bigger, crisper checkboxes (and badges/spacers, which share the
-           w-3.5/h-3.5 size). Nudged down to sit on the first text line. */
-        [data-dayflow-tasks="true"] .w-3\\.5 {
-          width: 1.375rem;
-          height: 1.375rem;
-          margin-top: 0.2rem;
-          border-width: 2px;
-          border-radius: 0.4rem;
-        }
-        /* Completed-task checkmark scales up with its box. */
-        [data-dayflow-tasks="true"] .w-2\\.5 {
-          width: 0.9rem;
-          height: 0.9rem;
-        }
-
-        /* Large, wrapping task text in SF Pro Rounded — a free macOS system
-           font (no bundling) that's a touch friendlier than the default UI
-           sans. Slightly smaller than the numbers above it. */
-        [data-dayflow-tasks="true"] span.cursor-text {
-          flex: 1 1 auto;
-          min-width: 0;
-          font-family: "SF Pro Rounded", ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 1.1875rem;
-          line-height: 1.5;
-          white-space: normal;
-          overflow: visible;
-          text-overflow: clip;
-          overflow-wrap: anywhere;
-        }
-        [data-dayflow-tasks="true"] input[type="text"] {
-          font-family: "SF Pro Rounded", ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif;
-          font-size: 1.1875rem;
-        }
       `}</style>
 
       {hasTask && (
@@ -360,31 +312,9 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
         </div>
       )}
 
-      {/* Today's tasks (capped to a reading measure) beside this week's tasks.
-          The grid sets each column's width; data-dayflow-tasks drives the
-          larger, wrapping rows in both columns. */}
-      <div
-        className="flex-1 min-h-0 grid gap-8"
-        style={{ gridTemplateColumns: "minmax(0, 44rem) minmax(0, 32rem)" }}
-        data-dayflow-tasks="true"
-      >
-        <div className="min-h-0 flex flex-col gap-2">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500 px-1">
-            Today
-          </span>
-          <div className="flex-1 min-h-0 flex flex-col">
-            <DailyTasks />
-          </div>
-        </div>
-        <div className="min-h-0 flex flex-col gap-2">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500 px-1">
-            This week
-          </span>
-          <div className="flex-1 min-h-0 flex flex-col">
-            <CompassWeekTasks />
-          </div>
-        </div>
-      </div>
+      {/* A shared drag context lets tasks move in either direction while each
+          list retains its own saved order. */}
+      <DayflowTaskBoard />
     </div>
   );
 };
