@@ -304,10 +304,22 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
   const getHeatmapColor = (score: number, inRange: boolean): string => {
     if (!inRange) return "bg-transparent";
     if (score === 0) return "bg-gray-100 dark:bg-gray-800/60";
-    if (score < 30) return "bg-emerald-200 dark:bg-emerald-800/50";
-    if (score < 50) return "bg-emerald-300 dark:bg-emerald-700/60";
+    if (score < signalPercentageGoal * 0.5)
+      return "bg-rose-200 dark:bg-rose-900/60";
     if (score < signalPercentageGoal)
-      return "bg-emerald-400 dark:bg-emerald-600/70";
+      return "bg-amber-300 dark:bg-amber-800/70";
+
+    // Only goal-hitting days are green. From the configured goal to 100%,
+    // progressively deepen the green so a perfect day is unmistakable.
+    const aboveGoalProgress =
+      (score - signalPercentageGoal) /
+      Math.max(1, 100 - signalPercentageGoal);
+    if (score >= 100)
+      return "bg-emerald-700 dark:bg-emerald-400 ring-1 ring-inset ring-emerald-900/40 dark:ring-emerald-200/50";
+    if (aboveGoalProgress < 0.34)
+      return "bg-emerald-200 dark:bg-emerald-800/70";
+    if (aboveGoalProgress < 0.67)
+      return "bg-emerald-400 dark:bg-emerald-600/80";
     return "bg-emerald-500 dark:bg-emerald-500";
   };
 
@@ -596,15 +608,20 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
             {/* Legend */}
             <div className="flex items-center justify-end gap-1.5 pt-1">
               <span className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">
-                Less
+                Below goal
               </span>
               <div className="w-[14px] h-[14px] rounded-[2px] bg-gray-100 dark:bg-gray-800/60" />
-              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-200 dark:bg-emerald-800/50" />
-              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-300 dark:bg-emerald-700/60" />
-              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-400 dark:bg-emerald-600/70" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-rose-200 dark:bg-rose-900/60" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-amber-300 dark:bg-amber-800/70" />
+              <span className="mx-0.5 text-[10px] text-gray-400 dark:text-gray-500">
+                Goal
+              </span>
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-200 dark:bg-emerald-800/70" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-400 dark:bg-emerald-600/80" />
               <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-500 dark:bg-emerald-500" />
+              <div className="w-[14px] h-[14px] rounded-[2px] bg-emerald-700 ring-1 ring-inset ring-emerald-900/40 dark:bg-emerald-400 dark:ring-emerald-200/50" />
               <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">
-                More
+                100%
               </span>
             </div>
           </div>

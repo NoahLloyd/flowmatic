@@ -23,7 +23,7 @@ import GlobalQuickAddNote from "./global/GlobalQuickAddNote";
 import ShortcutsHelpModal from "./global/ShortcutsHelpModal";
 import CurrentTaskPicker from "./global/CurrentTaskPicker";
 import StreakScreen from "./streak/StreakScreen";
-import { dispatchTaskAdded } from "../utils/taskEvents";
+import { dispatchTaskAdded, dispatchTaskUpdated } from "../utils/taskEvents";
 
 const PageContent = () => {
   const { selected, setSelected } = useNavigation();
@@ -162,6 +162,22 @@ const PageContent = () => {
         e.preventDefault();
         e.stopPropagation();
         window.dispatchEvent(new CustomEvent("clear-current-task"));
+        return;
+      }
+
+      // On Compass, D completes the primary Working on task and removes it
+      // from the active set. Daily task mode owns D while it is active.
+      if (
+        selected === "Compass" &&
+        e.key.toLowerCase() === "d" &&
+        !isQuickAddModalOpen &&
+        !isQuickAddNoteModalOpen &&
+        !isCurrentTaskPickerOpen
+      ) {
+        if (document.body.dataset.taskMode === "true") return;
+        e.preventDefault();
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent("complete-current-task"));
         return;
       }
 
@@ -307,6 +323,53 @@ const PageContent = () => {
   } = useTasks();
 
   const { isAuthenticated, isLoading, user } = useAuth();
+
+  const completingCurrentTaskRef = React.useRef(false);
+
+  // Complete the first (primary) Working on task. Working-on state is stored
+  // by title for backwards compatibility, so resolve that title against the
+  // active task pool before updating Supabase.
+  useEffect(() => {
+    const handleCompleteCurrentTask = async () => {
+      const title = currentTask.trim();
+      if (!title || completingCurrentTaskRef.current) return;
+
+      completingCurrentTaskRef.current = true;
+      try {
+        const activeTasks = await api.getActiveTasks();
+        const matchingTask = activeTasks.find(
+          (task) => task.title.trim() === title
+        );
+
+        if (!matchingTask) {
+          removeCurrentTask(title);
+          showToast("Removed from Working on — no saved task matched");
+          return;
+        }
+
+        const updatedTask = await api.updateTask(matchingTask.id, {
+          completed: true,
+          completedAt: new Date(),
+        });
+        dispatchTaskUpdated(updatedTask);
+        removeCurrentTask(title);
+        showToast("Task completed");
+      } catch (error) {
+        console.error("Failed to complete current task:", error);
+        showToast("Failed to complete task", "error");
+      } finally {
+        completingCurrentTaskRef.current = false;
+      }
+    };
+
+    window.addEventListener("complete-current-task", handleCompleteCurrentTask);
+    return () => {
+      window.removeEventListener(
+        "complete-current-task",
+        handleCompleteCurrentTask
+      );
+    };
+  }, [currentTask, removeCurrentTask, showToast]);
 
   // Listen for clear-current-task event from keyboard shortcut.
   // Also listen for "remove-current-task" (one specific title) so DailyTasks
@@ -557,7 +620,6 @@ const PageContent = () => {
           <CompassDayflow
             currentTask={currentTask}
             currentTasks={currentTasks}
-            onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
             onRemoveTask={removeCurrentTask}
           />
         ) : (
@@ -582,7 +644,6 @@ const PageContent = () => {
             sessionMinutes={sessionMinutes}
             currentTask={currentTask}
             currentTasks={currentTasks}
-            onOpenTaskPicker={() => setIsCurrentTaskPickerOpen(true)}
             onRemoveTask={removeCurrentTask}
             dndEnabled={dndEnabled}
             onToggleDnd={toggleDnd}

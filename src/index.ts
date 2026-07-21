@@ -398,7 +398,7 @@ ipcMain.handle("overlay-submit-task", async (_event, title: string) => {
       (async () => {
         try {
           const task = await window.__flowApi.createTask({ title: ${escapedTitle}, type: 'day', completed: false, completedAt: null, createdAt: new Date() });
-          window.dispatchEvent(new CustomEvent('task-added-from-overlay', { detail: task }));
+          window.dispatchEvent(new CustomEvent('task-added', { detail: { task } }));
           return true;
         } catch (e) {
           console.error('Failed to create task from overlay:', e);

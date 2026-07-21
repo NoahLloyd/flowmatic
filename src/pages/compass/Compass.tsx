@@ -49,7 +49,6 @@ interface CompassProps {
   // gets pre-filled when recording a session.
   currentTask?: string;
   currentTasks?: string[];
-  onOpenTaskPicker?: () => void;
   onRemoveTask?: (title: string) => void;
   // DND toggle
   dndEnabled?: boolean;
@@ -79,7 +78,6 @@ const Compass: React.FC<CompassProps> = ({
   sessionMinutes = 60,
   currentTask = "",
   currentTasks = [],
-  onOpenTaskPicker = () => {},
   onRemoveTask = () => {},
   dndEnabled = false,
   onToggleDnd = () => {},
@@ -484,7 +482,8 @@ const Compass: React.FC<CompassProps> = ({
             {tasksToShow.map((title, idx) => (
               <div
                 key={title + idx}
-                onClick={onOpenTaskPicker}
+                onClick={() => onRemoveTask(title)}
+                title="Remove from Working on"
                 className={`group flex items-center gap-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${
                   isSingle ? "px-5 py-3" : "px-3.5 py-2"
                 }`}

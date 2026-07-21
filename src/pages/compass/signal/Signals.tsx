@@ -303,17 +303,12 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
             : goalMet
               ? "bg-emerald-500/10 dark:bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/20"
               : "bg-orange-500/10 dark:bg-orange-500/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500/20";
-          const flameColor = signalStreakDanger ? "#ef4444" : goalMet ? "#22c55e" : "#f97316";
-          const glowColor = signalStreakDanger ? "#fca5a5" : goalMet ? "#86efac" : "#fde047";
           return (
             <span
               onClick={() => window.dispatchEvent(new CustomEvent("openStreakScreen"))}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${pillClass}`}
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${pillClass}`}
+              title="Open signal streak"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 1.5C12 1.5 5 8.5 5 14C5 18.1 8.1 21.5 12 21.5C15.9 21.5 19 18.1 19 14C19 8.5 12 1.5 12 1.5Z" fill={flameColor} />
-                <path d="M12 9C12 9 8.5 12.5 8.5 15.2C8.5 17.3 10.1 19 12 19C13.9 19 15.5 17.3 15.5 15.2C15.5 12.5 12 9 12 9Z" fill={glowColor} />
-              </svg>
               <span className="tabular-nums">{signalStreak}</span>
             </span>
           );

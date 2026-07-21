@@ -27,6 +27,14 @@ interface FriendStats {
   averageFocus: number;
 }
 
+const cleanSessionLabel = (value?: string | null): string => {
+  const label = (value || "").trim();
+  return label.toLowerCase() === "focus session" ? "" : label;
+};
+
+const getSessionLabel = (session: Session): string =>
+  cleanSessionLabel(session.project) || cleanSessionLabel(session.task);
+
 // Create a separate component for daily session visualization
 const DailySessionBar = ({
   sessions,
@@ -91,24 +99,20 @@ const DailySessionBar = ({
 
   // Process sessions to maintain individual backgrounds but group for project name display
   const processedSessions = sortedSessions.map((session, index) => {
-    const project = session.project || session.task || "Focus session";
+    const project = getSessionLabel(session);
     const hours = session.minutes / 60;
     const widthPercent = (hours / scaleFactor) * 100;
 
     // Check if this session has the same project as the previous one
     const prevProject =
       index > 0
-        ? sortedSessions[index - 1].project ||
-          sortedSessions[index - 1].task ||
-          "Focus session"
+        ? getSessionLabel(sortedSessions[index - 1])
         : null;
 
     // Check if this session has the same project as the next one
     const nextProject =
       index < sortedSessions.length - 1
-        ? sortedSessions[index + 1].project ||
-          sortedSessions[index + 1].task ||
-          "Focus session"
+        ? getSessionLabel(sortedSessions[index + 1])
         : null;
 
     const isPartOfGroup = prevProject === project || nextProject === project;
@@ -229,10 +233,18 @@ const DailySessionBar = ({
               {/* Hover tooltip */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/session:block z-30 pointer-events-none">
                 <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-md px-2.5 py-1.5 whitespace-nowrap shadow-lg">
-                  {session.task && <div className="font-medium mb-0.5">{session.task}</div>}
+                  {cleanSessionLabel(session.task) && (
+                    <div className="font-medium mb-0.5">
+                      {cleanSessionLabel(session.task)}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5">
-                    <span>{session.project || "No project"}</span>
-                    <span className="opacity-40">&middot;</span>
+                    {cleanSessionLabel(session.project) && (
+                      <>
+                        <span>{cleanSessionLabel(session.project)}</span>
+                        <span className="opacity-40">&middot;</span>
+                      </>
+                    )}
                     <span>{session.minutes}m</span>
                     <span className="opacity-40">&middot;</span>
                     <span>Focus {session.focus}/5</span>
@@ -249,7 +261,7 @@ const DailySessionBar = ({
       <div className="absolute inset-0 pointer-events-none">
         {projectGroups.map((group, idx) => {
           // Only show labels for groups with sufficient width
-          if (group.totalWidth <= 10) return null;
+          if (!group.project || group.totalWidth <= 10) return null;
 
           // Calculate the left position as the sum of widths of all previous sessions
           const leftPosition = processedSessions
@@ -265,7 +277,7 @@ const DailySessionBar = ({
                 width: `${group.totalWidth}%`,
               }}
             >
-              <span className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate px-2 z-10">
+              <span className="text-xs font-medium text-gray-800 dark:text-gray-200 overflow-hidden whitespace-nowrap [text-overflow:clip] px-2 z-10">
                 {group.project}
               </span>
             </div>
@@ -558,14 +570,18 @@ const FriendsProgressStats: React.FC = () => {
 
     // Get activities for the selected day
     const activities = daySessions
-      .map((session) => session.task || session.project || "Focus session")
+      .map((session) =>
+        cleanSessionLabel(session.task) || cleanSessionLabel(session.project)
+      )
+      .filter(Boolean)
       .filter((activity, index, self) => self.indexOf(activity) === index)
       .slice(0, 3); // Limit to 3 recent activities
 
     // Better activity tracking based on actual project names to match the screenshot
     const projectMinutes = daySessions.reduce(
       (acc: Record<string, number>, session) => {
-        const projectName = session.project || session.task || "Flow";
+        const projectName = getSessionLabel(session);
+        if (!projectName) return acc;
         if (!acc[projectName]) {
           acc[projectName] = 0;
         }

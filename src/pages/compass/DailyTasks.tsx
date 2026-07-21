@@ -9,7 +9,10 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
-import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import {
+  subscribeToTaskAdded,
+  subscribeToTaskUpdated,
+} from "../../utils/taskEvents";
 import TaskContextMenu from "../../components/task/TaskContextMenu";
 
 // Hydrate daily task lists from a localStorage snapshot of the previous
@@ -185,6 +188,38 @@ const DailyTasks: React.FC = () => {
       }
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    return subscribeToTaskUpdated((updatedTask) => {
+      setActiveTasks((prev) => {
+        const withoutTask = prev.filter((task) => task.id !== updatedTask.id);
+        if (updatedTask.type === "day" && !updatedTask.completed) {
+          return [updatedTask, ...withoutTask];
+        }
+        return withoutTask;
+      });
+
+      setCompletedTasks((prev) => {
+        const withoutTask = prev.filter((task) => task.id !== updatedTask.id);
+        if (
+          updatedTask.type === "day" &&
+          updatedTask.completed &&
+          isToday(updatedTask.completedAt)
+        ) {
+          return [...withoutTask, updatedTask];
+        }
+        return withoutTask;
+      });
+
+      if (updatedTask.completed) {
+        const currentOrder = getTaskOrderFromStorage("day") || [];
+        saveTaskOrderToStorage(
+          "day",
+          currentOrder.filter((taskId) => taskId !== updatedTask.id)
+        );
+      }
+    });
   }, []);
 
   const handleToggleComplete = useCallback(async (id: string) => {
@@ -383,8 +418,8 @@ const DailyTasks: React.FC = () => {
         return;
       }
 
-      // 'u' key enters task mode (update/select tasks)
-      if (e.key === "u" && !e.metaKey && !e.ctrlKey && !e.altKey && !taskMode) {
+      // 'e' key enters task mode (edit/select tasks)
+      if (e.key.toLowerCase() === "e" && !e.metaKey && !e.ctrlKey && !e.altKey && !taskMode) {
         e.preventDefault();
         e.stopPropagation();
         setTaskMode(true);

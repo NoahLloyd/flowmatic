@@ -7,6 +7,7 @@ interface QuestionsSectionProps {
   onChange: (id: string, answer: string) => void;
   progress: number;
   disabled?: boolean;
+  blurred?: boolean;
 }
 
 const QuestionsSection: React.FC<QuestionsSectionProps> = ({
@@ -14,6 +15,7 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
   onChange,
   progress,
   disabled = false,
+  blurred = false,
 }) => {
   return (
     <div className="mb-8">
@@ -76,7 +78,7 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
               placeholder="Type your answer..."
               rows={3}
               disabled={disabled}
-              className="
+              className={`
                 w-full px-4 py-3 rounded-lg
                 bg-white dark:bg-slate-800
                 border border-slate-200 dark:border-slate-700
@@ -85,7 +87,8 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
                 focus:outline-none focus:ring-2 focus:ring-blue-500/50 dark:focus:ring-blue-400/50
                 focus:border-blue-500 dark:focus:border-blue-400
                 resize-none transition-all
-              "
+                ${blurred ? "blur-sm" : ""}
+              `}
             />
           </div>
         ))}
@@ -95,4 +98,3 @@ const QuestionsSection: React.FC<QuestionsSectionProps> = ({
 };
 
 export default QuestionsSection;
-

@@ -217,7 +217,7 @@ const InlineTaskList: React.FC<InlineTaskListProps> = ({
           {emptyText}
         </p>
       ) : (
-        <div className="divide-y divide-slate-100 dark:divide-slate-700/60 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+        <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
           {tasks.map((task) => {
             const otherTypes = MOVE_TYPES.filter((t) => t !== type);
             return (
