@@ -19,7 +19,6 @@ import {
 interface CompassDayflowProps {
   currentTask?: string;
   currentTasks?: string[];
-  onOpenTaskPicker?: () => void;
   onRemoveTask?: (title: string) => void;
 }
 
@@ -30,7 +29,6 @@ const noop = (): void => {
 const CompassDayflow: React.FC<CompassDayflowProps> = ({
   currentTask = "",
   currentTasks = [],
-  onOpenTaskPicker = noop,
   onRemoveTask = noop,
 }) => {
   const { user } = useAuth();
@@ -275,7 +273,8 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
             {tasksToShow.map((title, idx) => (
               <div
                 key={title + idx}
-                onClick={onOpenTaskPicker}
+                onClick={() => onRemoveTask(title)}
+                title="Remove from Working on"
                 className={`group flex items-center gap-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${
                   isSingle ? "px-5 py-3" : "px-3.5 py-2"
                 }`}

@@ -7,6 +7,7 @@ import { spawn, execFile, ChildProcessWithoutNullStreams } from "child_process";
 function findClaudeBinary(): string {
   const home = os.homedir();
   const candidates = [
+    path.join(home, ".local/bin/claude"),
     path.join(home, ".bun/bin/claude"),
     path.join(home, ".claude/local/claude"),
     "/opt/homebrew/bin/claude",
@@ -15,7 +16,10 @@ function findClaudeBinary(): string {
   ];
   for (const c of candidates) {
     try {
-      if (fs.existsSync(c)) return c;
+      // A broken package-manager shim can exist without being executable.
+      // Only select paths spawn() can actually launch.
+      fs.accessSync(c, fs.constants.X_OK);
+      return c;
     } catch {
       /* noop */
     }
@@ -26,6 +30,7 @@ function findClaudeBinary(): string {
 function augmentedPath(): string {
   const home = os.homedir();
   const extras = [
+    path.join(home, ".local/bin"),
     path.join(home, ".bun/bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin",

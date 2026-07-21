@@ -15,7 +15,10 @@ import TaskContextMenu from "../../components/task/TaskContextMenu";
 import { useNavigation } from "../../hooks/useNavigation";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
-import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import {
+  subscribeToTaskAdded,
+  subscribeToTaskUpdated,
+} from "../../utils/taskEvents";
 
 const LIST_IDS: Record<"day" | "week", string> = {
   day: "dayflow-day-tasks",
@@ -214,6 +217,38 @@ const DayflowTaskBoard: React.FC = () => {
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    return subscribeToTaskUpdated((updatedTask) => {
+      setDayTasks((current) => {
+        const withoutTask = current.filter((task) => task.id !== updatedTask.id);
+        return updatedTask.type === "day" && !updatedTask.completed
+          ? [updatedTask, ...withoutTask]
+          : withoutTask;
+      });
+      setWeekTasks((current) => {
+        const withoutTask = current.filter((task) => task.id !== updatedTask.id);
+        return updatedTask.type === "week" && !updatedTask.completed
+          ? [updatedTask, ...withoutTask]
+          : withoutTask;
+      });
+      setCompletedTasks((current) => {
+        const withoutTask = current.filter((task) => task.id !== updatedTask.id);
+        return updatedTask.type === "day" && updatedTask.completed
+          ? [...withoutTask, updatedTask]
+          : withoutTask;
+      });
+
+      if (updatedTask.completed) {
+        for (const type of ["day", "week"] as const) {
+          const order = getStoredOrder(type).filter(
+            (taskId) => taskId !== updatedTask.id
+          );
+          localStorage.setItem(`taskOrder_${type}`, JSON.stringify(order));
+        }
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -478,7 +513,7 @@ const DayflowTaskBoard: React.FC = () => {
       }
 
       if (
-        event.key.toLowerCase() === "u" &&
+        event.key.toLowerCase() === "e" &&
         !event.metaKey &&
         !event.ctrlKey &&
         !event.altKey &&

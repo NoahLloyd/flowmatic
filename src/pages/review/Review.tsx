@@ -10,6 +10,8 @@ import {
   Plus,
   Trash2,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
@@ -217,6 +219,7 @@ const Review: React.FC = () => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(["questionHistory"])
   );
+  const [areAnswersBlurred, setAreAnswersBlurred] = useState(false);
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
       const next = new Set(prev);
@@ -225,6 +228,17 @@ const Review: React.FC = () => {
       return next;
     });
   };
+
+  useEffect(() => {
+    const handleBlurShortcut = (event: KeyboardEvent) => {
+      if (event.key !== "$") return;
+      event.preventDefault();
+      setAreAnswersBlurred((current) => !current);
+    };
+
+    window.addEventListener("keydown", handleBlurShortcut);
+    return () => window.removeEventListener("keydown", handleBlurShortcut);
+  }, []);
 
   // Week navigation
   const goToPreviousWeek = () => {
@@ -626,6 +640,24 @@ const Review: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setAreAnswersBlurred((current) => !current)}
+            aria-pressed={areAnswersBlurred}
+            title={`${areAnswersBlurred ? "Show" : "Blur"} review answers ($)`}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${
+              areAnswersBlurred
+                ? "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400"
+                : "border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:border-slate-700 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            }`}
+          >
+            {areAnswersBlurred ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
+            {areAnswersBlurred ? "Show" : "Blur"}
+          </button>
           {streak.current_streak > 0 && (
             <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
               <Flame className="w-3.5 h-3.5 text-orange-400" />
@@ -785,6 +817,7 @@ const Review: React.FC = () => {
         onChange={handleQuestionChange}
         progress={questionsProgress}
         disabled={!canEdit}
+        blurred={areAnswersBlurred}
       />
 
       {/* Question History - collapsible */}

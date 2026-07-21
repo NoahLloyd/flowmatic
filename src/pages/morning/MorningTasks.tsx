@@ -90,6 +90,9 @@ const MorningTasks: React.FC = () => {
 
   // Keyboard focus state: which task is highlighted
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editedTitle, setEditedTitle] = useState("");
+  const editCancelledRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const setterMap: Record<string, React.Dispatch<React.SetStateAction<Task[]>>> = {
@@ -191,6 +194,51 @@ const MorningTasks: React.FC = () => {
       await api.updateTask(id, { completed: true, completedAt: new Date() });
     } catch {
       fetchTasks();
+    }
+  };
+
+  const startEditing = useCallback((task: Task) => {
+    editCancelledRef.current = false;
+    setFocusedTaskId(task.id);
+    setEditedTitle(task.title);
+    setEditingTaskId(task.id);
+  }, []);
+
+  const cancelEditing = () => {
+    editCancelledRef.current = true;
+    setEditingTaskId(null);
+  };
+
+  const handleUpdateTitle = async (
+    task: Task,
+    type: TaskType,
+    title: string
+  ) => {
+    if (editCancelledRef.current) {
+      editCancelledRef.current = false;
+      return;
+    }
+
+    const trimmed = title.trim();
+    setEditingTaskId(null);
+    if (!trimmed || trimmed === task.title) return;
+
+    const setter = setterMap[type];
+    setter?.((prev) =>
+      prev.map((item) =>
+        item.id === task.id ? { ...item, title: trimmed } : item
+      )
+    );
+
+    try {
+      await api.updateTask(task.id, { title: trimmed });
+    } catch (error) {
+      console.error("Failed to rename morning task:", error);
+      setter?.((prev) =>
+        prev.map((item) =>
+          item.id === task.id ? { ...item, title: task.title } : item
+        )
+      );
     }
   };
 
@@ -305,6 +353,10 @@ const MorningTasks: React.FC = () => {
         e.preventDefault();
         e.stopPropagation();
         handleToggleComplete(current.task.id, current.type);
+      } else if (e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        e.stopPropagation();
+        startEditing(current.task);
       } else if (e.key.toLowerCase() === "d" && current.type !== "day") {
         e.preventDefault();
         e.stopPropagation();
@@ -325,7 +377,7 @@ const MorningTasks: React.FC = () => {
 
     window.addEventListener("keydown", handleKeyDown, true); // capture phase
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [focusedTaskId, buildFlatList]);
+  }, [focusedTaskId, buildFlatList, startEditing]);
 
   // Clear focus when clicking outside
   useEffect(() => {
@@ -354,7 +406,11 @@ const MorningTasks: React.FC = () => {
     const otherTypes = MORNING_TYPES.filter((t) => t !== type);
 
     return (
-      <Draggable draggableId={task.id} index={index}>
+      <Draggable
+        draggableId={task.id}
+        index={index}
+        isDragDisabled={editingTaskId === task.id}
+      >
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
@@ -389,16 +445,53 @@ const MorningTasks: React.FC = () => {
             />
 
             {/* Title */}
-            <span
-              className={`flex-1 min-w-0 truncate ${
-                primary
-                  ? "text-[15px] text-slate-800 dark:text-slate-100"
-                  : "text-sm text-slate-600 dark:text-slate-300"
-              }`}
-              title={task.title}
-            >
-              {task.title}
-            </span>
+            {editingTaskId === task.id ? (
+              <input
+                type="text"
+                value={editedTitle}
+                onChange={(event) => setEditedTitle(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleUpdateTitle(task, type, editedTitle);
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelEditing();
+                  }
+                }}
+                onBlur={() => handleUpdateTitle(task, type, editedTitle)}
+                className={`min-w-0 flex-1 border-b border-blue-400 bg-transparent px-0 py-0.5 outline-none ${
+                  primary
+                    ? "text-[15px] text-slate-800 dark:text-slate-100"
+                    : "text-sm text-slate-600 dark:text-slate-300"
+                }`}
+                aria-label={`Rename ${task.title}`}
+                autoFocus
+                onFocus={(event) => {
+                  const input = event.currentTarget;
+                  requestAnimationFrame(() => {
+                    input.select();
+                    input.scrollLeft = 0;
+                  });
+                }}
+              />
+            ) : (
+              <span
+                className={`flex-1 min-w-0 truncate ${
+                  primary
+                    ? "text-[15px] text-slate-800 dark:text-slate-100"
+                    : "text-sm text-slate-600 dark:text-slate-300"
+                }`}
+                title={`${task.title} — double-click or press E to rename`}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  startEditing(task);
+                }}
+              >
+                {task.title}
+              </span>
+            )}
 
             {/* Type switch — subtle badges, always present, brighter on hover/focus */}
             <div

@@ -91,13 +91,21 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
     {
       title: "Task Mode (on Compass)",
       shortcuts: [
-        { key: "U", label: "Enter task mode" },
+        { key: "E", label: "Enter task mode" },
         { key: "1-9", label: "Select task by number" },
         { key: "Enter / Space", label: "Toggle task complete" },
         { key: "E", label: "Edit selected task" },
         { key: "D", label: "Delete selected task" },
         { key: "W", label: "Set as current working task" },
         { key: "Esc", label: "Exit task mode" },
+      ],
+    },
+    {
+      title: "Working on",
+      shortcuts: [
+        { key: "D", label: "Complete primary task" },
+        { key: "X", label: "Clear working tasks" },
+        { key: "W", label: "Choose working tasks" },
       ],
     },
   ];
