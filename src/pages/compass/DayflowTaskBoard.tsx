@@ -20,17 +20,30 @@ import {
   subscribeToTaskUpdated,
 } from "../../utils/taskEvents";
 
-const LIST_IDS: Record<"day" | "week", string> = {
+const LIST_IDS: Record<BoardTaskType, string> = {
   day: "dayflow-day-tasks",
   week: "dayflow-week-tasks",
+  blocked: "dayflow-blocked-tasks",
+  future: "dayflow-future-tasks",
 };
+
+const SECONDARY_TASK_TYPES = ["week", "blocked", "future"] as const;
+const SECONDARY_VIEW_KEY = "compassSecondaryTaskView";
 
 const TODAY_KEY = () => new Date().toDateString();
 const ACTIVE_CACHE_KEY = "cachedDailyActive";
 const COMPLETED_CACHE_KEY = "cachedDailyCompleted";
 
-type BoardTaskType = "day" | "week";
+type SecondaryTaskType = (typeof SECONDARY_TASK_TYPES)[number];
+type BoardTaskType = "day" | SecondaryTaskType;
 type MenuState = { task: Task; position: { x: number; y: number } } | null;
+
+const readSecondaryView = (): SecondaryTaskType => {
+  const storedView = localStorage.getItem(SECONDARY_VIEW_KEY);
+  return SECONDARY_TASK_TYPES.includes(storedView as SecondaryTaskType)
+    ? (storedView as SecondaryTaskType)
+    : "week";
+};
 
 const isToday = (dateInput: Date | string | null) => {
   if (!dateInput) return false;
@@ -94,8 +107,8 @@ const applyStoredOrder = (tasks: Task[], type: TaskType) => {
 };
 
 const typeFromDroppableId = (id: string): BoardTaskType | null => {
-  if (id === LIST_IDS.day) return "day";
-  if (id === LIST_IDS.week) return "week";
+  const entry = Object.entries(LIST_IDS).find(([, listId]) => listId === id);
+  if (entry) return entry[0] as BoardTaskType;
   return null;
 };
 
@@ -125,6 +138,10 @@ const DayflowTaskBoard: React.FC = () => {
   const cachedCompletedRef = useRef(readCachedTasks(COMPLETED_CACHE_KEY));
   const [dayTasks, setDayTasks] = useState<Task[]>(cachedActiveRef.current ?? []);
   const [weekTasks, setWeekTasks] = useState<Task[]>([]);
+  const [blockedTasks, setBlockedTasks] = useState<Task[]>([]);
+  const [futureTasks, setFutureTasks] = useState<Task[]>([]);
+  const [secondaryView, setSecondaryView] =
+    useState<SecondaryTaskType>(readSecondaryView);
   const [completedTasks, setCompletedTasks] = useState<Task[]>(
     cachedCompletedRef.current ?? [],
   );
@@ -141,9 +158,11 @@ const DayflowTaskBoard: React.FC = () => {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const [day, week] = await Promise.all([
+      const [day, week, blocked, future] = await Promise.all([
         api.getTasksByType("day"),
         api.getTasksByType("week"),
+        api.getTasksByType("blocked"),
+        api.getTasksByType("future"),
       ]);
       const activeDay = applyStoredOrder(
         day.filter((task) => !task.completed),
@@ -153,12 +172,22 @@ const DayflowTaskBoard: React.FC = () => {
         week.filter((task) => !task.completed),
         "week",
       );
+      const activeBlocked = applyStoredOrder(
+        blocked.filter((task) => !task.completed),
+        "blocked",
+      );
+      const activeFuture = applyStoredOrder(
+        future.filter((task) => !task.completed),
+        "future",
+      );
       const completedToday = day.filter(
         (task) => task.completed && isToday(task.completedAt),
       );
 
       setDayTasks(activeDay);
       setWeekTasks(activeWeek);
+      setBlockedTasks(activeBlocked);
+      setFutureTasks(activeFuture);
       setCompletedTasks(completedToday);
     } catch (error) {
       console.error("Failed to fetch Compass tasks:", error);
@@ -200,16 +229,17 @@ const DayflowTaskBoard: React.FC = () => {
             JSON.stringify([newTask.id, ...order]),
           );
         }
-      } else if (newTask.type === "week") {
-        setWeekTasks((current) =>
+      } else if (SECONDARY_TASK_TYPES.includes(newTask.type as SecondaryTaskType)) {
+        const type = newTask.type as SecondaryTaskType;
+        setTasksForType(type, (current) =>
           current.some((task) => task.id === newTask.id)
             ? current
             : [newTask, ...current],
         );
-        const order = getStoredOrder("week");
+        const order = getStoredOrder(type);
         if (!order.includes(newTask.id)) {
           localStorage.setItem(
-            "taskOrder_week",
+            `taskOrder_${type}`,
             JSON.stringify([newTask.id, ...order]),
           );
         }
@@ -233,6 +263,18 @@ const DayflowTaskBoard: React.FC = () => {
           ? [updatedTask, ...withoutTask]
           : withoutTask;
       });
+      setBlockedTasks((current) => {
+        const withoutTask = current.filter((task) => task.id !== updatedTask.id);
+        return updatedTask.type === "blocked" && !updatedTask.completed
+          ? [updatedTask, ...withoutTask]
+          : withoutTask;
+      });
+      setFutureTasks((current) => {
+        const withoutTask = current.filter((task) => task.id !== updatedTask.id);
+        return updatedTask.type === "future" && !updatedTask.completed
+          ? [updatedTask, ...withoutTask]
+          : withoutTask;
+      });
       setCompletedTasks((current) => {
         const withoutTask = current.filter((task) => task.id !== updatedTask.id);
         return updatedTask.type === "day" && updatedTask.completed
@@ -241,7 +283,7 @@ const DayflowTaskBoard: React.FC = () => {
       });
 
       if (updatedTask.completed) {
-        for (const type of ["day", "week"] as const) {
+        for (const type of ["day", ...SECONDARY_TASK_TYPES] as const) {
           const order = getStoredOrder(type).filter(
             (taskId) => taskId !== updatedTask.id
           );
@@ -274,12 +316,33 @@ const DayflowTaskBoard: React.FC = () => {
     };
   }, [fetchTasks]);
 
-  const getTasks = (type: BoardTaskType) =>
-    type === "day" ? dayTasks : weekTasks;
+  const getTasks = (type: BoardTaskType) => {
+    if (type === "day") return dayTasks;
+    if (type === "blocked") return blockedTasks;
+    if (type === "future") return futureTasks;
+    return weekTasks;
+  };
 
   const setTasks = (type: BoardTaskType, tasks: Task[]) => {
     if (type === "day") setDayTasks(tasks);
+    else if (type === "blocked") setBlockedTasks(tasks);
+    else if (type === "future") setFutureTasks(tasks);
     else setWeekTasks(tasks);
+  };
+
+  const setTasksForType = (
+    type: BoardTaskType,
+    updater: (tasks: Task[]) => Task[],
+  ) => {
+    if (type === "day") setDayTasks(updater);
+    else if (type === "blocked") setBlockedTasks(updater);
+    else if (type === "future") setFutureTasks(updater);
+    else setWeekTasks(updater);
+  };
+
+  const selectSecondaryView = (type: SecondaryTaskType) => {
+    setSecondaryView(type);
+    localStorage.setItem(SECONDARY_VIEW_KEY, type);
   };
 
   const startEditing = useCallback((task: Task) => {
@@ -299,6 +362,8 @@ const DayflowTaskBoard: React.FC = () => {
       );
     setDayTasks(updateTitle);
     setWeekTasks(updateTitle);
+    setBlockedTasks(updateTitle);
+    setFutureTasks(updateTitle);
     setCompletedTasks(updateTitle);
 
     try {
@@ -327,10 +392,11 @@ const DayflowTaskBoard: React.FC = () => {
           });
           setCompletedTasks((current) => [...current, updatedTask]);
           removeFromWorkingSet(task);
-        } else if (task.type === "week") {
-          setWeekTasks((current) => {
+        } else if (SECONDARY_TASK_TYPES.includes(task.type as SecondaryTaskType)) {
+          const type = task.type as SecondaryTaskType;
+          setTasksForType(type, (current) => {
             const next = current.filter((item) => item.id !== task.id);
-            saveStoredOrder("week", next);
+            saveStoredOrder(type, next);
             return next;
           });
         }
@@ -370,10 +436,11 @@ const DayflowTaskBoard: React.FC = () => {
           saveStoredOrder("day", next);
           return next;
         });
-      } else if (task.type === "week") {
-        setWeekTasks((current) => {
+      } else if (SECONDARY_TASK_TYPES.includes(task.type as SecondaryTaskType)) {
+        const type = task.type as SecondaryTaskType;
+        setTasksForType(type, (current) => {
           const next = current.filter((item) => item.id !== task.id);
-          saveStoredOrder("week", next);
+          saveStoredOrder(type, next);
           return next;
         });
       }
@@ -385,10 +452,11 @@ const DayflowTaskBoard: React.FC = () => {
           saveStoredOrder("day", next);
           return next;
         });
-      } else if (toType === "week") {
-        setWeekTasks((current) => {
+      } else if (SECONDARY_TASK_TYPES.includes(toType as SecondaryTaskType)) {
+        const type = toType as SecondaryTaskType;
+        setTasksForType(type, (current) => {
           const next = [movedTask, ...current];
-          saveStoredOrder("week", next);
+          saveStoredOrder(type, next);
           return next;
         });
       }
@@ -409,10 +477,11 @@ const DayflowTaskBoard: React.FC = () => {
           saveStoredOrder("day", next);
           return next;
         });
-      } else if (task.type === "week") {
-        setWeekTasks((current) => {
+      } else if (SECONDARY_TASK_TYPES.includes(task.type as SecondaryTaskType)) {
+        const type = task.type as SecondaryTaskType;
+        setTasksForType(type, (current) => {
           const next = current.filter((item) => item.id !== task.id);
-          saveStoredOrder("week", next);
+          saveStoredOrder(type, next);
           return next;
         });
       }
@@ -704,7 +773,7 @@ const DayflowTaskBoard: React.FC = () => {
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`space-y-1 rounded-lg p-1 transition-colors ${
-              type === "week" || completedTasks.length === 0
+              type !== "day" || completedTasks.length === 0
                 ? "min-h-full"
                 : "min-h-[8rem]"
             } ${
@@ -746,7 +815,7 @@ const DayflowTaskBoard: React.FC = () => {
     <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.35fr)_minmax(18rem,1fr)] gap-6">
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <header className="shrink-0 border-b border-gray-100 bg-gray-50/60 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/30">
+          <header className="flex h-10 shrink-0 items-center border-b border-gray-100 bg-gray-50/60 px-4 dark:border-gray-800 dark:bg-gray-800/30">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Day
             </h2>
@@ -804,13 +873,32 @@ const DayflowTaskBoard: React.FC = () => {
         </section>
 
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <header className="shrink-0 border-b border-gray-100 bg-gray-50/60 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/30">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              Week
-            </h2>
+          <header className="flex h-10 shrink-0 items-center border-b border-gray-100 bg-gray-50/60 px-4 dark:border-gray-800 dark:bg-gray-800/30">
+            <div
+              className="flex items-center gap-4"
+              role="tablist"
+              aria-label="Task timeframe"
+            >
+              {SECONDARY_TASK_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  aria-selected={secondaryView === type}
+                  onClick={() => selectSecondaryView(type)}
+                  className={`text-[11px] font-semibold uppercase leading-none tracking-wider transition-colors ${
+                    secondaryView === type
+                      ? "text-gray-900 dark:text-gray-100"
+                      : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-2 scrollbar-hide">
-            {isLoading ? <BoardSkeleton /> : renderList("week")}
+            {isLoading ? <BoardSkeleton /> : renderList(secondaryView)}
           </div>
         </section>
       </div>
