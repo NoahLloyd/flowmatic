@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, FileText } from "lucide-react";
 import { TaskType } from "../../types/Task";
+import LinkifiedTaskText from "../task/LinkifiedTaskText";
 
 export interface ObsidianTask {
   file: string;
@@ -226,7 +227,7 @@ const ObsidianTasksPanel: React.FC<Props> = ({
                     </span>
                   )}
                   <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 overflow-hidden whitespace-nowrap">
-                    {t.display}
+                    <LinkifiedTaskText text={t.display} />
                   </span>
                   {t.due_date && (
                     <span className="text-[10px] text-amber-600 dark:text-amber-400 shrink-0">

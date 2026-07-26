@@ -94,6 +94,10 @@ contextBridge.exposeInMainWorld("electron", {
     return ipcRenderer.invoke("request-shortcuts-access");
   },
 
+  openExternal: (url: string) => {
+    return ipcRenderer.invoke("open-external", url);
+  },
+
   insights: {
     prepare: () => ipcRenderer.invoke("insights:prepare"),
     writeData: (files: Record<string, unknown>) =>

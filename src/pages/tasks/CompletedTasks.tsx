@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Task, TaskType } from "../../types/Task";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 interface CompletedTasksProps {
   tasks: Task[];
@@ -95,7 +96,7 @@ const CompletedTasks: React.FC<CompletedTasksProps> = ({
                 className="text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400 text-sm"
                 onClick={() => handleStartEdit(task)}
               >
-                {task.title}
+                <LinkifiedTaskText text={task.title} />
               </span>
             )}
           </div>

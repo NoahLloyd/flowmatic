@@ -13,6 +13,7 @@ import {
   subscribeToTaskAdded,
 } from "../../utils/taskEvents";
 import TaskContextMenu from "../../components/task/TaskContextMenu";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 const BlockedTasks: React.FC = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
@@ -349,7 +350,7 @@ const BlockedTasks: React.FC = () => {
                               onClick={() => startEditing(task)}
                               className="text-sm text-gray-800 dark:text-gray-200 truncate cursor-text"
                             >
-                              {task.title}
+                              <LinkifiedTaskText text={task.title} />
                             </span>
                           )}
                         </div>

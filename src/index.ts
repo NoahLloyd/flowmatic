@@ -7,6 +7,7 @@ import {
   Menu,
   globalShortcut,
   screen,
+  shell,
 } from "electron";
 import path from "path";
 import * as fs from "fs";
@@ -387,6 +388,18 @@ ipcMain.on("show-window", () => {
 // Get shortcuts
 ipcMain.handle("get-shortcuts", () => {
   return loadShortcuts();
+});
+
+ipcMain.handle("open-external", async (_event, rawUrl: string) => {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    await shell.openExternal(url.toString());
+    return true;
+  } catch (error) {
+    console.error("Failed to open external link:", error);
+    return false;
+  }
 });
 
 // Update shortcuts

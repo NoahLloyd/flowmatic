@@ -1,4 +1,5 @@
 import React from "react";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 interface CompassCurrentTasksProps {
   tasks: string[];
@@ -36,7 +37,7 @@ const CompassCurrentTasks: React.FC<CompassCurrentTasksProps> = ({
               isSingle ? "text-3xl leading-tight" : "text-base"
             }`}
           >
-            {title}
+            <LinkifiedTaskText text={title} />
           </span>
           <button
             type="button"

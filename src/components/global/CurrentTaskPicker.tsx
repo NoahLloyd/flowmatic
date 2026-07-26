@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../utils/api";
 import { Check, Trash2 } from "lucide-react";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import LinkifiedTaskText from "../task/LinkifiedTaskText";
 
 interface CurrentTaskPickerProps {
   isOpen: boolean;
@@ -304,7 +305,9 @@ const CurrentTaskPicker: React.FC<CurrentTaskPickerProps> = ({
                                 <Check className="w-3 h-3 text-white dark:text-gray-900" />
                               )}
                             </span>
-                            <span className="truncate flex-1">{row.title}</span>
+                            <span className="truncate flex-1">
+                              <LinkifiedTaskText text={row.title} />
+                            </span>
                             {row.type !== "day" && row.type !== "free" && (
                               <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium shrink-0">
                                 {row.type}

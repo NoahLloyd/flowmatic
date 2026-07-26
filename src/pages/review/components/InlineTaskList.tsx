@@ -11,6 +11,7 @@ import ObsidianTasksPanel, {
   ObsidianTask,
   rememberObsidianSource,
 } from "../../../components/obsidian/ObsidianTasksPanel";
+import LinkifiedTaskText from "../../../components/task/LinkifiedTaskText";
 
 interface InlineTaskListProps {
   type: TaskType;
@@ -234,7 +235,7 @@ const InlineTaskList: React.FC<InlineTaskListProps> = ({
                   <Check className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
                 <span className="text-sm text-slate-700 dark:text-slate-200 flex-1 min-w-0 truncate">
-                  {task.title}
+                  <LinkifiedTaskText text={task.title} />
                 </span>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
                   {otherTypes.map((t) => (

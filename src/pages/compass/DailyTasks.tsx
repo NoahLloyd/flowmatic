@@ -14,6 +14,7 @@ import {
   subscribeToTaskUpdated,
 } from "../../utils/taskEvents";
 import TaskContextMenu from "../../components/task/TaskContextMenu";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 // Hydrate daily task lists from a localStorage snapshot of the previous
 // fetch. Eliminates the boot-time skeleton flash — if today's data is
@@ -685,7 +686,7 @@ const DailyTasks: React.FC = () => {
                                 onClick={() => startEditing(task)}
                                 className="text-sm text-gray-800 dark:text-gray-200 truncate cursor-text"
                               >
-                                {task.title}
+                                <LinkifiedTaskText text={task.title} />
                               </span>
                             )}
 
@@ -749,7 +750,7 @@ const DailyTasks: React.FC = () => {
                     onClick={() => startEditing(task)}
                     className="text-sm text-gray-500 dark:text-gray-400 truncate cursor-text"
                   >
-                    {task.title}
+                    <LinkifiedTaskText text={task.title} />
                   </span>
                 )}
               </div>
