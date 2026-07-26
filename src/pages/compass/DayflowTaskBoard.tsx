@@ -12,6 +12,7 @@ import {
 } from "@hello-pangea/dnd";
 import { Check, GripVertical } from "lucide-react";
 import TaskContextMenu from "../../components/task/TaskContextMenu";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 import { useNavigation } from "../../hooks/useNavigation";
 import { Task, TaskType } from "../../types/Task";
 import { api } from "../../utils/api";
@@ -724,7 +725,7 @@ const DayflowTaskBoard: React.FC = () => {
                       '"SF Pro Rounded", ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
                   }}
                 >
-                  {task.title}
+                  <LinkifiedTaskText text={task.title} />
                 </span>
               )}
             </div>
@@ -861,7 +862,7 @@ const DayflowTaskBoard: React.FC = () => {
                           onClick={() => startEditing(task)}
                           className="min-w-0 flex-1 cursor-text break-words text-[15px] leading-6 text-gray-400 line-through decoration-gray-300 dark:text-gray-600 dark:decoration-gray-700"
                         >
-                          {task.title}
+                          <LinkifiedTaskText text={task.title} />
                         </span>
                       )}
                     </div>

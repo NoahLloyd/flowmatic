@@ -35,6 +35,7 @@ export interface IElectronAPI {
   getShortcuts: () => Promise<ShortcutsConfig>;
   updateShortcuts: (shortcuts: ShortcutsConfig) => Promise<ShortcutsConfig>;
   setDoNotDisturb: (enabled: boolean) => Promise<boolean>;
+  openExternal: (url: string) => Promise<boolean>;
   insights: InsightsAPI;
   anki: AnkiAPI;
 }

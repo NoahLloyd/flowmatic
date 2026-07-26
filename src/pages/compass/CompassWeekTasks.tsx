@@ -9,6 +9,7 @@ import {
   DropResult,
 } from "@hello-pangea/dnd";
 import { subscribeToTaskAdded } from "../../utils/taskEvents";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 // CompassWeekTasks is the "This week" companion list in the Dayflow Compass
 // variant. It's the BlockedTasks pattern pointed at the "week" task type, with
@@ -259,7 +260,7 @@ const CompassWeekTasks: React.FC = () => {
                               onClick={() => startEditing(task)}
                               className="text-sm text-gray-800 dark:text-gray-200 truncate cursor-text"
                             >
-                              {task.title}
+                              <LinkifiedTaskText text={task.title} />
                             </span>
                           )}
                         </div>

@@ -15,6 +15,7 @@ interface Window {
     }) => Promise<{ quickAddTask: string; quickAddNote: string }>;
     setDoNotDisturb: (enabled: boolean) => Promise<boolean>;
     requestShortcutsAccess: () => Promise<string>;
+    openExternal: (url: string) => Promise<boolean>;
     anki?: {
       readStats: () => Promise<
         | { ok: true; reviewsToday: number; dueRemaining: number | null; lastSync: string | null }

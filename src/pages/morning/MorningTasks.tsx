@@ -13,6 +13,7 @@ import {
   Draggable,
   DropResult,
 } from "@hello-pangea/dnd";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 // Only D, W, F are relevant for the morning view
 const MORNING_TYPES: TaskType[] = ["day", "week", "future"];
@@ -489,7 +490,7 @@ const MorningTasks: React.FC = () => {
                   startEditing(task);
                 }}
               >
-                {task.title}
+                <LinkifiedTaskText text={task.title} />
               </span>
             )}
 

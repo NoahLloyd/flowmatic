@@ -10,6 +10,7 @@ import { Session } from "../../../types/Session";
 import { useAuth } from "../../../context/AuthContext";
 import { getAllSignals, SignalConfig } from "../../settings/components/SignalSettings";
 import { computeDayScore } from "../../../context/SignalsContext";
+import LinkifiedTaskText from "../../../components/task/LinkifiedTaskText";
 
 interface WeekInReviewProps {
   weekStart: string; // YYYY-MM-DD
@@ -267,7 +268,7 @@ const WeekInReview: React.FC<WeekInReviewProps> = ({ weekStart, weekEnd }) => {
                   className="flex items-center gap-2 py-1"
                 >
                   <span className="text-xs text-slate-600 dark:text-slate-300 flex-1">
-                    {task.title}
+                    <LinkifiedTaskText text={task.title} />
                   </span>
                   <span className="text-[10px] text-slate-400 dark:text-slate-500">
                     {typeLabels[task.type] || task.type}

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Task, TaskType } from "../../types/Task";
 import { Draggable } from "@hello-pangea/dnd";
+import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
 
 interface TaskItemProps {
   task: Task;
@@ -100,7 +101,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
                 }`}
                 onClick={() => setIsEditing(true)}
               >
-                {task.title}
+                <LinkifiedTaskText text={task.title} />
               </span>
             )}
             {task.completedAt && (

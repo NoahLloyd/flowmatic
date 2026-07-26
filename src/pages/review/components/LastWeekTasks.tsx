@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Loader, Check } from "lucide-react";
 import { api } from "../../../utils/api";
 import { Task } from "../../../types/Task";
+import LinkifiedTaskText from "../../../components/task/LinkifiedTaskText";
 
 interface LastWeekTasksProps {
   // The Monday of the week being reviewed (YYYY-MM-DD).
@@ -73,7 +74,7 @@ const LastWeekTasks: React.FC<LastWeekTasksProps> = ({ weekStart }) => {
           <div key={task.id} className="flex items-center gap-2.5 px-3 py-1.5">
             <Check className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
             <span className="text-sm text-slate-600 dark:text-slate-300 flex-1 min-w-0 truncate">
-              {task.title}
+              <LinkifiedTaskText text={task.title} />
             </span>
             <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 flex-shrink-0">
               {TYPE_LABELS[task.type] || task.type}
