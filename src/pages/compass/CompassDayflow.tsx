@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Signals from "./signal/Signals";
 import DayflowFocusStats from "./DayflowFocusStats";
 import DayflowTaskBoard from "./DayflowTaskBoard";
+import CompassCurrentTasks from "./CompassCurrentTasks";
 import { useAuth } from "../../context/AuthContext";
 import {
   getAllSignals,
@@ -9,7 +10,7 @@ import {
 } from "../settings/components/SignalSettings";
 
 // CompassDayflow is the Dayflow-powered variant of the Compass page, selectable
-// in Settings. It keeps the "Working on" hero and the Signals row, swaps the
+// in Settings. It keeps the current-task hero and the Signals row, swaps the
 // timer + session-detail stats for a single Dayflow focus number (with weekly /
 // yearly progress), and drops Blocked Tasks so the task list fills the width.
 //
@@ -217,8 +218,6 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
       ? [currentTask]
       : [];
   const hasTask = tasksToShow.length > 0;
-  const isSingle = tasksToShow.length === 1;
-
   return (
     <div
       className="p-0 gap-4 flex flex-col h-full relative"
@@ -255,60 +254,13 @@ const CompassDayflow: React.FC<CompassDayflowProps> = ({
       {/* Dayflow focus number + weekly/yearly progress */}
       <DayflowFocusStats />
 
-      {/* "Working on" hero — sits just above the task lists (Signals + Focus
+      {/* Current-task hero — sits just above the task lists (Signals + Focus
           stay on top). Appears when you pick a task via the (w) picker. */}
       {hasTask && (
-        <div className="border-l-4 border-indigo-500 dark:border-indigo-400 pl-4 py-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-400">
-              Working on
-            </span>
-            {!isSingle && (
-              <span className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-                {tasksToShow.length}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {tasksToShow.map((title, idx) => (
-              <div
-                key={title + idx}
-                onClick={() => onRemoveTask(title)}
-                title="Remove from Working on"
-                className={`group flex items-center gap-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${
-                  isSingle ? "px-5 py-3" : "px-3.5 py-2"
-                }`}
-              >
-                {!isSingle && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      idx === 0
-                        ? "bg-indigo-500 dark:bg-indigo-400"
-                        : "bg-indigo-300/60 dark:bg-indigo-500/40"
-                    }`}
-                  />
-                )}
-                <span
-                  className={`flex-1 font-semibold text-gray-900 dark:text-white truncate ${
-                    isSingle ? "text-3xl leading-tight" : "text-base"
-                  }`}
-                >
-                  {title}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveTask(title);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 text-xs transition-opacity"
-                  title="Remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <CompassCurrentTasks
+          tasks={tasksToShow}
+          onRemoveTask={onRemoveTask}
+        />
       )}
 
       {/* A shared drag context lets tasks move in either direction while each

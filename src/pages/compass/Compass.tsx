@@ -10,6 +10,7 @@ import DailyTasks from "./DailyTasks";
 import BlockedTasks from "./BlockedTasks";
 import CompassStreakPanel from "./CompassStreakPanel";
 import ContextReminder from "./ContextReminder";
+import CompassCurrentTasks from "./CompassCurrentTasks";
 import { useFocusMode } from "../../context/FocusModeContext";
 
 // Define the session form data interface
@@ -447,8 +448,6 @@ const Compass: React.FC<CompassProps> = ({
     ? [currentTask]
     : [];
   const hasTask = tasksToShow.length > 0;
-  const isSingle = tasksToShow.length === 1;
-
   return (
     <div
       className="p-0 gap-4 flex flex-col h-full relative"
@@ -462,65 +461,14 @@ const Compass: React.FC<CompassProps> = ({
 
       <ContextReminder isRunning={isRunning} />
 
-      {/* Current task(s). Single and multi share the same shape (left
-          accent bar, "Working on" header, indigo pills). With one task
-          we omit the count and bump the pill text up so it still feels
-          like a hero element; with many we show the count. */}
+      {/* Current task(s). Single and multi share the same indigo pill shape.
+          With one task we bump the text up so it still feels like a hero
+          element. */}
       {hasTask && (
-        <div className="border-l-4 border-indigo-500 dark:border-indigo-400 pl-4 py-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-400">
-              Working on
-            </span>
-            {!isSingle && (
-              <span className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-                {tasksToShow.length}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {tasksToShow.map((title, idx) => (
-              <div
-                key={title + idx}
-                onClick={() => onRemoveTask(title)}
-                title="Remove from Working on"
-                className={`group flex items-center gap-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors ${
-                  isSingle ? "px-5 py-3" : "px-3.5 py-2"
-                }`}
-              >
-                {/* Primary indicator: filled dot for the most recently
-                    selected task (the one sessions pre-fill with), dimmer
-                    for the rest. Hidden when there's only one. */}
-                {!isSingle && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      idx === 0
-                        ? "bg-indigo-500 dark:bg-indigo-400"
-                        : "bg-indigo-300/60 dark:bg-indigo-500/40"
-                    }`}
-                  />
-                )}
-                <span
-                  className={`flex-1 font-semibold text-gray-900 dark:text-white truncate ${
-                    isSingle ? "text-3xl leading-tight" : "text-base"
-                  }`}
-                >
-                  {title}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveTask(title);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 text-xs transition-opacity"
-                  title="Remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+        <CompassCurrentTasks
+          tasks={tasksToShow}
+          onRemoveTask={onRemoveTask}
+        />
       )}
 
       <TimerCompleteModal
