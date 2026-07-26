@@ -10,6 +10,15 @@ export interface MorningActivityContent {
   gratitude?: string;
   affirmations?: string;
   lastActivityIndex?: number;
+  distractions?: MorningDistraction[];
+}
+
+export interface MorningDistraction {
+  id: string;
+  startedAt: string;
+  endedAt: string;
+  durationSeconds: number;
+  activityId: string;
 }
 
 export interface MorningEntries {

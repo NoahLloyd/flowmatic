@@ -4,18 +4,16 @@ import {
   Star,
   Check,
   Loader,
-  Timer,
   Play,
   Pause,
   RefreshCw,
-  ChevronDown,
-  ChevronUp,
   PenLine,
   Eye,
   Heart,
   Wind,
   CheckSquare,
   EyeOff,
+  CircleOff,
 } from "lucide-react";
 import { api } from "../../utils/api";
 import {
@@ -23,6 +21,7 @@ import {
   MorningActivity,
   DayOfWeek,
   MorningActivityContent,
+  MorningDistraction,
 } from "../../types/Morning";
 import { useAuth } from "../../context/AuthContext";
 import { debounce } from "lodash";
@@ -31,6 +30,61 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useTimezone } from "../../context/TimezoneContext";
 import MorningTasks from "./MorningTasks";
 import { pickNextPrompt, recordPromptShown } from "../../utils/promptPicker";
+
+const DISTRACTION_STORAGE_PREFIX = "morningDistractions:";
+const ACTIVE_DISTRACTION_KEY = "morningActiveDistraction";
+const MIN_DISTRACTION_MS = 1000;
+
+interface ActiveDistraction {
+  id: string;
+  date: string;
+  startedAt: string;
+  activityId: string;
+  remainingTimerSeconds: number;
+}
+
+const getStoredDistractions = (date: string): MorningDistraction[] => {
+  try {
+    const stored = localStorage.getItem(DISTRACTION_STORAGE_PREFIX + date);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const storeDistractions = (
+  date: string,
+  distractions: MorningDistraction[]
+) => {
+  localStorage.setItem(
+    DISTRACTION_STORAGE_PREFIX + date,
+    JSON.stringify(distractions)
+  );
+};
+
+const mergeDistractions = (
+  ...groups: MorningDistraction[][]
+): MorningDistraction[] => {
+  const byId = new Map<string, MorningDistraction>();
+  groups.flat().forEach((distraction) => {
+    if (distraction?.id) byId.set(distraction.id, distraction);
+  });
+  return Array.from(byId.values()).sort(
+    (a, b) =>
+      new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+  );
+};
+
+const readActiveDistraction = (): ActiveDistraction | null => {
+  try {
+    const stored = localStorage.getItem(ACTIVE_DISTRACTION_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
 
 const Morning = () => {
   const { user } = useAuth();
@@ -44,6 +98,7 @@ const Morning = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [highlightedDates, setHighlightedDates] = useState<Date[]>([]);
+  const [distractions, setDistractions] = useState<MorningDistraction[]>([]);
 
   // Morning activities from user preferences
   const [activities, setActivities] = useState<MorningActivity[]>([
@@ -75,6 +130,135 @@ const Morning = () => {
   // Keep track of today's day of week
   const [currentDayOfWeek, setCurrentDayOfWeek] = useState<string>("");
 
+  // Refs let focus and unmount listeners read the latest tracking state
+  // without rebinding on every timer tick.
+  const selectedDateRef = useRef(selectedDate);
+  const trackedActivityIdRef = useRef("writing");
+  const shouldTrackDistractionsRef = useRef(false);
+  const remainingTimerSecondsRef = useRef(timeRemaining);
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+    trackedActivityIdRef.current =
+      activities[currentActivityIndex]?.id || "writing";
+    remainingTimerSecondsRef.current = timeRemaining;
+    shouldTrackDistractionsRef.current =
+      timerActive && selectedDate === getTodayInUserTimezone();
+  }, [
+    selectedDate,
+    activities,
+    currentActivityIndex,
+    timerActive,
+    timeRemaining,
+    timezone,
+  ]);
+
+  const beginDistraction = useCallback(() => {
+    if (!shouldTrackDistractionsRef.current || readActiveDistraction()) return;
+
+    const now = new Date();
+    const active: ActiveDistraction = {
+      id: `distraction-${now.getTime()}-${Math.random()
+        .toString(36)
+        .slice(2)}`,
+      date: selectedDateRef.current,
+      startedAt: now.toISOString(),
+      activityId: trackedActivityIdRef.current,
+      remainingTimerSeconds: remainingTimerSecondsRef.current,
+    };
+    localStorage.setItem(ACTIVE_DISTRACTION_KEY, JSON.stringify(active));
+  }, []);
+
+  const finishDistraction = useCallback(() => {
+    const active = readActiveDistraction();
+    if (!active) return;
+
+    localStorage.removeItem(ACTIVE_DISTRACTION_KEY);
+    const endedAt = new Date();
+    const elapsedMs =
+      endedAt.getTime() - new Date(active.startedAt).getTime();
+    const maximumDurationMs =
+      typeof active.remainingTimerSeconds === "number"
+        ? Math.max(0, active.remainingTimerSeconds) * 1000
+        : elapsedMs;
+    const durationMs = Math.min(
+      elapsedMs,
+      maximumDurationMs
+    );
+    if (!Number.isFinite(durationMs) || durationMs < MIN_DISTRACTION_MS) return;
+
+    const completed: MorningDistraction = {
+      id: active.id,
+      startedAt: active.startedAt,
+      endedAt: endedAt.toISOString(),
+      durationSeconds: Math.max(1, Math.round(durationMs / 1000)),
+      activityId: active.activityId,
+    };
+
+    const stored = getStoredDistractions(active.date);
+    const next = mergeDistractions(stored, [completed]);
+    storeDistractions(active.date, next);
+
+    if (selectedDateRef.current === active.date) {
+      setDistractions((current) => mergeDistractions(current, next));
+    }
+  }, []);
+
+  // Electron reports whether any Flowmatic window is focused. In a regular
+  // browser preview, fall back to the standard focus/visibility events.
+  useEffect(() => {
+    const handleFocusChanged = (isFocused: boolean) => {
+      if (isFocused) finishDistraction();
+      else beginDistraction();
+    };
+    const handleWindowFocus = () => finishDistraction();
+    const handleWindowBlur = () => beginDistraction();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") beginDistraction();
+      else finishDistraction();
+    };
+
+    let focusListenerId: number | undefined;
+    if (window.electron?.on) {
+      focusListenerId = window.electron.on(
+        "flowmatic-focus-changed",
+        handleFocusChanged
+      );
+    } else {
+      window.addEventListener("focus", handleWindowFocus);
+      window.addEventListener("blur", handleWindowBlur);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+
+    window.addEventListener("beforeunload", beginDistraction);
+    finishDistraction();
+
+    return () => {
+      window.removeEventListener("beforeunload", beginDistraction);
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (
+        focusListenerId !== undefined &&
+        window.electron?.removeListener
+      ) {
+        window.electron.removeListener(
+          "flowmatic-focus-changed",
+          focusListenerId
+        );
+      }
+    };
+  }, [beginDistraction, finishDistraction]);
+
+  // Navigating to another Flowmatic page unmounts Morning without blurring the
+  // app, so start the away interval during unmount as well.
+  useEffect(
+    () => () => {
+      beginDistraction();
+    },
+    [beginDistraction]
+  );
+
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   function getTodayInUserTimezone() {
     try {
@@ -99,11 +283,47 @@ const Morning = () => {
     }
   }
 
-  // Format time as MM:SS
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    return `${mins} min`;
+  const formatTimerTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes} min`;
   };
+
+  const distractionSeconds = distractions.reduce(
+    (total, distraction) => total + distraction.durationSeconds,
+    0
+  );
+
+  const formatDistractionTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s away`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes < 60) {
+      return `${minutes}m${
+        remainingSeconds ? ` ${remainingSeconds}s` : ""
+      } away`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h${remainingMinutes ? ` ${remainingMinutes}m` : ""} away`;
+  };
+
+  const formatDuration = (seconds: number) =>
+    formatDistractionTime(seconds).replace(" away", "");
+
+  const formatSelectedDate = (date: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(`${date}T12:00:00`));
+
+  const recentDistractions = [...distractions]
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    )
+    .slice(0, 4);
 
   // Load activities from user preferences
   useEffect(() => {
@@ -303,6 +523,9 @@ const Morning = () => {
   // Load current date's entry
   useEffect(() => {
     const loadCurrentEntry = async () => {
+      const locallyStoredDistractions = getStoredDistractions(selectedDate);
+      setDistractions(locallyStoredDistractions);
+
       try {
         const response = await api.getEntry(selectedDate);
         const { content, activityContent } = response;
@@ -311,10 +534,7 @@ const Morning = () => {
         // This prevents wiping out the UI when empty data is returned
         const hasActivityContent =
           activityContent &&
-          Object.keys(activityContent).length > 0 &&
-          (activityContent.writing ||
-            activityContent.gratitude ||
-            activityContent.affirmations);
+          Object.keys(activityContent).length > 0;
 
         const hasContent = content && content.trim().length > 0;
 
@@ -344,6 +564,16 @@ const Morning = () => {
           if (activityContent.affirmations) {
             setAffirmationsEntry(activityContent.affirmations);
           }
+
+          const mergedDistractions = mergeDistractions(
+            activityContent.distractions || [],
+            locallyStoredDistractions
+          );
+          setDistractions((current) => {
+            const next = mergeDistractions(current, mergedDistractions);
+            storeDistractions(selectedDate, next);
+            return next;
+          });
 
           // Restore last activity index if available and valid
           if (
@@ -383,7 +613,8 @@ const Morning = () => {
         content: string,
         gratitudeText: string,
         affirmationsText: string,
-        activityIndex: number
+        activityIndex: number,
+        distractionEvents: MorningDistraction[]
       ) => {
         try {
           setIsSaving(true);
@@ -394,6 +625,7 @@ const Morning = () => {
             gratitude: gratitudeText,
             affirmations: affirmationsText,
             lastActivityIndex: activityIndex,
+            distractions: distractionEvents,
           };
 
           // Pass empty string for content (we'll use writing from activityContent)
@@ -445,13 +677,19 @@ const Morning = () => {
   // Auto-save when any content changes
   useEffect(() => {
     // Only save if there's actual content to save
-    if (currentEntry || gratitudeEntry || affirmationsEntry) {
+    if (
+      currentEntry ||
+      gratitudeEntry ||
+      affirmationsEntry ||
+      distractions.length > 0
+    ) {
       debouncedSave(
         selectedDate,
         currentEntry,
         gratitudeEntry,
         affirmationsEntry,
-        currentActivityIndex
+        currentActivityIndex,
+        distractions
       );
     }
   }, [
@@ -460,6 +698,7 @@ const Morning = () => {
     affirmationsEntry,
     selectedDate,
     currentActivityIndex,
+    distractions,
     debouncedSave,
   ]);
 
@@ -640,11 +879,6 @@ const Morning = () => {
     selectedDate,
   ]);
 
-  // Handle click event on next button
-  const handleNextButtonClick = () => {
-    nextActivity();
-  };
-
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -749,196 +983,168 @@ const Morning = () => {
     setSelectedDate(newToday);
   }, [timezone]);
 
-  // The tasks activity needs the full window width so users can see daily,
-  // weekly, future, and Obsidian buckets side-by-side without horizontal
-  // cramping. Other activities stay at the readable max-w-4xl text width.
-  const isTasksActivity = currentActivity?.type === "tasks";
-
   return (
-    <div
-      className={`mx-auto dark:bg-slate-900 ${
-        isTasksActivity ? "max-w-none px-4 py-4" : "max-w-4xl p-8"
-      }`}
-    >
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <Star className="w-5 h-5 text-yellow-500" />
-            <span className="text-slate-700 dark:text-slate-200">
-              {streak} day streak
-            </span>
-          </div>
-
-          {/* Timer display */}
-          <div
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border ${
-              timerComplete
-                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                : timerActive
-                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-            }`}
-          >
-            <Timer
-              className={`w-5 h-5 ${
-                timerComplete
-                  ? "text-green-500 dark:text-green-400"
-                  : timerActive
-                  ? "text-blue-500 dark:text-blue-400"
-                  : "text-slate-500 dark:text-slate-400"
-              }`}
-            />
-            <span
-              className={`${
-                timerComplete
-                  ? "text-green-700 dark:text-green-300"
-                  : timerActive
-                  ? "text-blue-700 dark:text-blue-300"
-                  : "text-slate-700 dark:text-slate-200"
-              }`}
-            >
-              {formatTime(timeRemaining)}
-            </span>
-            <div className="flex space-x-1 ml-1">
-              {timerActive ? (
-                <button
-                  onClick={pauseTimer}
-                  className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
-                  title="Pause timer"
-                >
-                  <Pause className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                </button>
-              ) : (
-                <button
-                  onClick={startTimer}
-                  className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
-                  title="Start timer"
-                >
-                  <Play className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                </button>
-              )}
-              <button
-                onClick={resetTimer}
-                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
-                title="Reset timer"
-              >
-                <RefreshCw className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              </button>
-            </div>
-          </div>
-
-          {/* Condensed activity navigation */}
-          {activities.length > 1 && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <button
-                onClick={prevActivity}
-                disabled={currentActivityIndex === 0}
-                className={`p-1 rounded-full ${
-                  currentActivityIndex === 0
-                    ? "text-slate-400 dark:text-slate-600"
-                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+    <div className="mx-auto w-full max-w-[1500px] p-2 dark:bg-slate-900">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)_250px]">
+        <aside className="xl:sticky xl:top-2">
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 dark:border-slate-700">
+              <span
+                className={`text-2xl font-medium tracking-tight ${
+                  timerComplete
+                    ? "text-green-600 dark:text-green-400"
+                    : timerActive
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-slate-800 dark:text-white"
                 }`}
-                title="Previous (← or ↑ key)"
               >
-                <ChevronUp className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center space-x-2 px-1">
-                {getActivityIcon(currentActivity?.type || "writing")}
-                <span className="text-sm text-slate-700 dark:text-slate-300">
-                  {currentActivityIndex + 1}/{activities.length}
-                </span>
-              </div>
-
-              <button
-                onClick={handleNextButtonClick}
-                disabled={currentActivityIndex === activities.length - 1}
-                className={`p-1 rounded-full ${
-                  currentActivityIndex === activities.length - 1
-                    ? "text-slate-400 dark:text-slate-600"
-                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
-                }`}
-                title="Next (→ or ↓ key)"
-              >
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* Blur toggle button */}
-          <div className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <button
-              onClick={toggleBlur}
-              title={isTextBlurred ? "Show text (Alt+B)" : "Blur text (Alt+B)"}
-              className="flex items-center space-x-1"
-            >
-              {isTextBlurred ? (
-                <Eye className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-              ) : (
-                <EyeOff className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-              )}
-              <span className="text-slate-700 dark:text-slate-200">
-                {isTextBlurred ? "Show" : "Blur"}
+                {formatTimerTime(timeRemaining)}
               </span>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative flex items-center space-x-2">
-          <button
-            onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-            className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
-          >
-            <Calendar className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-            {isSaving || hasPendingChanges ? (
-              <Loader className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-            ) : lastSaved ? (
-              <Check className="w-5 h-5 text-green-500" />
-            ) : null}
-          </button>
-          {isCalendarOpen && (
-            <div className="absolute top-full right-0 mt-2 z-10">
-              <DatePicker
-                selected={new Date(selectedDate)}
-                onChange={handleDateChange}
-                inline
-                maxDate={new Date()}
-                highlightDates={highlightedDates}
-                dayClassName={(date) =>
-                  highlightedDates.some((d) => {
-                    // Convert both dates to YYYY-MM-DD in user's timezone
-                    const dateParts = new Intl.DateTimeFormat("en-US", {
-                      timeZone: timezone,
-                      year: "numeric",
-                      month: "2-digit",
-                      day: "2-digit",
-                    }).formatToParts(date);
-
-                    const month =
-                      dateParts.find((part) => part.type === "month")?.value ||
-                      "01";
-                    const day =
-                      dateParts.find((part) => part.type === "day")?.value ||
-                      "01";
-                    const year =
-                      dateParts.find((part) => part.type === "year")?.value ||
-                      "2023";
-
-                    const formattedDate = `${year}-${month}-${day}`;
-
-                    // Get the entry date in YYYY-MM-DD format
-                    const entryDateString = d.toISOString().split("T")[0];
-
-                    return entryDateString === formattedDate;
-                  })
-                    ? "highlighted-date"
-                    : undefined
-                }
-              />
+              <div className="flex items-center gap-1">
+                {timerActive ? (
+                  <button
+                    onClick={pauseTimer}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                    title="Pause timer"
+                  >
+                    <Pause className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={startTimer}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                    title="Start timer"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={resetTimer}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                  title="Reset timer"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="p-2">
+              {activities.map((activity, index) => {
+                const isActive = index === currentActivityIndex;
+                return (
+                  <button
+                    key={activity.id}
+                    onClick={() => setCurrentActivityIndex(index)}
+                    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                      isActive
+                        ? "bg-slate-100 font-medium text-slate-900 dark:bg-slate-700 dark:text-white"
+                        : "text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/60"
+                    }`}
+                  >
+                    {getActivityIcon(activity.type)}
+                    <span className="truncate">
+                      {activity.type.charAt(0).toUpperCase() +
+                        activity.type.slice(1)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-700">
+              <button
+                onClick={toggleBlur}
+                title={
+                  isTextBlurred ? "Show text (Alt+B)" : "Blur text (Alt+B)"
+                }
+                className="flex items-center justify-center gap-1.5 border-r border-slate-100 px-2 py-3 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700"
+              >
+                {isTextBlurred ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+                {isTextBlurred ? "Show" : "Blur"}
+              </button>
+              <div className="flex items-center justify-center gap-1.5 px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
+                <Star className="h-3.5 w-3.5 text-yellow-500" />
+                {streak} {streak === 1 ? "day" : "days"}
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <main className="min-w-0">
+          <header className="mb-4 flex min-h-[48px] items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              {getActivityIcon(currentActivity?.type || "writing")}
+              <h1 className="truncate text-lg font-semibold text-slate-800 dark:text-white">
+                {currentActivity?.title || "Morning"}
+              </h1>
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                <Calendar className="h-4 w-4 text-slate-400" />
+                <span>
+                  <span className="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                    {selectedDate === getTodayInUserTimezone()
+                      ? "Today"
+                      : "Journal"}
+                  </span>
+                  <span className="block text-[10px] text-slate-400 dark:text-slate-500">
+                    {formatSelectedDate(selectedDate)}
+                  </span>
+                </span>
+                {isSaving || hasPendingChanges ? (
+                  <Loader className="h-4 w-4 text-slate-400" />
+                ) : lastSaved ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : null}
+              </button>
+              {isCalendarOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2">
+                  <DatePicker
+                    selected={new Date(selectedDate)}
+                    onChange={handleDateChange}
+                    inline
+                    maxDate={new Date()}
+                    highlightDates={highlightedDates}
+                    dayClassName={(date) =>
+                      highlightedDates.some((d) => {
+                        const dateParts = new Intl.DateTimeFormat("en-US", {
+                          timeZone: timezone,
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                        }).formatToParts(date);
+
+                        const month =
+                          dateParts.find((part) => part.type === "month")
+                            ?.value || "01";
+                        const day =
+                          dateParts.find((part) => part.type === "day")?.value ||
+                          "01";
+                        const year =
+                          dateParts.find((part) => part.type === "year")
+                            ?.value || "2023";
+
+                        const formattedDate = `${year}-${month}-${day}`;
+                        const entryDateString = d.toISOString().split("T")[0];
+
+                        return entryDateString === formattedDate;
+                      })
+                        ? "highlighted-date"
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </header>
 
       {/* Timer completion notification */}
       {timerComplete && (
@@ -1075,6 +1281,69 @@ const Morning = () => {
 
         {/* Tasks */}
         {currentActivity?.type === "tasks" && <MorningTasks />}
+          </div>
+        </main>
+
+        <aside className="xl:sticky xl:top-2">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+            <div className="mb-5 flex items-center gap-2">
+              <CircleOff className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-white">
+                Distractions
+              </h2>
+            </div>
+
+            <div className="mb-6 grid grid-cols-2">
+              <div className="border-r border-slate-100 pr-4 dark:border-slate-700">
+                <div
+                  data-testid="distraction-count"
+                  className="text-4xl font-semibold leading-none text-slate-900 dark:text-white"
+                >
+                  {distractions.length}
+                </div>
+                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  {distractions.length === 1 ? "time" : "times"}
+                </div>
+              </div>
+              <div className="pl-4">
+                <div
+                  data-testid="distraction-total"
+                  className="text-lg font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+                >
+                  {formatDuration(distractionSeconds)}
+                </div>
+                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  away
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+              Recent
+            </div>
+            {recentDistractions.length === 0 ? (
+              <div className="pt-3 text-xs text-slate-400 dark:text-slate-500">
+                None yet
+              </div>
+            ) : (
+              <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-700">
+                {recentDistractions.map((distraction, index) => (
+                  <div
+                    key={distraction.id}
+                    className="flex items-center justify-between py-2.5 text-xs"
+                  >
+                    <span className="text-slate-400 dark:text-slate-500">
+                      #{distractions.length - index}
+                    </span>
+                    <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                      {formatDuration(distraction.durationSeconds)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
   );
