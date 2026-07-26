@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("electron", {
       "navigate-to-streak",
       "open-current-task-picker",
       "finish-session",
+      "flowmatic-focus-changed",
     ];
     if (validChannels.includes(channel)) {
       const id = listenerId++;
@@ -51,6 +52,7 @@ contextBridge.exposeInMainWorld("electron", {
       "navigate-to-streak",
       "open-current-task-picker",
       "finish-session",
+      "flowmatic-focus-changed",
     ];
     if (validChannels.includes(channel)) {
       if (typeof idOrFunc === "number") {

@@ -26,6 +26,23 @@ let tray: Tray | null = null;
 let signalTray: Tray | null = null;
 let signalTrayIconOutline: Electron.NativeImage | null = null;
 let signalTrayIconFilled: Electron.NativeImage | null = null;
+let focusBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Renderer window blur alone is not enough to decide that the user left
+// Flowmatic: focusing the quick-add overlay also blurs the main window. Wait
+// briefly for Electron's focus handoff to settle, then report whether any
+// Flowmatic window is focused.
+const broadcastFlowmaticFocus = () => {
+  if (focusBroadcastTimer) clearTimeout(focusBroadcastTimer);
+  focusBroadcastTimer = setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const isFocused = BrowserWindow.getFocusedWindow() !== null;
+    mainWindow.webContents.send("flowmatic-focus-changed", isFocused);
+  }, 75);
+};
+
+app.on("browser-window-focus", broadcastFlowmaticFocus);
+app.on("browser-window-blur", broadcastFlowmaticFocus);
 
 // Default shortcuts
 const DEFAULT_SHORTCUTS = {
