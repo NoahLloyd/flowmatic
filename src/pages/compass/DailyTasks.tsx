@@ -419,8 +419,16 @@ const DailyTasks: React.FC = () => {
         return;
       }
 
-      // 'e' key enters task mode (edit/select tasks)
-      if (e.key.toLowerCase() === "e" && !e.metaKey && !e.ctrlKey && !e.altKey && !taskMode) {
+      const isTaskModeKey =
+        e.key.toLowerCase() === "e" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey;
+
+      // 'e' enters task mode, but only when there is something to select.
+      // Previously an empty list could enter an invisible mode that swallowed
+      // every other shortcut.
+      if (isTaskModeKey && !taskMode && activeTasks.length > 0) {
         e.preventDefault();
         e.stopPropagation();
         setTaskMode(true);
@@ -431,8 +439,13 @@ const DailyTasks: React.FC = () => {
       // Everything below only when task mode is active
       if (!taskMode) return;
 
-      // Escape exits task mode
-      if (e.key === "Escape") {
+      // Before a task is selected, E acts as a toggle as well as Escape. This
+      // makes an accidental or repeated E press recover immediately instead
+      // of leaving the app in what looks like a broken shortcut state.
+      if (
+        e.key === "Escape" ||
+        (isTaskModeKey && selectedTaskIndex === null)
+      ) {
         e.preventDefault();
         e.stopPropagation();
         setTaskMode(false);
@@ -503,6 +516,21 @@ const DailyTasks: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown, true); // capture phase
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [taskMode, selectedTaskIndex, activeTasks, handleToggleComplete, startEditing]);
+
+  // Task mode is a temporary keyboard interaction. Never leave it armed after
+  // the user switches away from Flowmatic.
+  useEffect(() => {
+    if (!taskMode) return;
+
+    const handleWindowBlur = () => {
+      delete document.body.dataset.taskMode;
+      setTaskMode(false);
+      setSelectedTaskIndex(null);
+    };
+
+    window.addEventListener("blur", handleWindowBlur);
+    return () => window.removeEventListener("blur", handleWindowBlur);
+  }, [taskMode]);
 
   // Drag and Drop
   const handleDragEnd = (result: DropResult) => {
@@ -607,9 +635,24 @@ const DailyTasks: React.FC = () => {
           </span>
         </div>
       </div>
-      <div className="p-4 bg-white dark:bg-gray-900 flex-1 min-h-0 overflow-hidden">
+      <div className="p-4 bg-white dark:bg-gray-900 flex flex-col flex-1 min-h-0 overflow-hidden">
+        {taskMode && (
+          <div
+            role="status"
+            className="mb-3 flex items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300"
+          >
+            <span className="font-semibold uppercase tracking-wide">
+              Task mode
+            </span>
+            <span>
+              {selectedTaskIndex === null
+                ? "1–9 select · E or Esc exits"
+                : "Enter complete · E edit · Esc exits"}
+            </span>
+          </div>
+        )}
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="space-y-2 h-full overflow-y-auto overflow-x-hidden scrollbar-hide">
+          <div className="space-y-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide">
             <Droppable droppableId="daily-active-tasks">
               {(provided) => (
                 <div
