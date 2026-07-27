@@ -582,13 +582,14 @@ const DayflowTaskBoard: React.FC = () => {
         return;
       }
 
-      if (
+      const isTaskModeKey =
         event.key.toLowerCase() === "e" &&
         !event.metaKey &&
         !event.ctrlKey &&
-        !event.altKey &&
-        !taskMode
-      ) {
+        !event.altKey;
+
+      // Do not arm an invisible mode when there are no day tasks to select.
+      if (isTaskModeKey && !taskMode && dayTasks.length > 0) {
         event.preventDefault();
         event.stopPropagation();
         setTaskMode(true);
@@ -597,7 +598,12 @@ const DayflowTaskBoard: React.FC = () => {
       }
       if (!taskMode) return;
 
-      if (event.key === "Escape") {
+      // E is both the entry key and, until a task is selected, an intuitive
+      // toggle back out. Escape remains available in every task-mode state.
+      if (
+        event.key === "Escape" ||
+        (isTaskModeKey && selectedTaskIndex === null)
+      ) {
         event.preventDefault();
         event.stopPropagation();
         setTaskMode(false);
@@ -649,6 +655,21 @@ const DayflowTaskBoard: React.FC = () => {
     taskMode,
   ]);
 
+  // Avoid retaining a modal keyboard state while Flowmatic is in the
+  // background. This also guarantees that shortcuts resume on refocus.
+  useEffect(() => {
+    if (!taskMode) return;
+
+    const handleWindowBlur = () => {
+      delete document.body.dataset.taskMode;
+      setTaskMode(false);
+      setSelectedTaskIndex(null);
+    };
+
+    window.addEventListener("blur", handleWindowBlur);
+    return () => window.removeEventListener("blur", handleWindowBlur);
+  }, [taskMode]);
+
   const openMenu = (event: React.MouseEvent, task: Task) => {
     event.preventDefault();
     event.stopPropagation();
@@ -662,8 +683,9 @@ const DayflowTaskBoard: React.FC = () => {
   };
 
   const renderTask = (task: Task, index: number, type: BoardTaskType) => {
+    const numberedInTaskMode = type === "day" && taskMode;
     const selectedInTaskMode =
-      type === "day" && taskMode && selectedTaskIndex === index;
+      numberedInTaskMode && selectedTaskIndex === index;
     const label = numberLabel(index);
 
     return (
@@ -682,8 +704,14 @@ const DayflowTaskBoard: React.FC = () => {
                 : "border-transparent hover:border-gray-200 hover:bg-gray-50/80 dark:hover:border-gray-700 dark:hover:bg-gray-800/70"
             }`}
           >
-            {selectedInTaskMode && label ? (
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-500 text-[10px] font-bold text-white">
+            {numberedInTaskMode && label ? (
+              <span
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${
+                  selectedInTaskMode
+                    ? "bg-indigo-500 text-white"
+                    : "bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300"
+                }`}
+              >
                 {label}
               </span>
             ) : (
@@ -820,6 +848,16 @@ const DayflowTaskBoard: React.FC = () => {
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               Day
             </h2>
+            {taskMode && (
+              <div
+                role="status"
+                className="ml-auto rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300"
+              >
+                {selectedTaskIndex === null
+                  ? "Task mode · 1–9 · E/Esc"
+                  : "Task mode · E edit · Esc"}
+              </div>
+            )}
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-2 scrollbar-hide">
             {isLoading ? <BoardSkeleton /> : renderList("day")}
