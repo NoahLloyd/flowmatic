@@ -33,6 +33,7 @@ import { pickNextPrompt, recordPromptShown } from "../../utils/promptPicker";
 
 const DISTRACTION_STORAGE_PREFIX = "morningDistractions:";
 const ACTIVE_DISTRACTION_KEY = "morningActiveDistraction";
+const TIMER_STORAGE_PREFIX = "morningTimer:";
 const MIN_DISTRACTION_MS = 1000;
 
 interface ActiveDistraction {
@@ -42,6 +43,54 @@ interface ActiveDistraction {
   activityId: string;
   remainingTimerSeconds: number;
 }
+
+interface StoredTimerState {
+  remainingSeconds: number;
+  isComplete: boolean;
+}
+
+const getTimerStorageKey = (date: string, activityId: string) =>
+  `${TIMER_STORAGE_PREFIX}${date}:${activityId}`;
+
+const readTimerState = (
+  date: string,
+  activityId: string,
+  durationSeconds: number
+): StoredTimerState => {
+  try {
+    const stored = localStorage.getItem(getTimerStorageKey(date, activityId));
+    if (!stored) {
+      return { remainingSeconds: durationSeconds, isComplete: false };
+    }
+
+    const parsed = JSON.parse(stored);
+    if (typeof parsed.remainingSeconds !== "number") {
+      return { remainingSeconds: durationSeconds, isComplete: false };
+    }
+
+    const remainingSeconds = Math.min(
+      durationSeconds,
+      Math.max(0, Math.round(parsed.remainingSeconds))
+    );
+    return {
+      remainingSeconds,
+      isComplete: parsed.isComplete === true || remainingSeconds === 0,
+    };
+  } catch {
+    return { remainingSeconds: durationSeconds, isComplete: false };
+  }
+};
+
+const storeTimerState = (
+  date: string,
+  activityId: string,
+  state: StoredTimerState
+) => {
+  localStorage.setItem(
+    getTimerStorageKey(date, activityId),
+    JSON.stringify(state)
+  );
+};
 
 const getStoredDistractions = (date: string): MorningDistraction[] => {
   try {
@@ -119,7 +168,6 @@ const Morning = () => {
   const [timerComplete, setTimerComplete] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(15 * 60); // 15 minutes in seconds
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasStartedWriting = useRef(false);
 
   // Gratitude and affirmation entries
   const [gratitudeEntry, setGratitudeEntry] = useState("");
@@ -130,44 +178,158 @@ const Morning = () => {
   // Keep track of today's day of week
   const [currentDayOfWeek, setCurrentDayOfWeek] = useState<string>("");
 
+  const timerActivity = activities[currentActivityIndex];
+  const timerActivityId = timerActivity?.id || "writing";
+  const timerDurationSeconds = Math.max(
+    1,
+    (timerActivity?.timerMinutes || 15) * 60
+  );
+
   // Refs let focus and unmount listeners read the latest tracking state
   // without rebinding on every timer tick.
   const selectedDateRef = useRef(selectedDate);
   const trackedActivityIdRef = useRef("writing");
   const shouldTrackDistractionsRef = useRef(false);
   const remainingTimerSecondsRef = useRef(timeRemaining);
+  const timerActiveRef = useRef(timerActive);
+  const timerCompleteRef = useRef(timerComplete);
 
   useEffect(() => {
     selectedDateRef.current = selectedDate;
-    trackedActivityIdRef.current =
-      activities[currentActivityIndex]?.id || "writing";
+    trackedActivityIdRef.current = timerActivityId;
     remainingTimerSecondsRef.current = timeRemaining;
+    timerActiveRef.current = timerActive;
+    timerCompleteRef.current = timerComplete;
     shouldTrackDistractionsRef.current =
       timerActive && selectedDate === getTodayInUserTimezone();
   }, [
     selectedDate,
-    activities,
-    currentActivityIndex,
+    timerActivityId,
     timerActive,
+    timerComplete,
     timeRemaining,
     timezone,
   ]);
 
-  const beginDistraction = useCallback(() => {
-    if (!shouldTrackDistractionsRef.current || readActiveDistraction()) return;
+  const startTimer = useCallback(() => {
+    if (
+      timerCompleteRef.current ||
+      remainingTimerSecondsRef.current <= 0
+    ) {
+      return;
+    }
 
-    const now = new Date();
-    const active: ActiveDistraction = {
-      id: `distraction-${now.getTime()}-${Math.random()
-        .toString(36)
-        .slice(2)}`,
-      date: selectedDateRef.current,
-      startedAt: now.toISOString(),
-      activityId: trackedActivityIdRef.current,
-      remainingTimerSeconds: remainingTimerSecondsRef.current,
-    };
-    localStorage.setItem(ACTIVE_DISTRACTION_KEY, JSON.stringify(active));
-  }, []);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    timerActiveRef.current = true;
+    setTimerActive(true);
+    setTimerComplete(false);
+
+    timerIntervalRef.current = setInterval(() => {
+      setTimeRemaining((previous) => {
+        const remainingSeconds = Math.max(0, previous - 1);
+        const isComplete = remainingSeconds === 0;
+
+        remainingTimerSecondsRef.current = remainingSeconds;
+        timerCompleteRef.current = isComplete;
+        storeTimerState(selectedDate, timerActivityId, {
+          remainingSeconds,
+          isComplete,
+        });
+
+        if (isComplete) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+          timerActiveRef.current = false;
+          setTimerActive(false);
+          setTimerComplete(true);
+        }
+
+        return remainingSeconds;
+      });
+    }, 1000);
+  }, [selectedDate, timerActivityId]);
+
+  const pauseTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    timerActiveRef.current = false;
+    setTimerActive(false);
+    storeTimerState(selectedDate, timerActivityId, {
+      remainingSeconds: remainingTimerSecondsRef.current,
+      isComplete: timerCompleteRef.current,
+    });
+  }, [selectedDate, timerActivityId]);
+
+  const resetTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    remainingTimerSecondsRef.current = timerDurationSeconds;
+    timerActiveRef.current = false;
+    timerCompleteRef.current = false;
+    setTimeRemaining(timerDurationSeconds);
+    setTimerActive(false);
+    setTimerComplete(false);
+    storeTimerState(selectedDate, timerActivityId, {
+      remainingSeconds: timerDurationSeconds,
+      isComplete: false,
+    });
+  }, [selectedDate, timerActivityId, timerDurationSeconds]);
+
+  // A timer is always restored paused. This makes leaving Morning, switching
+  // activities, or restarting the app safe: the next keystroke resumes from
+  // the saved remaining time instead of creating a fresh session.
+  useEffect(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    const stored = readTimerState(
+      selectedDate,
+      timerActivityId,
+      timerDurationSeconds
+    );
+    remainingTimerSecondsRef.current = stored.remainingSeconds;
+    timerActiveRef.current = false;
+    timerCompleteRef.current = stored.isComplete;
+    setTimeRemaining(stored.remainingSeconds);
+    setTimerActive(false);
+    setTimerComplete(stored.isComplete);
+  }, [selectedDate, timerActivityId, timerDurationSeconds]);
+
+  const beginDistraction = useCallback(() => {
+    if (!timerActiveRef.current) return;
+
+    if (
+      shouldTrackDistractionsRef.current &&
+      !readActiveDistraction()
+    ) {
+      const now = new Date();
+      const active: ActiveDistraction = {
+        id: `distraction-${now.getTime()}-${Math.random()
+          .toString(36)
+          .slice(2)}`,
+        date: selectedDateRef.current,
+        startedAt: now.toISOString(),
+        activityId: trackedActivityIdRef.current,
+        remainingTimerSeconds: remainingTimerSecondsRef.current,
+      };
+      localStorage.setItem(ACTIVE_DISTRACTION_KEY, JSON.stringify(active));
+    }
+
+    pauseTimer();
+  }, [pauseTimer]);
 
   const finishDistraction = useCallback(() => {
     const active = readActiveDistraction();
@@ -175,16 +337,8 @@ const Morning = () => {
 
     localStorage.removeItem(ACTIVE_DISTRACTION_KEY);
     const endedAt = new Date();
-    const elapsedMs =
+    const durationMs =
       endedAt.getTime() - new Date(active.startedAt).getTime();
-    const maximumDurationMs =
-      typeof active.remainingTimerSeconds === "number"
-        ? Math.max(0, active.remainingTimerSeconds) * 1000
-        : elapsedMs;
-    const durationMs = Math.min(
-      elapsedMs,
-      maximumDurationMs
-    );
     if (!Number.isFinite(durationMs) || durationMs < MIN_DISTRACTION_MS) return;
 
     const completed: MorningDistraction = {
@@ -284,8 +438,7 @@ const Morning = () => {
   }
 
   const formatTimerTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes} min`;
+    return `${Math.ceil(seconds / 60)} min`;
   };
 
   const distractionSeconds = distractions.reduce(
@@ -322,8 +475,7 @@ const Morning = () => {
     .sort(
       (a, b) =>
         new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-    )
-    .slice(0, 4);
+    );
 
   // Load activities from user preferences
   useEffect(() => {
@@ -372,12 +524,6 @@ const Morning = () => {
 
       if (todayActivities && todayActivities.length > 0) {
         setActivities(todayActivities);
-
-        // Set timer to first activity's duration
-        const firstActivity = todayActivities[0];
-        if (firstActivity.timerMinutes) {
-          setTimeRemaining(firstActivity.timerMinutes * 60);
-        }
       }
     } else if (user?.preferences?.morningActivities) {
       // Legacy format - using the same activities for all days
@@ -386,80 +532,13 @@ const Morning = () => {
         (activity: MorningActivity) => activity.enabled
       );
       setActivities(enabledActivities);
-
-      // Set timer to first activity's duration
-      if (enabledActivities.length > 0) {
-        const firstActivity = enabledActivities[0];
-        if (firstActivity.timerMinutes) {
-          setTimeRemaining(firstActivity.timerMinutes * 60);
-        }
-      }
     }
   }, [user, timezone]);
-
-  // Timer control functions
-  const startTimer = useCallback(() => {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-
-    setTimerActive(true);
-    setTimerComplete(false);
-
-    timerIntervalRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          // Timer complete
-          clearInterval(timerIntervalRef.current as NodeJS.Timeout);
-          setTimerActive(false);
-          setTimerComplete(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  const pauseTimer = useCallback(() => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    setTimerActive(false);
-  }, []);
-
-  const resetTimer = useCallback(() => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-
-    // Reset timer to current activity's duration
-    const activity = activities[currentActivityIndex];
-    if (activity && activity.timerMinutes) {
-      setTimeRemaining(activity.timerMinutes * 60);
-    } else {
-      setTimeRemaining(15 * 60); // Default to 15 minutes
-    }
-
-    setTimerActive(false);
-    setTimerComplete(false);
-  }, [activities, currentActivityIndex]);
 
   // Switch to next activity
   const nextActivity = useCallback(() => {
     if (currentActivityIndex < activities.length - 1) {
-      const nextActivityIndex = currentActivityIndex + 1;
-      const nextActivityItem = activities[nextActivityIndex];
-
-      // Just move to the next activity
-      setCurrentActivityIndex(nextActivityIndex);
-      setTimerComplete(false);
-
-      // Reset timer for new activity
-      if (nextActivityItem && nextActivityItem.timerMinutes) {
-        setTimeRemaining(nextActivityItem.timerMinutes * 60);
-      } else {
-        setTimeRemaining(15 * 60); // Default
-      }
+      setCurrentActivityIndex(currentActivityIndex + 1);
     }
   }, [activities, currentActivityIndex]);
 
@@ -467,17 +546,8 @@ const Morning = () => {
   const prevActivity = useCallback(() => {
     if (currentActivityIndex > 0) {
       setCurrentActivityIndex((prev) => prev - 1);
-      setTimerComplete(false);
-
-      // Reset timer for new activity
-      const prevActivity = activities[currentActivityIndex - 1];
-      if (prevActivity && prevActivity.timerMinutes) {
-        setTimeRemaining(prevActivity.timerMinutes * 60);
-      } else {
-        setTimeRemaining(15 * 60); // Default
-      }
     }
-  }, [activities, currentActivityIndex]);
+  }, [currentActivityIndex]);
 
   // Clean up interval on unmount
   useEffect(() => {
@@ -487,12 +557,6 @@ const Morning = () => {
       }
     };
   }, []);
-
-  // Reset timer when date or activity changes
-  useEffect(() => {
-    resetTimer();
-    hasStartedWriting.current = false;
-  }, [selectedDate, currentActivityIndex, resetTimer]);
 
   // Load entries and streak on mount
   useEffect(() => {
@@ -588,15 +652,6 @@ const Morning = () => {
           setCurrentEntry(content);
         }
 
-        // If either writing content or legacy content exists, consider writing already started
-        if (
-          (activityContent?.writing && activityContent.writing.trim()) ||
-          (content && content.trim())
-        ) {
-          hasStartedWriting.current = true;
-        } else {
-          hasStartedWriting.current = false;
-        }
       } catch (error) {
         console.error("Failed to load entry:", error);
       }
@@ -715,12 +770,9 @@ const Morning = () => {
     const textAfterCursor = newText.slice(e.target.selectionStart);
     const lastWord = textBeforeCursor.split("\n").pop()?.trim();
 
-    // Start timer automatically if this is the first time typing
-    if (!hasStartedWriting.current && newText.trim() !== "") {
-      hasStartedWriting.current = true;
-      if (!timerActive && !timerComplete) {
-        startTimer();
-      }
+    // Every new bit of writing resumes a timer that was auto-paused while away.
+    if (!timerActive && !timerComplete && newText.trim() !== "") {
+      startTimer();
     }
 
     if (lastChar === " ") {
@@ -954,6 +1006,7 @@ const Morning = () => {
   ]);
 
   const [isTextBlurred, setIsTextBlurred] = useState(false);
+  const timerHasProgress = timeRemaining < timerDurationSeconds;
 
   // Add global keyboard shortcut for blur toggle
   useEffect(() => {
@@ -985,46 +1038,57 @@ const Morning = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] p-2 dark:bg-slate-900">
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)_250px]">
-        <aside className="xl:sticky xl:top-2">
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 dark:border-slate-700">
-              <span
-                className={`text-2xl font-medium tracking-tight ${
-                  timerComplete
-                    ? "text-green-600 dark:text-green-400"
-                    : timerActive
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-slate-800 dark:text-white"
-                }`}
-              >
-                {formatTimerTime(timeRemaining)}
-              </span>
-              <div className="flex items-center gap-1">
-                {timerActive ? (
-                  <button
-                    onClick={pauseTimer}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
-                    title="Pause timer"
-                  >
-                    <Pause className="h-3.5 w-3.5" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={startTimer}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
-                    title="Start timer"
-                  >
-                    <Play className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <button
-                  onClick={resetTimer}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                  title="Reset timer"
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)]">
+        <aside className="xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-1rem)] xl:min-h-0 xl:flex-col">
+          <section className="shrink-0 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+            <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <div
+                  data-testid="morning-timer-time"
+                  data-timer-state={
+                    timerComplete
+                      ? "complete"
+                      : timerActive
+                      ? "running"
+                      : "paused"
+                  }
+                  data-has-progress={timerHasProgress}
+                  className={`text-2xl font-medium tabular-nums tracking-tight ${
+                    timerComplete
+                      ? "text-green-600 dark:text-green-400"
+                      : timerActive
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-slate-800 dark:text-white"
+                  }`}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
+                  {formatTimerTime(timeRemaining)}
+                </div>
+                <div className="flex items-center gap-1">
+                  {timerActive ? (
+                    <button
+                      onClick={pauseTimer}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                      title="Pause timer"
+                    >
+                      <Pause className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startTimer}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                      title="Start timer"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={resetTimer}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                    title="Reset timer"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1051,62 +1115,31 @@ const Morning = () => {
               })}
             </div>
 
-            <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-700">
+            <div className="relative border-t border-slate-100 dark:border-slate-700">
               <button
-                onClick={toggleBlur}
-                title={
-                  isTextBlurred ? "Show text (Alt+B)" : "Blur text (Alt+B)"
-                }
-                className="flex items-center justify-center gap-1.5 border-r border-slate-100 px-2 py-3 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700"
-              >
-                {isTextBlurred ? (
-                  <Eye className="h-3.5 w-3.5" />
-                ) : (
-                  <EyeOff className="h-3.5 w-3.5" />
-                )}
-                {isTextBlurred ? "Show" : "Blur"}
-              </button>
-              <div className="flex items-center justify-center gap-1.5 px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
-                <Star className="h-3.5 w-3.5 text-yellow-500" />
-                {streak} {streak === 1 ? "day" : "days"}
-              </div>
-            </div>
-          </section>
-        </aside>
-
-        <main className="min-w-0">
-          <header className="mb-4 flex min-h-[48px] items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {getActivityIcon(currentActivity?.type || "writing")}
-              <h1 className="truncate text-lg font-semibold text-slate-800 dark:text-white">
-                {currentActivity?.title || "Morning"}
-              </h1>
-            </div>
-
-            <div className="relative">
-              <button
+                data-testid="morning-date-picker"
                 onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700"
               >
-                <Calendar className="h-4 w-4 text-slate-400" />
-                <span>
+                <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="min-w-0 flex-1">
                   <span className="block text-xs font-medium text-slate-700 dark:text-slate-200">
                     {selectedDate === getTodayInUserTimezone()
                       ? "Today"
                       : "Journal"}
                   </span>
-                  <span className="block text-[10px] text-slate-400 dark:text-slate-500">
+                  <span className="block truncate text-[10px] text-slate-400 dark:text-slate-500">
                     {formatSelectedDate(selectedDate)}
                   </span>
                 </span>
                 {isSaving || hasPendingChanges ? (
-                  <Loader className="h-4 w-4 text-slate-400" />
+                  <Loader className="h-4 w-4 shrink-0 text-slate-400" />
                 ) : lastSaved ? (
-                  <Check className="h-4 w-4 text-green-500" />
+                  <Check className="h-4 w-4 shrink-0 text-green-500" />
                 ) : null}
               </button>
               {isCalendarOpen && (
-                <div className="absolute right-0 top-full z-50 mt-2">
+                <div className="absolute left-0 top-full z-50 mt-2">
                   <DatePicker
                     selected={new Date(selectedDate)}
                     onChange={handleDateChange}
@@ -1144,8 +1177,97 @@ const Morning = () => {
                 </div>
               )}
             </div>
-          </header>
 
+            <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-700">
+              <button
+                onClick={toggleBlur}
+                title={
+                  isTextBlurred ? "Show text (Alt+B)" : "Blur text (Alt+B)"
+                }
+                className="flex items-center justify-center gap-1.5 border-r border-slate-100 px-2 py-3 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-700"
+              >
+                {isTextBlurred ? (
+                  <Eye className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeOff className="h-3.5 w-3.5" />
+                )}
+                {isTextBlurred ? "Show" : "Blur"}
+              </button>
+              <div className="flex items-center justify-center gap-1.5 px-2 py-3 text-xs text-slate-500 dark:text-slate-400">
+                <Star className="h-3.5 w-3.5 text-yellow-500" />
+                {streak} {streak === 1 ? "day" : "days"}
+              </div>
+            </div>
+          </section>
+
+          <section
+            data-testid="distractions-panel"
+            className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <div className="mb-4 flex shrink-0 items-center gap-2">
+              <CircleOff className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-white">
+                Distractions
+              </h2>
+            </div>
+
+            <div className="mb-5 grid shrink-0 grid-cols-2">
+              <div className="border-r border-slate-100 pr-3 dark:border-slate-700">
+                <div
+                  data-testid="distraction-count"
+                  className="text-3xl font-semibold leading-none text-slate-900 dark:text-white"
+                >
+                  {distractions.length}
+                </div>
+                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  {distractions.length === 1 ? "time" : "times"}
+                </div>
+              </div>
+              <div className="pl-3">
+                <div
+                  data-testid="distraction-total"
+                  className="text-base font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+                >
+                  {formatDuration(distractionSeconds)}
+                </div>
+                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  away
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+              Recent
+            </div>
+            {recentDistractions.length === 0 ? (
+              <div className="pt-3 text-xs text-slate-400 dark:text-slate-500">
+                None yet
+              </div>
+            ) : (
+              <div
+                data-testid="distraction-list"
+                className="mt-2 min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain pr-1 dark:divide-slate-700"
+              >
+                {recentDistractions.map((distraction, index) => (
+                  <div
+                    key={distraction.id}
+                    data-testid="distraction-row"
+                    className="flex items-center justify-between py-2.5 text-xs"
+                  >
+                    <span className="text-slate-400 dark:text-slate-500">
+                      #{distractions.length - index}
+                    </span>
+                    <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                      {formatDuration(distraction.durationSeconds)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </aside>
+
+        <main className="min-w-0">
       {/* Timer completion notification */}
       {timerComplete && (
         <div className="mb-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 flex items-center justify-between">
@@ -1173,10 +1295,10 @@ const Morning = () => {
       )}
 
       {/* Different activity types */}
-      <div className="w-full mt-4">
+      <div className="w-full">
         {/* Stream of Consciousness Writing */}
         {currentActivity.type === "writing" && (
-          <div className="flex flex-col gap-3 h-[calc(100vh-16rem)]">
+          <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
             {activePrompt && (
               <div className="px-5 py-3 rounded-lg bg-amber-50/70 dark:bg-amber-900/20 border border-amber-200/70 dark:border-amber-800/40 text-amber-900 dark:text-amber-100 text-base leading-snug shrink-0">
                 <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400 mr-2">
@@ -1205,7 +1327,7 @@ const Morning = () => {
 
         {/* Visualization */}
         {currentActivity.type === "visualization" && (
-          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+          <div className="flex h-[calc(100vh-8rem)] w-full flex-col rounded-lg border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             {timerComplete && (
               <div className="mb-4 text-sm text-green-600 dark:text-green-400 flex items-center self-end">
                 <Check className="w-4 h-4 mr-1" /> Complete
@@ -1224,7 +1346,7 @@ const Morning = () => {
 
         {/* Gratitude */}
         {currentActivity.type === "gratitude" && (
-          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+          <div className="flex h-[calc(100vh-8rem)] w-full flex-col rounded-lg border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <textarea
               ref={gratitudeTextareaRef}
               value={gratitudeEntry}
@@ -1241,7 +1363,7 @@ const Morning = () => {
 
         {/* Affirmations */}
         {currentActivity.type === "affirmations" && (
-          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+          <div className="flex h-[calc(100vh-8rem)] w-full flex-col rounded-lg border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <textarea
               ref={affirmationsTextareaRef}
               value={affirmationsEntry}
@@ -1258,7 +1380,7 @@ const Morning = () => {
 
         {/* Breathwork */}
         {currentActivity.type === "breathwork" && (
-          <div className="w-full h-[calc(100vh-16rem)] p-6 rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+          <div className="flex h-[calc(100vh-8rem)] w-full flex-col rounded-lg border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             {timerComplete && (
               <div className="mb-4 text-sm text-green-600 dark:text-green-400 flex items-center self-end">
                 <Check className="w-4 h-4 mr-1" /> Complete
@@ -1284,66 +1406,6 @@ const Morning = () => {
           </div>
         </main>
 
-        <aside className="xl:sticky xl:top-2">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-            <div className="mb-5 flex items-center gap-2">
-              <CircleOff className="h-4 w-4 text-amber-500 dark:text-amber-400" />
-              <h2 className="text-sm font-semibold text-slate-800 dark:text-white">
-                Distractions
-              </h2>
-            </div>
-
-            <div className="mb-6 grid grid-cols-2">
-              <div className="border-r border-slate-100 pr-4 dark:border-slate-700">
-                <div
-                  data-testid="distraction-count"
-                  className="text-4xl font-semibold leading-none text-slate-900 dark:text-white"
-                >
-                  {distractions.length}
-                </div>
-                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
-                  {distractions.length === 1 ? "time" : "times"}
-                </div>
-              </div>
-              <div className="pl-4">
-                <div
-                  data-testid="distraction-total"
-                  className="text-lg font-semibold tabular-nums text-slate-800 dark:text-slate-100"
-                >
-                  {formatDuration(distractionSeconds)}
-                </div>
-                <div className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
-                  away
-                </div>
-              </div>
-            </div>
-
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-              Recent
-            </div>
-            {recentDistractions.length === 0 ? (
-              <div className="pt-3 text-xs text-slate-400 dark:text-slate-500">
-                None yet
-              </div>
-            ) : (
-              <div className="mt-2 divide-y divide-slate-100 dark:divide-slate-700">
-                {recentDistractions.map((distraction, index) => (
-                  <div
-                    key={distraction.id}
-                    className="flex items-center justify-between py-2.5 text-xs"
-                  >
-                    <span className="text-slate-400 dark:text-slate-500">
-                      #{distractions.length - index}
-                    </span>
-                    <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
-                      {formatDuration(distraction.durationSeconds)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </aside>
       </div>
     </div>
   );
