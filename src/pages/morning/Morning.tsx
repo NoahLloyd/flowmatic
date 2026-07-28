@@ -1039,7 +1039,7 @@ const Morning = () => {
   return (
     <div className="mx-auto w-full max-w-[1500px] p-2 dark:bg-slate-900">
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-1rem)] xl:min-h-0 xl:flex-col">
+        <aside className="xl:sticky xl:top-2 xl:flex xl:h-[calc(100vh-8rem)] xl:min-h-0 xl:flex-col">
           <section className="shrink-0 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
             <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-700">
               <div className="flex items-center justify-between">
@@ -1056,8 +1056,6 @@ const Morning = () => {
                   className={`text-2xl font-medium tabular-nums tracking-tight ${
                     timerComplete
                       ? "text-green-600 dark:text-green-400"
-                      : timerActive
-                      ? "text-blue-600 dark:text-blue-400"
                       : "text-slate-800 dark:text-white"
                   }`}
                 >
