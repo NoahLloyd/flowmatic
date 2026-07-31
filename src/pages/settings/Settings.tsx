@@ -292,6 +292,9 @@ const Settings = () => {
         ...(signalSettings.signalGoals
           ? { signalGoals: signalSettings.signalGoals }
           : {}),
+        ...(signalSettings.signalRequirements
+          ? { signalRequirements: signalSettings.signalRequirements }
+          : {}),
         ...(signalSettings.customSignals
           ? { customSignals: signalSettings.customSignals }
           : {}),

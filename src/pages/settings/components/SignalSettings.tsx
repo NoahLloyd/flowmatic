@@ -91,6 +91,12 @@ const SignalSettings: React.FC = () => {
     }
   );
 
+  // A short definition of what counts for each signal. These are displayed
+  // when the user hovers over a signal card title on the Compass page.
+  const [signalRequirements, setSignalRequirements] = useState<Record<string, string>>(
+    user?.preferences?.signalRequirements || {}
+  );
+
   // Form state for creating new signals
   const [showForm, setShowForm] = useState(false);
   const [newSignalName, setNewSignalName] = useState("");
@@ -132,6 +138,9 @@ const SignalSettings: React.FC = () => {
     if (user?.preferences?.signalGoals) {
       setSignalGoals(user.preferences.signalGoals);
     }
+    if (user?.preferences?.signalRequirements) {
+      setSignalRequirements(user.preferences.signalRequirements);
+    }
     if (user?.preferences?.customSignals) {
       setCustomSignals(user.preferences.customSignals as Record<string, SignalConfig>);
     }
@@ -166,6 +175,18 @@ const SignalSettings: React.FC = () => {
       ...prev,
       [signalKey]: value,
     }));
+  };
+
+  const handleRequirementChange = (signalKey: string, value: string) => {
+    setSignalRequirements((prev) => {
+      const next = { ...prev };
+      if (value) {
+        next[signalKey] = value;
+      } else {
+        delete next[signalKey];
+      }
+      return next;
+    });
   };
 
   const getUnitForSignal = (signalKey: string): string => {
@@ -256,6 +277,11 @@ const SignalSettings: React.FC = () => {
       delete next[key];
       return next;
     });
+    setSignalRequirements((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   // Store current values in a custom property that the parent component can access
@@ -264,9 +290,10 @@ const SignalSettings: React.FC = () => {
     window.__signalSettings = {
       activeSignals,
       signalGoals,
+      signalRequirements,
       customSignals,
     };
-  }, [activeSignals, signalGoals, customSignals]);
+  }, [activeSignals, signalGoals, signalRequirements, customSignals]);
 
   const renderGoalInput = (signalKey: string) => {
     const signal = allSignals[signalKey];
@@ -531,6 +558,25 @@ const SignalSettings: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {isActive && (
+                    <div className="mt-2">
+                      <label
+                        htmlFor={`signal-requirement-${key}`}
+                        className="text-xs text-gray-500 dark:text-gray-400"
+                      >
+                        Requirements
+                      </label>
+                      <textarea
+                        id={`signal-requirement-${key}`}
+                        value={signalRequirements[key] || ""}
+                        onChange={(e) => handleRequirementChange(key, e.target.value)}
+                        placeholder="What counts as complete?"
+                        rows={2}
+                        className="mt-1 w-full resize-none p-1.5 text-xs border border-gray-200 dark:border-gray-800 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
+                      />
+                    </div>
+                  )}
 
                   {isActive && renderGoalInput(key)}
                 </div>

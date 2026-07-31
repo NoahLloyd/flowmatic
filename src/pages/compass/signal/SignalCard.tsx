@@ -17,6 +17,7 @@ interface SignalCardProps {
   onChange?: (value: number | boolean) => void;
   isModalOpen?: boolean;
   isReadOnly?: boolean;
+  requirement?: string;
 }
 
 const SignalCard = ({
@@ -34,6 +35,7 @@ const SignalCard = ({
   onChange = () => {},
   isModalOpen = false,
   isReadOnly = false,
+  requirement,
 }: SignalCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
@@ -95,6 +97,7 @@ const SignalCard = ({
   // Get background class based on status
   const containerClasses = status === "active" ? "" : "opacity-75";
   const bgClass = "bg-white dark:bg-gray-900";
+  const requirementTooltipId = `signal-requirement-${metric}`;
 
   const getTimeColor = (minutes: number) => {
     // Check if we have a goal value for comparison (use metric key, not display label)
@@ -484,11 +487,30 @@ const SignalCard = ({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-900 p-3 transition-colors hover:border-gray-300 dark:hover:border-gray-700">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 transition-colors hover:border-gray-300 dark:hover:border-gray-700">
       <div className="flex justify-between items-center mb-2">
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-          {label}
-        </label>
+        {requirement?.trim() ? (
+          <div className="relative group min-w-0">
+            <span
+              aria-describedby={requirementTooltipId}
+              className="block max-w-full truncate text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+            >
+              {label}
+            </span>
+            <div
+              id={requirementTooltipId}
+              role="tooltip"
+              className="pointer-events-none absolute z-30 left-0 top-full mt-2 w-max max-w-64 whitespace-pre-line rounded-md bg-gray-900 dark:bg-gray-100 px-3 py-2 text-xs font-normal normal-case tracking-normal leading-relaxed text-white dark:text-gray-900 opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0 shadow-lg"
+            >
+              {requirement.trim()}
+              <span className="absolute left-3 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-gray-100" />
+            </div>
+          </div>
+        ) : (
+          <span className="min-w-0 truncate text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            {label}
+          </span>
+        )}
         <div className="flex justify-end">{renderHistoryOrLoading()}</div>
       </div>
 
