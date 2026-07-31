@@ -29,6 +29,7 @@ interface UserPreferences {
   dailyHoursGoals?: DailyHoursGoal;
   yearlyHoursGoal?: YearlyGoal;
   signalGoals?: Record<string, number>;
+  signalRequirements?: Record<string, string>;
   activeSignals?: string[];
   stopwatchAlertMinutes?: number;
   signalPercentageGoal?: number;

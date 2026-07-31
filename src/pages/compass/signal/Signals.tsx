@@ -291,8 +291,8 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const activeSignals = getActiveSignals();
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
-      <div className="card-header border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-2.5">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800">
+      <div className="card-header rounded-t-lg border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center gap-2.5">
         <h2 className="text-sm font-medium text-gray-900 dark:text-white">
           Signals
         </h2>
@@ -339,6 +339,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
                     isHistoryLoading={false} // Always false - we use localStorage cache to avoid loading flash
                     isModalOpen={isModalOpen}
                     isReadOnly={true}
+                    requirement={user?.preferences?.signalRequirements?.[key]}
                   />
                 );
               }
@@ -362,6 +363,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
                     isHistoryLoading={isHistoryLoading}
                     isModalOpen={isModalOpen}
                     isReadOnly={true}
+                    requirement={user?.preferences?.signalRequirements?.[key]}
                   />
                 );
               }
@@ -385,6 +387,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
                   history={signalHistory[key] || []}
                   isHistoryLoading={isHistoryLoading}
                   isModalOpen={isModalOpen}
+                  requirement={user?.preferences?.signalRequirements?.[key]}
                 />
               );
             })}
