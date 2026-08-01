@@ -11,6 +11,7 @@ import { supabase, getCurrentUserId } from "../utils/supabase";
 import { useAuth } from "./AuthContext";
 import { useTimezone } from "./TimezoneContext";
 import { AVAILABLE_SIGNALS as ImportedAvailableSignals, getAllSignals, SignalConfig } from "../pages/settings/components/SignalSettings";
+import { getAppDayHour, getAppDayKey } from "../utils/appDay";
 
 // Exported type for heatmap data
 export interface HeatmapSignalDetail {
@@ -185,13 +186,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
   // We only restore when the cached date matches today (in user TZ); a
   // stale day's data would mislead until the fresh fetch lands.
   const todayKeyForCache = (() => {
-    try {
-      return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(
-        new Date()
-      );
-    } catch {
-      return new Date().toISOString().split("T")[0];
-    }
+    return getAppDayKey(new Date(), timezone);
   })();
   const [signals, setSignals] = useState<Record<string, number | boolean>>(
     () => {
@@ -232,6 +227,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       return 0;
     }
   });
+  const activeAppDayRef = React.useRef(todayKeyForCache);
   const [signalStreak, setSignalStreak] = useState(() => {
     const cached = localStorage.getItem("signalStreak");
     return cached ? parseInt(cached, 10) : 0;
@@ -286,34 +282,18 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     const activeSignals = user?.preferences?.activeSignals as string[] | undefined;
     const history = user?.preferences?.signalActiveHistory;
     if (activeSignals && activeSignals.length > 0 && (!history || history.length === 0)) {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getAppDayKey(new Date(), timezone);
       api.updateUserPreferences(user.id, {
         signalActiveHistory: [{ date: today, signals: activeSignals }],
       }).catch((err: Error) =>
         console.error("Failed to seed signalActiveHistory:", err)
       );
     }
-  }, [user?.id]);
+  }, [user?.id, timezone]);
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   const getTodayInUserTimezone = () => {
-    try {
-      const date = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).formatToParts(new Date());
-
-      const month = date.find((part) => part.type === "month")?.value || "01";
-      const day = date.find((part) => part.type === "day")?.value || "01";
-      const year = date.find((part) => part.type === "year")?.value || "2023";
-
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error("Error formatting date with timezone:", error);
-      return new Date().toISOString().split("T")[0];
-    }
+    return getAppDayKey(new Date(), timezone);
   };
 
   // ── Confirmed streak from past days (computed once on mount) ──
@@ -407,16 +387,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       })();
 
       const yesterday = (() => {
-        const d = new Date(new Date().getTime() - 86400000);
-        try {
-          const parts = new Intl.DateTimeFormat("en-US", {
-            timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-          }).formatToParts(d);
-          const m = parts.find(p => p.type === "month")?.value || "01";
-          const dy = parts.find(p => p.type === "day")?.value || "01";
-          const y = parts.find(p => p.type === "year")?.value || "2024";
-          return `${y}-${m}-${dy}`;
-        } catch { return d.toISOString().split("T")[0]; }
+        const d = new Date(today + "T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 1);
+        return d.toISOString().split("T")[0];
       })();
 
       // Paginate to fetch ALL signal data (Supabase default limit is 1000 rows)
@@ -519,6 +492,30 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
 
     try {
       const today = getTodayInUserTimezone();
+
+      if (activeAppDayRef.current !== today) {
+        activeAppDayRef.current = today;
+        setSignals({});
+        setSignalScore(0);
+        setCompletedSignals(0);
+        confirmedStreakRef.current.computed = false;
+        try {
+          localStorage.setItem(
+            "cachedSignalsToday",
+            JSON.stringify({ day: today, signals: {} }),
+          );
+          localStorage.setItem(
+            "cachedSignalScoreToday",
+            JSON.stringify({ day: today, score: 0 }),
+          );
+          localStorage.setItem(
+            "cachedCompletedSignalsToday",
+            JSON.stringify({ day: today, count: 0 }),
+          );
+        } catch {
+          /* quota error, ignore */
+        }
+      }
 
       // Read the existing access token from local session. We do NOT call
       // supabase.auth.refreshSession() here: refresh tokens are single-use, so
@@ -907,9 +904,9 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [timezone, user]);
 
-  // Streak-at-risk notifications: alert the user during the evening if the
-  // day's signal goal isn't met. Aggressive when truly in danger (no points
-  // banked); gentler single nudge when they have a save-point cushion.
+  // Streak-at-risk notifications: alert the user late in the app day if the
+  // signal goal isn't met. Aggressive when truly in danger (no points banked);
+  // gentler single nudge when they have a save-point cushion.
   useEffect(() => {
     if (signalStreak <= 0) return;
 
@@ -921,28 +918,17 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     const aggressive = signalStreakDanger;
     const thresholds = aggressive
       ? [
-          { hour: 21, key: "21", label: "3 hours" },
-          { hour: 23, key: "23", label: "1 hour" },
-          { hour: 23.75, key: "2345", label: "15 minutes" },
+          { hour: 24, key: "24", label: "3 hours" },
+          { hour: 26, key: "26", label: "1 hour" },
+          { hour: 26.75, key: "2645", label: "15 minutes" },
         ]
-      : [{ hour: 21, key: "21-save", label: "3 hours" }];
+      : [{ hour: 24, key: "24-save", label: "3 hours" }];
 
-    const todayKey = (() => {
-      try {
-        return new Intl.DateTimeFormat("en-CA", {
-          timeZone: timezone,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date());
-      } catch {
-        return new Date().toISOString().split("T")[0];
-      }
-    })();
+    const todayKey = getAppDayKey(new Date(), timezone);
 
     const check = () => {
       const now = new Date();
-      const localHour = now.getHours() + now.getMinutes() / 60;
+      const localHour = getAppDayHour(now, timezone);
       for (const t of thresholds) {
         if (localHour < t.hour) continue;
         const storageKey = `streakDangerNotified:${todayKey}:${t.key}`;

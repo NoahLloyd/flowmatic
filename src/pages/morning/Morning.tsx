@@ -30,6 +30,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useTimezone } from "../../context/TimezoneContext";
 import MorningTasks from "./MorningTasks";
 import { pickNextPrompt, recordPromptShown } from "../../utils/promptPicker";
+import { getAppDayKey } from "../../utils/appDay";
 
 const DISTRACTION_STORAGE_PREFIX = "morningDistractions:";
 const ACTIVE_DISTRACTION_KEY = "morningActiveDistraction";
@@ -415,26 +416,7 @@ const Morning = () => {
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   function getTodayInUserTimezone() {
-    try {
-      // Use Intl.DateTimeFormat to get the date parts in the user's timezone
-      const date = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).formatToParts(new Date());
-
-      // Extract and format as YYYY-MM-DD
-      const month = date.find((part) => part.type === "month")?.value || "01";
-      const day = date.find((part) => part.type === "day")?.value || "01";
-      const year = date.find((part) => part.type === "year")?.value || "2023";
-
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error("Error formatting date with timezone:", error);
-      // Fallback to UTC
-      return new Date().toISOString().split("T")[0];
-    }
+    return getAppDayKey(new Date(), timezone);
   }
 
   const formatTimerTime = (seconds: number) => {
@@ -480,8 +462,6 @@ const Morning = () => {
   // Load activities from user preferences
   useEffect(() => {
     if (user?.preferences?.weeklyMorningSchedule) {
-      // Get current day of the week based on user's timezone
-      const today = new Date();
       const daysOfWeek = [
         "sunday",
         "monday",
@@ -492,15 +472,8 @@ const Morning = () => {
         "saturday",
       ];
 
-      // Get the day of the week in the user's timezone
-      const currentDay =
-        daysOfWeek[
-          new Date(
-            new Intl.DateTimeFormat("en-US", {
-              timeZone: timezone,
-            }).format(today)
-          ).getDay()
-        ];
+      const appDay = new Date(`${getTodayInUserTimezone()}T12:00:00Z`);
+      const currentDay = daysOfWeek[appDay.getUTCDay()];
 
       // Store current day name for display
       setCurrentDayOfWeek(

@@ -1,8 +1,13 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useSignals } from "../../context/SignalsContext";
-import { HeatmapDay, HeatmapSignalDetail } from "../../context/SignalsContext";
+import {
+  HeatmapDay,
+  HeatmapSignalDetail,
+  useSignals,
+} from "../../context/SignalsContext";
 import { useAuth } from "../../context/AuthContext";
+import { useTimezone } from "../../context/TimezoneContext";
 import { getAllSignals, SignalConfig } from "../../pages/settings/components/SignalSettings";
+import { getAppDayKey } from "../../utils/appDay";
 import {
   Flame,
   Trophy,
@@ -65,12 +70,13 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
     fetchHeatmapData,
   } = useSignals();
   const { user } = useAuth();
+  const { timezone } = useTimezone();
+  const todayStr = getAppDayKey(new Date(), timezone);
+  const currentYear = Number(todayStr.slice(0, 4));
 
   const [rawHeatmapData, setRawHeatmapData] = useState<HeatmapDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(() =>
-    new Date().getFullYear()
-  );
+  const [selectedYear, setSelectedYear] = useState(currentYear);
   const [tooltip, setTooltip] = useState<{
     day: HeatmapDay;
     x: number;
@@ -80,9 +86,6 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
 
   const signalPercentageGoal =
     user?.preferences?.signalPercentageGoal || 75;
-  const currentYear = new Date().getFullYear();
-  const todayStr = formatLocalDate(new Date());
-
   // Build today's live signal details from context state
   const todayEntry = useMemo((): HeatmapDay => {
     const activeSignals = (user?.preferences?.activeSignals || []) as string[];
@@ -195,8 +198,9 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
 
     // Determine start/end of the year range
     const yearStart = new Date(selectedYear, 0, 1);
-    const yearEnd =
-      selectedYear === currentYear ? new Date() : new Date(selectedYear, 11, 31);
+    const yearEnd = selectedYear === currentYear
+      ? new Date(`${todayStr}T00:00:00`)
+      : new Date(selectedYear, 11, 31);
 
     // Find the Monday on or before Jan 1
     const startDay = yearStart.getDay(); // 0=Sun
@@ -207,7 +211,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
     const weeksArr: ({ date: string; score: number; signals: HeatmapSignalDetail[]; inRange: boolean; dayOfWeek: number } | null)[][] = [];
     const monthPos: { month: number; weekIdx: number }[] = [];
 
-    let current = new Date(gridStart);
+    const current = new Date(gridStart);
     let weekIdx = 0;
     let lastMonth = -1;
 
@@ -246,7 +250,7 @@ const StreakScreen: React.FC<StreakScreenProps> = ({ onClose }) => {
     }
 
     return { weeks: weeksArr, monthPositions: monthPos };
-  }, [heatmapData, selectedYear, currentYear]);
+  }, [heatmapData, selectedYear, currentYear, todayStr]);
 
   // Score trend (last 30 entries)
   const trendData = useMemo(() => {

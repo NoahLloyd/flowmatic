@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSignals } from "../../context/SignalsContext";
 import { api } from "../../utils/api";
 import { startOfDay } from "date-fns";
+import { APP_DAY_RESET_HOUR, getAppDayKey } from "../../utils/appDay";
 
 interface ContextReminderProps {
   isRunning: boolean;
@@ -13,7 +14,7 @@ interface Reminder {
   lines: string[];
 }
 
-const getTodayKey = () => startOfDay(new Date()).toISOString().slice(0, 10);
+const getTodayKey = () => getAppDayKey();
 
 const ContextReminder: React.FC<ContextReminderProps> = ({ isRunning }) => {
   const { signals } = useSignals();
@@ -64,9 +65,16 @@ const ContextReminder: React.FC<ContextReminderProps> = ({ isRunning }) => {
       checkedFirstSession.current = true;
 
       try {
-        const dayStart = startOfDay(now).toISOString();
+        const dayStart = startOfDay(now);
+        if (now.getHours() < APP_DAY_RESET_HOUR) {
+          dayStart.setDate(dayStart.getDate() - 1);
+        }
+        dayStart.setHours(APP_DAY_RESET_HOUR, 0, 0, 0);
         const dayEnd = now.toISOString();
-        const todaySessions = await api.getSessionsByDateRange(dayStart, dayEnd);
+        const todaySessions = await api.getSessionsByDateRange(
+          dayStart.toISOString(),
+          dayEnd,
+        );
 
         if (todaySessions.length === 0) {
           setReminder({

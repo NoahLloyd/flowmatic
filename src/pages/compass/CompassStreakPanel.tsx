@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSignals, HeatmapDay } from "../../context/SignalsContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTimezone } from "../../context/TimezoneContext";
+import { getAppDayKey } from "../../utils/appDay";
 
 // Focus-mode replacement for BlockedTasks. Drops the bulky hero card in
 // favor of a tall, scannable history strip: a small streak chip at the
@@ -89,8 +90,7 @@ const CompassStreakPanel: React.FC<Props> = ({ onClick }) => {
       try {
         // Last 21 days, oldest → newest. The list will reverse it for
         // newest-on-top display.
-        const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone })
-          .format(new Date());
+        const today = getAppDayKey(new Date(), timezone);
         const end = today;
         const startDate = new Date(today + "T00:00:00");
         startDate.setDate(startDate.getDate() - 20);

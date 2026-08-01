@@ -4,7 +4,8 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/api";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import SessionEditModal from "./SessionEditModal";
-import { format, isToday, addDays, subDays, startOfDay } from "date-fns";
+import { format, addDays, subDays, startOfDay } from "date-fns";
+import { getAppDayDate, getAppDayKey } from "../../utils/appDay";
 
 interface FriendStats {
   todayHours: number;
@@ -375,7 +376,7 @@ const FriendsProgressStats: React.FC = () => {
   const [statsData, setStatsData] = useState<Record<string, FriendStats>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(
-    startOfDay(new Date())
+    getAppDayDate()
   );
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
 
@@ -388,7 +389,7 @@ const FriendsProgressStats: React.FC = () => {
     if (user?.preferences?.yearlyHoursGoal?.startDate) {
       return new Date(user.preferences.yearlyHoursGoal.startDate);
     }
-    return new Date(new Date().getFullYear(), 0, 1);
+    return new Date(getAppDayDate().getFullYear(), 0, 1);
   }, [user?.preferences?.yearlyHoursGoal?.startDate]);
 
   // Fetch session data (targeted queries instead of loading everything)
@@ -399,7 +400,7 @@ const FriendsProgressStats: React.FC = () => {
 
       // Calculate how far back we need full session objects
       // Need at least 7 days for history dots, and potentially further for selectedDate
-      const sevenDaysAgo = new Date();
+      const sevenDaysAgo = getAppDayDate();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       sevenDaysAgo.setHours(0, 0, 0, 0);
 
@@ -446,13 +447,13 @@ const FriendsProgressStats: React.FC = () => {
 
   // Detect day change when app regains focus (e.g. coming back to office next morning)
   useEffect(() => {
-    let lastCheckedDay = startOfDay(new Date()).getTime();
+    let lastCheckedDay = getAppDayKey();
 
     const checkDayChange = () => {
-      const today = startOfDay(new Date()).getTime();
+      const today = getAppDayKey();
       if (today !== lastCheckedDay) {
         lastCheckedDay = today;
-        setSelectedDate(startOfDay(new Date()));
+        setSelectedDate(getAppDayDate());
       }
     };
 
@@ -541,12 +542,11 @@ const FriendsProgressStats: React.FC = () => {
     };
 
     // Selected date's stats
-    const dayStart = startOfDay(selectedDate);
-    const dayEnd = addDays(dayStart, 1);
+    const selectedDayKey = format(selectedDate, "yyyy-MM-dd");
 
     const daySessions = recentSessions.filter((session) => {
       const sessionDate = new Date(session.created_at);
-      return sessionDate >= dayStart && sessionDate < dayEnd;
+      return getAppDayKey(sessionDate) === selectedDayKey;
     });
 
     const hoursOnDay = daySessions.reduce(
@@ -598,14 +598,14 @@ const FriendsProgressStats: React.FC = () => {
 
     // Calculate expected progress based on time of day (9 AM - 4 PM workday)
     // Only apply expected progress if viewing today, otherwise show 100% expected
-    const isViewingToday = isToday(selectedDate);
+    const isViewingToday = selectedDayKey === getAppDayKey();
     let expectedDailyProgress = 100; // Default to 100% if not viewing today or after workday end
 
     if (isViewingToday) {
       const now = new Date();
-      const workdayStart = new Date(now);
+      const workdayStart = getAppDayDate(now);
       workdayStart.setHours(9, 0, 0, 0); // 9 AM
-      const workdayEnd = new Date(now);
+      const workdayEnd = getAppDayDate(now);
       workdayEnd.setHours(16, 0, 0, 0); // 4 PM
 
       if (now < workdayStart) {
@@ -627,14 +627,15 @@ const FriendsProgressStats: React.FC = () => {
     const dayProgressPercent = Math.round((hoursOnDay / dailyTarget) * 100);
 
     // Weekly stats
-    const weekStart = new Date();
+    const weekStart = getAppDayDate();
     weekStart.setHours(0, 0, 0, 0);
     const currentDay = weekStart.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1; // Convert to Monday-based
     weekStart.setDate(weekStart.getDate() - daysFromMonday); // Go back to Monday
 
+    const weekStartKey = format(weekStart, "yyyy-MM-dd");
     const weekSessions = recentSessions.filter(
-      (session) => new Date(session.created_at) >= weekStart
+      (session) => getAppDayKey(new Date(session.created_at)) >= weekStartKey
     );
 
     const hoursThisWeek = weekSessions.reduce(
@@ -682,11 +683,12 @@ const FriendsProgressStats: React.FC = () => {
     const yearlyHours = yearHours;
 
     const yearlyTarget = getYearlyTarget();
+    const appDayDate = getAppDayDate();
     const dayOfYear = Math.floor(
-      (new Date().getTime() - yearStart.getTime()) / (24 * 60 * 60 * 1000)
+      (appDayDate.getTime() - yearStart.getTime()) / (24 * 60 * 60 * 1000)
     );
 
-    const daysInYear = 365 + (new Date().getFullYear() % 4 === 0 ? 1 : 0); // Account for leap years
+    const daysInYear = 365 + (appDayDate.getFullYear() % 4 === 0 ? 1 : 0); // Account for leap years
     const expectedYearlyDays = dayOfYear + expectedDailyProgress / 100;
     const expectedYearlyProgress =
       (expectedYearlyDays / daysInYear) * yearlyTarget;
@@ -839,7 +841,7 @@ const FriendsProgressStats: React.FC = () => {
   const renderSessionsHistory = () => {
     // Create an array of the past 7 days
     const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
+      const date = getAppDayDate();
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() - 6 + i);
       return date;
@@ -870,12 +872,11 @@ const FriendsProgressStats: React.FC = () => {
 
     // Calculate hours for each day
     const dayData = last7Days.map((date) => {
-      const dayStart = startOfDay(date);
-      const dayEnd = addDays(dayStart, 1);
+      const dateKey = format(date, "yyyy-MM-dd");
 
       const daySessions = recentSessions.filter((session) => {
         const sessionDate = new Date(session.created_at);
-        return sessionDate >= dayStart && sessionDate < dayEnd;
+        return getAppDayKey(sessionDate) === dateKey;
       });
 
       const hours = daySessions.reduce(
@@ -951,13 +952,13 @@ const FriendsProgressStats: React.FC = () => {
   const goToNextDay = () => {
     const nextDay = addDays(selectedDate, 1);
     // Don't allow navigating to future dates
-    if (nextDay <= startOfDay(new Date())) {
+    if (nextDay <= getAppDayDate()) {
       setSelectedDate(nextDay);
     }
   };
 
   const goToToday = () => {
-    setSelectedDate(startOfDay(new Date()));
+    setSelectedDate(getAppDayDate());
   };
 
   // Session edit handlers
@@ -984,7 +985,8 @@ const FriendsProgressStats: React.FC = () => {
     }
   };
 
-  const isViewingToday = isToday(selectedDate);
+  const isViewingToday =
+    format(selectedDate, "yyyy-MM-dd") === getAppDayKey();
   const canGoForward = !isViewingToday;
 
   return (

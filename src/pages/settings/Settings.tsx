@@ -28,6 +28,7 @@ import WorkingHoursSettings from "./components/WorkingHoursSettings";
 import SignalSettings from "./components/SignalSettings";
 import ReviewSettings from "./components/ReviewSettings";
 import ShortcutSettings from "./components/ShortcutSettings";
+import { getAppDayKey } from "../../utils/appDay";
 
 // List of common timezones
 const COMMON_TIMEZONES = [
@@ -307,7 +308,7 @@ const Settings = () => {
             prevActive.some((s: string) => !newActive.includes(s));
           if (changed) {
             const history = [...(user?.preferences?.signalActiveHistory || [])];
-            const today = new Date().toISOString().split("T")[0];
+            const today = getAppDayKey(new Date(), currentTimezone);
             // Don't duplicate if we already have an entry for today
             const lastEntry = history[history.length - 1];
             if (lastEntry?.date === today) {
