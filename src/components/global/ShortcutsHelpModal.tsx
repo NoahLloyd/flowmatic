@@ -6,6 +6,7 @@ interface ShortcutsHelpModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentPage: string;
+  isDayflowMode?: boolean;
 }
 
 interface ShortcutEntry {
@@ -22,6 +23,7 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
   isOpen,
   onClose,
   currentPage,
+  isDayflowMode = false,
 }) => {
   useEffect(() => {
     if (!isOpen) return;
@@ -55,7 +57,9 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
         { key: "A", label: "Quick add task" },
         { key: "O", label: "Quick add note" },
         { key: "W / ⌥W", label: "Set current task" },
-        { key: "⌥F", label: "Finish session (global)" },
+        ...(!isDayflowMode
+          ? [{ key: "⌥F", label: "Finish session (global)" }]
+          : []),
         { key: "?", label: "Show this help" },
       ],
     },
@@ -150,7 +154,9 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
       shortcuts: [
         { key: "Alt + T", label: "Quick add daily task" },
         { key: "Alt + N", label: "Quick add note" },
-        { key: "Hyper + Space", label: "Toggle timer" },
+        ...(!isDayflowMode
+          ? [{ key: "Hyper + Space", label: "Toggle timer" }]
+          : []),
       ],
     },
   ];
@@ -158,7 +164,11 @@ const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
   // Build the page-specific sections
   const pageSections: ShortcutSection[] = [];
   if (currentPage === "Compass") {
-    pageSections.push(...compassSection);
+    pageSections.push(
+      ...(isDayflowMode
+        ? compassSection.filter((section) => section.title !== "Timer")
+        : compassSection),
+    );
   } else if (currentPage === "Tasks") {
     pageSections.push(...tasksSection);
   } else if (currentPage === "Notes") {

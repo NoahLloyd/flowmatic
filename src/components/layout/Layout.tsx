@@ -15,6 +15,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
   const { isDarkMode } = useTheme();
   const { user } = useAuth();
   const { isFocusMode } = useFocusMode();
+  const isDayflowMode = user?.preferences?.compassVariant === "dayflow";
 
   // Theme-based default colors for dark/light mode
   const defaultLightFromColor = "#E8CBC0";
@@ -90,6 +91,7 @@ const Layout: React.FC<LayoutProps> = ({ children, selected, setSelected }) => {
   // - Show only if timer is actually running (not paused)
   // - And either 1) showInSidebar flag is true, or 2) not on Compass page with active timer
   const displaySidebarTimer =
+    !isDayflowMode &&
     (isRunning || (isBreakMode && breakIsRunning)) && // Only show when timer is actively running
     (showInSidebar ||
       (selected !== "Compass" &&
