@@ -8,7 +8,13 @@ let listenerId = 0;
 
 contextBridge.exposeInMainWorld("electron", {
   send: (channel: string, data?: any) => {
-    const validChannels = ["show-window", "update-tray", "update-signal-tray", "toggle-timer"];
+    const validChannels = [
+      "show-window",
+      "update-tray",
+      "update-signal-tray",
+      "toggle-timer",
+      "set-dayflow-mode",
+    ];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }

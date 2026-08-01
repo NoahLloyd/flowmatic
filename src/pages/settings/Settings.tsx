@@ -468,31 +468,35 @@ const Settings = () => {
                 onChange={(e) => setCompassVariant(e.target.value)}
                 className="w-full p-2.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 text-sm focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-500 focus:border-gray-400 dark:focus:border-gray-500"
               >
-                <option value="classic">
-                  Classic — timer, session details & blocked tasks
-                </option>
+                <option value="classic">Classic — original Compass layout</option>
                 <option value="dayflow">
                   Dayflow — focus hours pulled from Dayflow
                 </option>
               </select>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 The Dayflow version reads your focus hours straight from the
-                Dayflow app, hides the timer and blocked tasks, and shows just
-                the number with weekly &amp; yearly progress.
+                Dayflow app and shows the number with weekly &amp; yearly
+                progress.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Project & Timer Settings */}
+        {/* Classic session settings; Dayflow keeps only the shared signal goal. */}
         <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
           <div className="border-b border-gray-200 dark:border-gray-800 px-5 py-3 flex items-center">
-            <Clock className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+            {compassVariant === "dayflow" ? (
+              <BarChart className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <Clock className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400" />
+            )}
             <h2 className="text-sm font-medium text-gray-900 dark:text-white">
-              Projects & Timers
+              {compassVariant === "dayflow" ? "Signal Goal" : "Projects & Timers"}
             </h2>
           </div>
           <div className="p-5 space-y-4">
+            {compassVariant !== "dayflow" && (
+              <>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Default Project
@@ -612,6 +616,8 @@ const Settings = () => {
                 </p>
               </div>
             </div>
+              </>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Signal Percentage Goal
@@ -634,6 +640,7 @@ const Settings = () => {
                 Signal score threshold for goal completion
               </p>
             </div>
+            {compassVariant !== "dayflow" && (
             <div className="pt-2 border-t border-gray-200 dark:border-gray-800">
               <div className="flex items-center justify-between">
                 <div>
@@ -816,6 +823,7 @@ const Settings = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 

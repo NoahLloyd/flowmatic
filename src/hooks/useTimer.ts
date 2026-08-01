@@ -248,13 +248,17 @@ export const useTimer = (directNavigate?: (page: string) => void) => {
     window.electron.send("update-tray", "");
   };
 
-  // Remove a timer title that was already present as soon as Dayflow becomes
-  // active (including when preferences finish loading or are changed).
+  // Tell the main process which tray menu to expose once preferences are
+  // available. The shortcut remains registered in either mode.
   useEffect(() => {
-    if (isPrimary && !shouldShowTimerInMenuBar) {
+    if (!isPrimary || isAuthLoading) return;
+
+    const isDayflowMode = user?.preferences?.compassVariant === "dayflow";
+    window.electron.send("set-dayflow-mode", isDayflowMode);
+    if (isDayflowMode) {
       clearTray();
     }
-  }, [isPrimary, shouldShowTimerInMenuBar]);
+  }, [isPrimary, isAuthLoading, user?.preferences?.compassVariant]);
 
   // Helper: build tray text and only send if changed.
   // For multi-task: shows the primary task plus a "+N" badge for the rest,

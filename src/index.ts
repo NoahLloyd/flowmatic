@@ -28,6 +28,41 @@ let signalTray: Tray | null = null;
 let signalTrayIconOutline: Electron.NativeImage | null = null;
 let signalTrayIconFilled: Electron.NativeImage | null = null;
 let focusBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+let isDayflowMode: boolean | null = null;
+
+const updateTrayContextMenu = () => {
+  if (!tray) return;
+
+  const template: Electron.MenuItemConstructorOptions[] = [];
+  if (isDayflowMode === false) {
+    template.push({
+      label: "Restart timer",
+      click: () => {
+        if (mainWindow) {
+          mainWindow.webContents.send("toggle-timer");
+        }
+      },
+    });
+  }
+  template.push(
+    {
+      label: "Show App",
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+        }
+      },
+    },
+    {
+      label: "Quit",
+      click: () => {
+        app.quit();
+      },
+    },
+  );
+
+  tray.setContextMenu(Menu.buildFromTemplate(template));
+};
 
 // Renderer window blur alone is not enough to decide that the user left
 // Flowmatic: focusing the quick-add overlay also blurs the main window. Wait
@@ -272,33 +307,9 @@ const createWindow = (): void => {
 
     tray.setToolTip("Flow");
 
-    // Create context menu
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: "Restart timer",
-        click: () => {
-          if (mainWindow) {
-            mainWindow.webContents.send("toggle-timer");
-          }
-        },
-      },
-      {
-        label: "Show App",
-        click: () => {
-          if (mainWindow) {
-            mainWindow.show();
-          }
-        },
-      },
-      {
-        label: "Quit",
-        click: () => {
-          app.quit();
-        },
-      },
-    ]);
-
-    tray.setContextMenu(contextMenu);
+    // Wait until renderer preferences are loaded before exposing mode-specific
+    // actions, so Dayflow never flashes a timer item during startup.
+    updateTrayContextMenu();
 
     // Add click handler for the tray icon
     tray.on("click", () => {
@@ -369,6 +380,14 @@ ipcMain.on("update-tray", (_event, text: string) => {
   if (tray) {
     tray.setTitle(text);
   }
+});
+
+ipcMain.on("set-dayflow-mode", (_event, enabled: boolean) => {
+  isDayflowMode = Boolean(enabled);
+  if (isDayflowMode && tray) {
+    tray.setTitle("");
+  }
+  updateTrayContextMenu();
 });
 
 ipcMain.on("update-signal-tray", (_event, data: { text: string; goalMet: boolean }) => {

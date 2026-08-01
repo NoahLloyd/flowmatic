@@ -728,6 +728,7 @@ const PageContent = () => {
         isOpen={isShortcutsHelpOpen}
         onClose={() => setIsShortcutsHelpOpen(false)}
         currentPage={selected}
+        isDayflowMode={user?.preferences?.compassVariant === "dayflow"}
       />
     </Layout>
   );
