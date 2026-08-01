@@ -8,6 +8,7 @@ import { useSignals } from "../../../context/SignalsContext";
 
 import { useTimezone } from "../../../context/TimezoneContext";
 import { MorningEntry } from "../../../types/Morning";
+import { getAppDayKey } from "../../../utils/appDay";
 
 // Define units for different signals
 const SIGNAL_UNITS: Record<string, string> = {
@@ -79,23 +80,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   const getTodayInUserTimezone = () => {
-    try {
-      const date = new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).formatToParts(new Date());
-
-      const month = date.find((part) => part.type === "month")?.value || "01";
-      const day = date.find((part) => part.type === "day")?.value || "01";
-      const year = date.find((part) => part.type === "year")?.value || "2023";
-
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      console.error("Error formatting date with timezone:", error);
-      return new Date().toISOString().split("T")[0];
-    }
+    return getAppDayKey(new Date(), timezone);
   };
 
   // Get today's date in YYYY-MM-DD format
@@ -105,7 +90,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   useEffect(() => {
     loadSignalHistory();
     loadMorningEntries();
-  }, [user]);
+  }, [user, timezone]);
 
   // Refresh signal data when day changes (e.g. app left open overnight)
   useEffect(() => {

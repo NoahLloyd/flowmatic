@@ -20,6 +20,7 @@ import {
   subscribeToTaskAdded,
   subscribeToTaskUpdated,
 } from "../../utils/taskEvents";
+import { getAppDayKey, isCurrentAppDay } from "../../utils/appDay";
 
 const LIST_IDS: Record<BoardTaskType, string> = {
   day: "dayflow-day-tasks",
@@ -31,7 +32,7 @@ const LIST_IDS: Record<BoardTaskType, string> = {
 const SECONDARY_TASK_TYPES = ["week", "blocked", "future"] as const;
 const SECONDARY_VIEW_KEY = "compassSecondaryTaskView";
 
-const TODAY_KEY = () => new Date().toDateString();
+const TODAY_KEY = () => getAppDayKey();
 const ACTIVE_CACHE_KEY = "cachedDailyActive";
 const COMPLETED_CACHE_KEY = "cachedDailyCompleted";
 
@@ -48,14 +49,7 @@ const readSecondaryView = (): SecondaryTaskType => {
 
 const isToday = (dateInput: Date | string | null) => {
   if (!dateInput) return false;
-  const date = new Date(dateInput);
-  const today = new Date();
-  if (isNaN(date.getTime())) return false;
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
+  return isCurrentAppDay(dateInput);
 };
 
 const readCachedTasks = (key: string): Task[] | null => {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../utils/api";
+import { getAppDayDate, getAppDayKey } from "../../utils/appDay";
 
 // DayflowFocusStats renders three progress cards — daily, weekly, yearly — in
 // the Dayflow Compass variant. Each card shows progress toward the same goals
@@ -44,7 +45,7 @@ const fmtHours = (h: number) => h.toFixed(1).replace(/\.0$/, "");
 function getYearStart(prefs: any): Date {
   return prefs?.yearlyHoursGoal?.startDate
     ? new Date(prefs.yearlyHoursGoal.startDate)
-    : new Date(new Date().getFullYear(), 0, 1);
+    : new Date(getAppDayDate().getFullYear(), 0, 1);
 }
 
 const DayflowFocusStats: React.FC = () => {
@@ -116,11 +117,11 @@ const DayflowFocusStats: React.FC = () => {
       const byDay: FocusMap = {};
       for (const s of sessions) {
         if (!s.created_at) continue;
-        const k = dayKey(new Date(s.created_at));
+        const k = getAppDayKey(new Date(s.created_at));
         byDay[k] = (byDay[k] || 0) + (s.minutes || 0) / 60;
       }
       setTrackedByDay(byDay);
-      lastTrackedDayRef.current = dayKey(new Date());
+      lastTrackedDayRef.current = getAppDayKey();
     } catch (e) {
       console.error("[dayflow] tracked-session fetch failed", e);
     }
@@ -135,7 +136,7 @@ const DayflowFocusStats: React.FC = () => {
     // events or a day rollover, so we avoid re-querying the year on every focus.
     const onFocus = () => {
       syncDayflow();
-      if (lastTrackedDayRef.current !== dayKey(new Date())) fetchTracked();
+      if (lastTrackedDayRef.current !== getAppDayKey()) fetchTracked();
     };
     const onSession = () => fetchTracked();
 
@@ -172,15 +173,22 @@ const DayflowFocusStats: React.FC = () => {
       Math.max(dayflowMap[k] || 0, trackedByDay[k] || 0);
 
     const now = new Date();
-    const todayKey = dayKey(now);
-    const today = effective(todayKey);
+    const appDay = getAppDayDate(now);
+    const todayKey = getAppDayKey(now);
+    const calendarTodayKey = dayKey(now);
+    // Before 3 AM, Dayflow's midnight-based current bucket is still part of
+    // Flowmatic's previous app day. Session-based focus is already re-bucketed.
+    const dayflowToday = calendarTodayKey === todayKey
+      ? dayflowMap[todayKey] || 0
+      : (dayflowMap[todayKey] || 0) + (dayflowMap[calendarTodayKey] || 0);
+    const today = Math.max(dayflowToday, trackedByDay[todayKey] || 0);
 
     // Expected progress through today's goal, ramping 9am → 4pm (mirrors the
     // classic FriendsProgressStats pace model).
     let expectedDailyProgress = 100;
-    const start = new Date(now);
+    const start = new Date(appDay);
     start.setHours(9, 0, 0, 0);
-    const end = new Date(now);
+    const end = new Date(appDay);
     end.setHours(16, 0, 0, 0);
     if (now < start) {
       expectedDailyProgress = 0;
@@ -192,14 +200,14 @@ const DayflowFocusStats: React.FC = () => {
       );
     }
 
-    const todayTarget = dailyGoals[DAY_NAMES[now.getDay()]] ?? 4;
+    const todayTarget = dailyGoals[DAY_NAMES[appDay.getDay()]] ?? 4;
     const expectedDailyHours = (todayTarget * expectedDailyProgress) / 100;
     const todayOffset = today - expectedDailyHours;
     const todayProgress =
       todayTarget > 0 ? Math.round((today / todayTarget) * 100) : 0;
 
     // This week (Monday-based), summing the effective hours per day.
-    const weekStart = new Date();
+    const weekStart = new Date(appDay);
     weekStart.setHours(0, 0, 0, 0);
     const dow = weekStart.getDay();
     const daysFromMonday = dow === 0 ? 6 : dow - 1;
@@ -209,7 +217,8 @@ const DayflowFocusStats: React.FC = () => {
     for (let i = 0; i <= daysFromMonday; i++) {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
-      week += effective(dayKey(d));
+      const key = dayKey(d);
+      week += key === todayKey ? today : effective(key);
     }
 
     const passedNames = [
@@ -239,16 +248,19 @@ const DayflowFocusStats: React.FC = () => {
       ...Object.keys(dayflowMap),
       ...Object.keys(trackedByDay),
     ]);
+    allKeys.add(todayKey);
     let year = 0;
     for (const k of allKeys) {
-      if (k >= yearStartKey && k <= todayKey) year += effective(k);
+      if (k >= yearStartKey && k <= todayKey) {
+        year += k === todayKey ? today : effective(k);
+      }
     }
 
     const dayOfYear = Math.max(
       0,
-      Math.floor((now.getTime() - yearStart.getTime()) / 86400000),
+      Math.floor((appDay.getTime() - yearStart.getTime()) / 86400000),
     );
-    const daysInYear = 365 + (now.getFullYear() % 4 === 0 ? 1 : 0);
+    const daysInYear = 365 + (appDay.getFullYear() % 4 === 0 ? 1 : 0);
     const expectedYearlyProgress =
       ((dayOfYear + expectedDailyProgress / 100) / daysInYear) * yearlyTarget;
     const yearlyOffset = year - expectedYearlyProgress;

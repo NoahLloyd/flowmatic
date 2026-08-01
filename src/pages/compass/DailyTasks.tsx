@@ -15,12 +15,13 @@ import {
 } from "../../utils/taskEvents";
 import TaskContextMenu from "../../components/task/TaskContextMenu";
 import LinkifiedTaskText from "../../components/task/LinkifiedTaskText";
+import { getAppDayKey, isCurrentAppDay } from "../../utils/appDay";
 
 // Hydrate daily task lists from a localStorage snapshot of the previous
 // fetch. Eliminates the boot-time skeleton flash — if today's data is
 // already cached, we render it immediately and only re-render if the
 // background fetch returns something different.
-const TODAY_KEY = () => new Date().toDateString();
+const TODAY_KEY = () => getAppDayKey();
 const ACTIVE_CACHE_KEY = "cachedDailyActive";
 const COMPLETED_CACHE_KEY = "cachedDailyCompleted";
 
@@ -76,14 +77,7 @@ const DailyTasks: React.FC = () => {
 
   const isToday = (dateInput: Date | string | null) => {
     if (!dateInput) return false;
-    const date = new Date(dateInput);
-    const today = new Date();
-    if (isNaN(date.getTime())) return false;
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
+    return isCurrentAppDay(dateInput);
   };
 
   const getTaskOrderFromStorage = (type: TaskType): string[] | null => {
@@ -145,10 +139,10 @@ const DailyTasks: React.FC = () => {
 
   // Detect day change when app regains focus
   useEffect(() => {
-    let lastCheckedDay = new Date().toDateString();
+    let lastCheckedDay = TODAY_KEY();
 
     const checkDayChange = () => {
-      const today = new Date().toDateString();
+      const today = TODAY_KEY();
       if (today !== lastCheckedDay) {
         lastCheckedDay = today;
         fetchTasks();

@@ -163,18 +163,22 @@ function hasJournalingContent(activityContent: Record<string, unknown> | null): 
   return total >= JOURNALING_MIN_CHARS;
 }
 
-/** Get today's date in user's timezone as YYYY-MM-DD. */
-function getDateInTimezone(timezone: string, date: Date = new Date()): string {
+/** Get the 3:00 AM-based app date in the user's timezone as YYYY-MM-DD. */
+function getAppDateInTimezone(timezone: string, date: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(date);
   const month = parts.find((p) => p.type === "month")?.value || "01";
   const day = parts.find((p) => p.type === "day")?.value || "01";
   const year = parts.find((p) => p.type === "year")?.value || "2024";
-  return `${year}-${month}-${day}`;
+  const hour = Number(parts.find((p) => p.type === "hour")?.value || "0");
+  const calendarDate = `${year}-${month}-${day}`;
+  return hour < 3 ? daysBeforeDate(calendarDate, 1) : calendarDate;
 }
 
 // ── Main handler ───────────────────────────────────────────────
@@ -327,7 +331,7 @@ Deno.serve(async (req: Request) => {
     let hoursToday = 0;
     if (sessions) {
       for (const s of sessions) {
-        const sessionDate = getDateInTimezone(timezone, new Date(s.created_at));
+        const sessionDate = getAppDateInTimezone(timezone, new Date(s.created_at));
         if (sessionDate === date) {
           hoursToday += (s.minutes || 0) / 60;
         }
@@ -406,9 +410,9 @@ Deno.serve(async (req: Request) => {
     let needsSave = false;
     let maxStreakSeen = prefs.signalStreakLongest ?? 0;
 
-    // Get yesterday in user's timezone
-    const nowDate = new Date();
-    const yesterday = getDateInTimezone(timezone, new Date(nowDate.getTime() - 86400000));
+    // The request date is the current 3:00 AM-based app day, so its previous
+    // calendar date is always the last completed day for streak processing.
+    const yesterday = daysBeforeDate(date, 1);
 
     /** Process a single day for streak. */
     const processDay = (
