@@ -14,7 +14,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "lint": "eslint --ext .ts,.tsx .",
+    "test:journaling": "node -r ts-node/register tests/journalingProgress.test.ts"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.5.0",

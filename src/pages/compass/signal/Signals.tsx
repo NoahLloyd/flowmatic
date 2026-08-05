@@ -2,12 +2,11 @@ import React, { useEffect, useState } from "react";
 import SignalCard from "./SignalCard";
 import { api } from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
-import { AVAILABLE_SIGNALS, getAllSignals, SignalConfig } from "../../../pages/settings/components/SignalSettings";
-import { SignalHistory, AllSignalsHistory } from "../../../types/Signal";
+import { getAllSignals, SignalConfig } from "../../../pages/settings/components/SignalSettings";
+import { AllSignalsHistory } from "../../../types/Signal";
 import { useSignals } from "../../../context/SignalsContext";
 
 import { useTimezone } from "../../../context/TimezoneContext";
-import { MorningEntry } from "../../../types/Morning";
 import { getAppDayKey } from "../../../utils/appDay";
 
 // Define units for different signals
@@ -21,30 +20,6 @@ const SIGNAL_DISPLAY_LABELS: Record<string, string> = {
   minutesToOffice: "Minutes",
 };
 
-// Helper function to check if a morning entry has journaling content
-const hasJournalingContent = (entry: MorningEntry | undefined): boolean => {
-  if (!entry) return false;
-
-  // Check for new activityContent format
-  if (entry.activityContent) {
-    const { writing, gratitude, affirmations } = entry.activityContent;
-    if (
-      (writing && writing.trim().length > 0) ||
-      (gratitude && gratitude.trim().length > 0) ||
-      (affirmations && affirmations.trim().length > 0)
-    ) {
-      return true;
-    }
-  }
-
-  // Check for legacy content format
-  if (entry.content && entry.content.trim().length > 0) {
-    return true;
-  }
-
-  return false;
-};
-
 interface SignalsProps {
   isModalOpen?: boolean;
 }
@@ -53,43 +28,20 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
   const { user } = useAuth();
   const { timezone } = useTimezone();
   // Use the Signals context instead of local state
-  const { signals, updateSignal, refreshSignals, signalScore, signalStreak, signalStreakDanger, totalSignals } = useSignals();
+  const { signals, updateSignal, signalScore, signalStreak, signalStreakDanger, totalSignals } = useSignals();
 
   const [signalHistory, setSignalHistory] = useState<AllSignalsHistory>({});
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
-
-  // State for journaling signal (derived from morning entries)
-  // Initialize from localStorage to avoid loading flash
-  const [journalingValue, setJournalingValue] = useState<boolean>(() => {
-    const cached = localStorage.getItem("journalingValue");
-    return cached === "true";
-  });
-  const [journalingHistory, setJournalingHistory] = useState<SignalHistory[]>(
-    () => {
-      const cached = localStorage.getItem("journalingHistory");
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          return [];
-        }
-      }
-      return [];
-    }
-  );
 
   // Function to get today's date in YYYY-MM-DD format in user's timezone
   const getTodayInUserTimezone = () => {
     return getAppDayKey(new Date(), timezone);
   };
 
-  // Get today's date in YYYY-MM-DD format
-  const today = getTodayInUserTimezone();
-
-  // Initial load of signal history and morning entries
+  // Initial load of signal history. Journaling now comes from the persisted
+  // signal row, like the other computed signals, rather than text presence.
   useEffect(() => {
     loadSignalHistory();
-    loadMorningEntries();
   }, [user, timezone]);
 
   // Refresh signal data when day changes (e.g. app left open overnight)
@@ -101,7 +53,6 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
       if (currentDay !== lastCheckedDay) {
         lastCheckedDay = currentDay;
         loadSignalHistory();
-        loadMorningEntries();
       }
     };
 
@@ -117,54 +68,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [user]);
-
-  // Load morning entries for journaling signal
-  const loadMorningEntries = async () => {
-    if (!user) return;
-
-    try {
-      const data = await api.getAllEntries();
-
-      // Check today's journaling status
-      const todayEntry = data.entries?.find(
-        (entry: MorningEntry) => entry.date === today
-      );
-      const newJournalingValue = hasJournalingContent(todayEntry);
-
-      // Build journaling history for the past 7 days
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - 6 + i);
-        return date.toISOString().split("T")[0];
-      });
-
-      const journalingHistoryData: SignalHistory[] = last7Days.map((date) => {
-        const entry = data.entries?.find((e: MorningEntry) => e.date === date);
-        return {
-          date,
-          value: hasJournalingContent(entry),
-        };
-      });
-
-      // Update state and localStorage if data changed
-      const cachedValue = localStorage.getItem("journalingValue") === "true";
-      const cachedHistory = localStorage.getItem("journalingHistory");
-      const newHistoryJson = JSON.stringify(journalingHistoryData);
-
-      if (newJournalingValue !== cachedValue) {
-        setJournalingValue(newJournalingValue);
-        localStorage.setItem("journalingValue", String(newJournalingValue));
-      }
-
-      if (cachedHistory !== newHistoryJson) {
-        setJournalingHistory(journalingHistoryData);
-        localStorage.setItem("journalingHistory", newHistoryJson);
-      }
-    } catch (error) {
-      console.error("Failed to load morning entries for journaling:", error);
-    }
-  };
+  }, [user, timezone]);
 
   const loadSignalHistory = async () => {
     if (!user) return;
@@ -172,10 +76,11 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
     setIsHistoryLoading(true);
     try {
       // Get dates for the last week (7 days)
-      const dates = [];
+      const dates: string[] = [];
+      const appDay = new Date(`${getTodayInUserTimezone()}T12:00:00Z`);
       for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+        const d = new Date(appDay);
+        d.setUTCDate(d.getUTCDate() - i);
         dates.push(d.toISOString().split("T")[0]);
       }
 
@@ -305,32 +210,9 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
             .filter((key) => allSignals[key])
             .map((key) => {
               const config = allSignals[key];
-              // Special handling for journaling signal - use morning entries data
-              if (key === "journaling") {
-                return (
-                  <SignalCard
-                    key={key}
-                    metric={key}
-                    label={SIGNAL_DISPLAY_LABELS[key] || config.label}
-                    format=""
-                    value={journalingValue}
-                    unit=""
-                    type={config.type}
-                    status={"active"}
-                    timestamp={new Date()}
-                    onChange={() => {}} // Read-only - journaling is determined by Morning page
-                    goalValue={undefined}
-                    history={journalingHistory}
-                    isHistoryLoading={false} // Always false - we use localStorage cache to avoid loading flash
-                    isModalOpen={isModalOpen}
-                    isReadOnly={true}
-                    requirement={user?.preferences?.signalRequirements?.[key]}
-                  />
-                );
-              }
-
-              // Special handling for focusHours signal - read-only, computed from sessions
-              if (key === "focusHours") {
+              // Computed signals are persisted by their source workflows and
+              // remain read-only here.
+              if (key === "journaling" || key === "focusHours") {
                 return (
                   <SignalCard
                     key={key}
@@ -342,7 +224,7 @@ const Signals: React.FC<SignalsProps> = ({ isModalOpen = false }) => {
                     type={config.type}
                     status={"active"}
                     timestamp={new Date()}
-                    onChange={() => {}} // Read-only - focusHours is determined by sessions
+                    onChange={() => undefined}
                     goalValue={undefined}
                     history={signalHistory[key] || []}
                     isHistoryLoading={isHistoryLoading}

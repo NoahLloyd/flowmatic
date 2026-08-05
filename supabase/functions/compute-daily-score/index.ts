@@ -18,7 +18,7 @@ interface SignalConfig {
 
 const STREAK_ALGO_VERSION = 6;
 const STREAK_MILESTONES = [7, 14, 30, 60, 100, 200, 365];
-const JOURNALING_MIN_CHARS = 1000;
+const JOURNALING_TARGET_SECONDS = 15 * 60;
 
 // Number of recent days to protect during v5 migration backfill.
 // Scores below the goal threshold are clamped to the threshold
@@ -152,15 +152,15 @@ function daysBeforeDate(dateStr: string, n: number): string {
   return d.toISOString().split("T")[0];
 }
 
-/** Check if a writing entry has enough content for the journaling signal. */
-function hasJournalingContent(activityContent: Record<string, unknown> | null): boolean {
+/** Check whether the durable 15-minute writing target has been reached. */
+function hasCompletedJournaling(activityContent: Record<string, unknown> | null): boolean {
   if (!activityContent) return false;
-  let total = 0;
-  const { writing, gratitude, affirmations } = activityContent as Record<string, string>;
-  if (writing) total += writing.trim().length;
-  if (gratitude) total += gratitude.trim().length;
-  if (affirmations) total += affirmations.trim().length;
-  return total >= JOURNALING_MIN_CHARS;
+  const writingSeconds = Number(activityContent.writingSeconds || 0);
+  const completedAt = activityContent.journalingCompletedAt;
+  return (
+    (typeof completedAt === "string" && completedAt.length > 0) ||
+    (Number.isFinite(writingSeconds) && writingSeconds >= JOURNALING_TARGET_SECONDS)
+  );
 }
 
 /** Get the 3:00 AM-based app date in the user's timezone as YYYY-MM-DD. */
@@ -294,11 +294,16 @@ Deno.serve(async (req: Request) => {
       .eq("date", date)
       .maybeSingle();
 
-    const journalingValue = hasJournalingContent(writingEntry?.activity_content || null);
+    const storedJournaling = signalRows?.find((s) => s.metric === "journaling")?.value;
+    // Completion is monotonic for an app day. Once the 15-minute target has
+    // been persisted, an old client or a resettable countdown cannot turn it
+    // off again.
+    const journalingValue =
+      isTruthy(storedJournaling) ||
+      hasCompletedJournaling(writingEntry?.activity_content || null);
     todaySignals.journaling = journalingValue;
 
     // Persist if changed
-    const storedJournaling = signalRows?.find((s) => s.metric === "journaling")?.value;
     if (storedJournaling === undefined || storedJournaling !== (journalingValue ? 1 : 0)) {
       await supabaseAdmin.from("signals").upsert(
         { user_id: userId, date, metric: "journaling", value: journalingValue ? 1 : 0 },

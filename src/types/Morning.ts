@@ -9,6 +9,11 @@ export interface MorningActivityContent {
   writing?: string;
   gratitude?: string;
   affirmations?: string;
+  // Focused time spent in the writing activity. This only ever increases for
+  // a date and is capped at the 15-minute journaling target.
+  writingSeconds?: number;
+  // Once set, this marker is never cleared by resetting the visible timer.
+  journalingCompletedAt?: string;
   lastActivityIndex?: number;
   distractions?: MorningDistraction[];
 }
