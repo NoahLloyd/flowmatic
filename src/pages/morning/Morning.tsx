@@ -31,10 +31,18 @@ import { useTimezone } from "../../context/TimezoneContext";
 import MorningTasks from "./MorningTasks";
 import { pickNextPrompt, recordPromptShown } from "../../utils/promptPicker";
 import { getAppDayKey } from "../../utils/appDay";
+import {
+  advanceJournalingProgress,
+  getJournalingProgress,
+  JournalingProgress,
+  JOURNALING_TARGET_SECONDS,
+  mergeJournalingProgress,
+} from "../../utils/journalingProgress";
 
 const DISTRACTION_STORAGE_PREFIX = "morningDistractions:";
 const ACTIVE_DISTRACTION_KEY = "morningActiveDistraction";
 const TIMER_STORAGE_PREFIX = "morningTimer:";
+const JOURNALING_PROGRESS_STORAGE_PREFIX = "morningWritingProgress:";
 const MIN_DISTRACTION_MS = 1000;
 
 interface ActiveDistraction {
@@ -90,6 +98,29 @@ const storeTimerState = (
   localStorage.setItem(
     getTimerStorageKey(date, activityId),
     JSON.stringify(state)
+  );
+};
+
+const readJournalingProgress = (date: string): JournalingProgress => {
+  try {
+    const stored = localStorage.getItem(
+      JOURNALING_PROGRESS_STORAGE_PREFIX + date
+    );
+    return stored
+      ? mergeJournalingProgress(JSON.parse(stored))
+      : { seconds: 0 };
+  } catch {
+    return { seconds: 0 };
+  }
+};
+
+const storeJournalingProgress = (
+  date: string,
+  progress: JournalingProgress
+) => {
+  localStorage.setItem(
+    JOURNALING_PROGRESS_STORAGE_PREFIX + date,
+    JSON.stringify(progress)
   );
 };
 
@@ -175,6 +206,16 @@ const Morning = () => {
   const [affirmationsEntry, setAffirmationsEntry] = useState("");
 
   const [selectedDate, setSelectedDate] = useState(getTodayInUserTimezone());
+  const [journalingProgress, setJournalingProgress] =
+    useState<JournalingProgress>(() =>
+      readJournalingProgress(getTodayInUserTimezone())
+    );
+  const [journalingProgressDate, setJournalingProgressDate] =
+    useState(selectedDate);
+  const [loadedEntryDate, setLoadedEntryDate] = useState<string | null>(null);
+  const [journalSignalSyncedDate, setJournalSignalSyncedDate] = useState<
+    string | null
+  >(null);
 
   // Keep track of today's day of week
   const [currentDayOfWeek, setCurrentDayOfWeek] = useState<string>("");
@@ -194,6 +235,8 @@ const Morning = () => {
   const remainingTimerSecondsRef = useRef(timeRemaining);
   const timerActiveRef = useRef(timerActive);
   const timerCompleteRef = useRef(timerComplete);
+  const lastTimerTickAtRef = useRef<number | null>(null);
+  const journalingProgressRef = useRef(journalingProgress);
 
   useEffect(() => {
     selectedDateRef.current = selectedDate;
@@ -212,6 +255,85 @@ const Morning = () => {
     timezone,
   ]);
 
+  useEffect(() => {
+    const stored = readJournalingProgress(selectedDate);
+    journalingProgressRef.current = stored;
+    setJournalingProgress(stored);
+    setJournalingProgressDate(selectedDate);
+    setJournalSignalSyncedDate(null);
+  }, [selectedDate]);
+
+  const advanceWritingProgress = useCallback(
+    (elapsedSeconds: number) => {
+      if (timerActivity?.type !== "writing" || elapsedSeconds <= 0) return;
+
+      const previous = journalingProgressRef.current;
+      const next = advanceJournalingProgress(
+        previous,
+        elapsedSeconds,
+        new Date().toISOString()
+      );
+      if (
+        next.seconds === previous.seconds &&
+        next.completedAt === previous.completedAt
+      ) {
+        return;
+      }
+
+      journalingProgressRef.current = next;
+      storeJournalingProgress(selectedDate, next);
+      setJournalingProgress(next);
+    },
+    [selectedDate, timerActivity?.type]
+  );
+
+  const advanceActiveTimer = useCallback(
+    (now: number) => {
+      if (!timerActiveRef.current) return;
+
+      const lastTickAt = lastTimerTickAtRef.current;
+      if (lastTickAt === null) {
+        lastTimerTickAtRef.current = now;
+        return;
+      }
+
+      const elapsedSeconds = Math.floor((now - lastTickAt) / 1000);
+      if (elapsedSeconds <= 0) return;
+
+      lastTimerTickAtRef.current = lastTickAt + elapsedSeconds * 1000;
+      const consumedSeconds = Math.min(
+        remainingTimerSecondsRef.current,
+        elapsedSeconds
+      );
+      const remainingSeconds = Math.max(
+        0,
+        remainingTimerSecondsRef.current - consumedSeconds
+      );
+      const isComplete = remainingSeconds === 0;
+
+      advanceWritingProgress(consumedSeconds);
+      remainingTimerSecondsRef.current = remainingSeconds;
+      timerCompleteRef.current = isComplete;
+      setTimeRemaining(remainingSeconds);
+      storeTimerState(selectedDate, timerActivityId, {
+        remainingSeconds,
+        isComplete,
+      });
+
+      if (isComplete) {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+        lastTimerTickAtRef.current = null;
+        timerActiveRef.current = false;
+        setTimerActive(false);
+        setTimerComplete(true);
+      }
+    },
+    [advanceWritingProgress, selectedDate, timerActivityId]
+  );
+
   const startTimer = useCallback(() => {
     if (
       timerCompleteRef.current ||
@@ -225,49 +347,30 @@ const Morning = () => {
     }
 
     timerActiveRef.current = true;
+    lastTimerTickAtRef.current = Date.now();
     setTimerActive(true);
     setTimerComplete(false);
 
     timerIntervalRef.current = setInterval(() => {
-      setTimeRemaining((previous) => {
-        const remainingSeconds = Math.max(0, previous - 1);
-        const isComplete = remainingSeconds === 0;
-
-        remainingTimerSecondsRef.current = remainingSeconds;
-        timerCompleteRef.current = isComplete;
-        storeTimerState(selectedDate, timerActivityId, {
-          remainingSeconds,
-          isComplete,
-        });
-
-        if (isComplete) {
-          if (timerIntervalRef.current) {
-            clearInterval(timerIntervalRef.current);
-            timerIntervalRef.current = null;
-          }
-          timerActiveRef.current = false;
-          setTimerActive(false);
-          setTimerComplete(true);
-        }
-
-        return remainingSeconds;
-      });
-    }, 1000);
-  }, [selectedDate, timerActivityId]);
+      advanceActiveTimer(Date.now());
+    }, 250);
+  }, [advanceActiveTimer]);
 
   const pauseTimer = useCallback(() => {
+    advanceActiveTimer(Date.now());
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
 
+    lastTimerTickAtRef.current = null;
     timerActiveRef.current = false;
     setTimerActive(false);
     storeTimerState(selectedDate, timerActivityId, {
       remainingSeconds: remainingTimerSecondsRef.current,
       isComplete: timerCompleteRef.current,
     });
-  }, [selectedDate, timerActivityId]);
+  }, [advanceActiveTimer, selectedDate, timerActivityId]);
 
   const resetTimer = useCallback(() => {
     if (timerIntervalRef.current) {
@@ -275,6 +378,7 @@ const Morning = () => {
       timerIntervalRef.current = null;
     }
 
+    lastTimerTickAtRef.current = null;
     remainingTimerSecondsRef.current = timerDurationSeconds;
     timerActiveRef.current = false;
     timerCompleteRef.current = false;
@@ -301,13 +405,43 @@ const Morning = () => {
       timerActivityId,
       timerDurationSeconds
     );
+    lastTimerTickAtRef.current = null;
     remainingTimerSecondsRef.current = stored.remainingSeconds;
     timerActiveRef.current = false;
     timerCompleteRef.current = stored.isComplete;
     setTimeRemaining(stored.remainingSeconds);
     setTimerActive(false);
     setTimerComplete(stored.isComplete);
-  }, [selectedDate, timerActivityId, timerDurationSeconds]);
+
+    // Migrate progress from the pre-signal timer storage. This ensures a
+    // writing timer that had already reached 15 minutes is recognized after
+    // upgrading, without letting a later reset reduce earned progress.
+    if (timerActivity?.type === "writing") {
+      const elapsedSeconds = Math.max(
+        0,
+        timerDurationSeconds - stored.remainingSeconds
+      );
+      const migrated = mergeJournalingProgress(
+        journalingProgressRef.current,
+        {
+          seconds: elapsedSeconds,
+          completedAt:
+            stored.isComplete &&
+            elapsedSeconds >= JOURNALING_TARGET_SECONDS
+              ? new Date().toISOString()
+              : undefined,
+        }
+      );
+      journalingProgressRef.current = migrated;
+      storeJournalingProgress(selectedDate, migrated);
+      setJournalingProgress(migrated);
+    }
+  }, [
+    selectedDate,
+    timerActivity?.type,
+    timerActivityId,
+    timerDurationSeconds,
+  ]);
 
   const beginDistraction = useCallback(() => {
     if (!timerActiveRef.current) return;
@@ -559,16 +693,32 @@ const Morning = () => {
 
   // Load current date's entry
   useEffect(() => {
+    let cancelled = false;
+    const entryDate = selectedDate;
+
     const loadCurrentEntry = async () => {
-      const locallyStoredDistractions = getStoredDistractions(selectedDate);
+      setLoadedEntryDate(null);
+      setCurrentEntry("");
+      setGratitudeEntry("");
+      setAffirmationsEntry("");
+      const locallyStoredDistractions = getStoredDistractions(entryDate);
       setDistractions(locallyStoredDistractions);
 
       try {
-        const response = await api.getEntry(selectedDate);
+        const response = await api.getEntry(entryDate);
+        if (cancelled) return;
         const { content, activityContent } = response;
 
-        // Only reset content if we have actual data to set
-        // This prevents wiping out the UI when empty data is returned
+        const mergedProgress = mergeJournalingProgress(
+          journalingProgressRef.current,
+          getJournalingProgress(activityContent)
+        );
+        journalingProgressRef.current = mergedProgress;
+        storeJournalingProgress(entryDate, mergedProgress);
+        setJournalingProgress(mergedProgress);
+        setJournalingProgressDate(entryDate);
+
+        // Determine whether the selected date has saved activity content.
         const hasActivityContent =
           activityContent &&
           Object.keys(activityContent).length > 0;
@@ -576,13 +726,9 @@ const Morning = () => {
         const hasContent = content && content.trim().length > 0;
 
         if (!hasActivityContent && !hasContent) {
-          return; // Don't reset if no content found
+          setLoadedEntryDate(entryDate);
+          return;
         }
-
-        // Reset entry values
-        setCurrentEntry("");
-        setGratitudeEntry("");
-        setAffirmationsEntry("");
 
         // Load saved activity data if available
         if (activityContent && Object.keys(activityContent).length > 0) {
@@ -608,7 +754,7 @@ const Morning = () => {
           );
           setDistractions((current) => {
             const next = mergeDistractions(current, mergedDistractions);
-            storeDistractions(selectedDate, next);
+            storeDistractions(entryDate, next);
             return next;
           });
 
@@ -625,13 +771,22 @@ const Morning = () => {
           setCurrentEntry(content);
         }
 
+        setLoadedEntryDate(entryDate);
       } catch (error) {
         console.error("Failed to load entry:", error);
+        if (!cancelled) setLoadedEntryDate(entryDate);
       }
     };
 
     loadCurrentEntry();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedDate, activities.length]);
+
+  // Serialize writes so a slower, older autosave can never land after a newer
+  // journaling-completion save and remove its monotonic progress fields.
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Debounced save function for all activity content
   const debouncedSave = useCallback(
@@ -642,74 +797,83 @@ const Morning = () => {
         gratitudeText: string,
         affirmationsText: string,
         activityIndex: number,
-        distractionEvents: MorningDistraction[]
+        distractionEvents: MorningDistraction[],
+        writingSeconds: number,
+        journalingCompletedAt?: string
       ) => {
-        try {
-          setIsSaving(true);
+        const activityContent: MorningActivityContent = {
+          writing: content,
+          gratitude: gratitudeText,
+          affirmations: affirmationsText,
+          writingSeconds,
+          journalingCompletedAt,
+          lastActivityIndex: activityIndex,
+          distractions: distractionEvents,
+        };
 
-          // Create activity content object to save all activities
-          const activityContent: MorningActivityContent = {
-            writing: content,
-            gratitude: gratitudeText,
-            affirmations: affirmationsText,
-            lastActivityIndex: activityIndex,
-            distractions: distractionEvents,
-          };
+        saveQueueRef.current = saveQueueRef.current
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              setIsSaving(true);
+              await api.updateEntry(date, "", activityContent);
 
-          // Pass empty string for content (we'll use writing from activityContent)
-          const saveResponse = await api.updateEntry(date, "", activityContent);
-
-          setLastSaved(new Date());
-          setHasPendingChanges(false);
-          setEntries((prevEntries) => {
-            const userId = localStorage.getItem("name");
-            const entryIndex = prevEntries.findIndex(
-              (entry) => entry.date === date && entry.user_id === userId
-            );
-            if (entryIndex >= 0) {
-              const newEntries = [...prevEntries];
-              newEntries[entryIndex] = {
-                date,
-                content: "", // Don't store in content anymore
-                user_id: userId,
-                activityContent,
-              };
-              return newEntries;
-            } else {
-              return [
-                ...prevEntries,
-                {
+              setLastSaved(new Date());
+              setHasPendingChanges(false);
+              setEntries((prevEntries) => {
+                const userId = localStorage.getItem("name");
+                const entryIndex = prevEntries.findIndex(
+                  (entry) => entry.date === date && entry.user_id === userId
+                );
+                const savedEntry = {
                   date,
-                  content: "", // Don't store in content anymore
-                  user_id: userId,
+                  content: "",
+                  user_id: userId || "",
                   activityContent,
-                },
-              ];
+                };
+                if (entryIndex >= 0) {
+                  const newEntries = [...prevEntries];
+                  newEntries[entryIndex] = savedEntry;
+                  return newEntries;
+                }
+                return [...prevEntries, savedEntry];
+              });
+
+              window.dispatchEvent(new CustomEvent("morningEntryUpdated"));
+            } catch (error) {
+              console.error("Failed to save entry:", error);
+            } finally {
+              setIsSaving(false);
             }
           });
 
-          // Dispatch event to notify other components (like SignalsContext) that morning entry has been updated
-          // This will update the journaling signal in real-time
-          window.dispatchEvent(new CustomEvent("morningEntryUpdated"));
-        } catch (error) {
-          console.error("Failed to save entry:", error);
-        } finally {
-          setIsSaving(false);
-        }
+        await saveQueueRef.current;
       },
       500
     ),
     []
   );
 
-  // Auto-save when any content changes
+  const activeJournalingProgress: JournalingProgress =
+    journalingProgressDate === selectedDate
+      ? journalingProgress
+      : { seconds: 0 };
+  const journalingSaveCheckpoint = activeJournalingProgress.completedAt
+    ? JOURNALING_TARGET_SECONDS
+    : Math.floor(activeJournalingProgress.seconds / 60) * 60;
+
+  // Autosave text changes and checkpoint writing time once per minute. Exact
+  // progress is also stored locally on every tick, while completion is saved
+  // immediately through the final 15-minute checkpoint below.
   useEffect(() => {
-    // Only save if there's actual content to save
+    if (loadedEntryDate !== selectedDate) return;
+
     if (
       currentEntry ||
       gratitudeEntry ||
       affirmationsEntry ||
-      distractions.length > 0
+      distractions.length > 0 ||
+      journalingSaveCheckpoint > 0
     ) {
       debouncedSave(
         selectedDate,
@@ -717,7 +881,9 @@ const Morning = () => {
         gratitudeEntry,
         affirmationsEntry,
         currentActivityIndex,
-        distractions
+        distractions,
+        activeJournalingProgress.seconds,
+        activeJournalingProgress.completedAt
       );
     }
   }, [
@@ -725,9 +891,73 @@ const Morning = () => {
     gratitudeEntry,
     affirmationsEntry,
     selectedDate,
+    loadedEntryDate,
     currentActivityIndex,
     distractions,
+    journalingSaveCheckpoint,
+    activeJournalingProgress.completedAt,
     debouncedSave,
+  ]);
+
+  useEffect(
+    () => () => {
+      debouncedSave.flush();
+    },
+    [debouncedSave]
+  );
+
+  const journalingComplete =
+    Boolean(activeJournalingProgress.completedAt) ||
+    activeJournalingProgress.seconds >= JOURNALING_TARGET_SECONDS;
+
+  // Persist the earned signal independently of the resettable timer. The
+  // upsert is idempotent and retried while this page is open, so a temporary
+  // network failure cannot silently lose a completed 15-minute session.
+  useEffect(() => {
+    if (
+      !user ||
+      !journalingComplete ||
+      journalingProgressDate !== selectedDate ||
+      journalSignalSyncedDate === selectedDate
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const syncSignal = async () => {
+      try {
+        await api.recordSignal(selectedDate, "journaling", true);
+        if (cancelled) return;
+        setJournalSignalSyncedDate(selectedDate);
+        window.dispatchEvent(
+          new CustomEvent("signalUpdated", {
+            detail: {
+              date: selectedDate,
+              metric: "journaling",
+              value: true,
+            },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to sync journaling completion:", error);
+      }
+    };
+
+    void syncSignal();
+    const retryInterval = window.setInterval(syncSignal, 30_000);
+    window.addEventListener("online", syncSignal);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(retryInterval);
+      window.removeEventListener("online", syncSignal);
+    };
+  }, [
+    journalSignalSyncedDate,
+    journalingComplete,
+    journalingProgressDate,
+    selectedDate,
+    user,
   ]);
 
   // Refs for textarea/input elements

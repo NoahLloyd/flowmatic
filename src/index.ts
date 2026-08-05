@@ -6,6 +6,7 @@ import {
   nativeImage,
   Menu,
   globalShortcut,
+  powerMonitor,
   screen,
   shell,
 } from "electron";
@@ -29,6 +30,11 @@ let signalTrayIconOutline: Electron.NativeImage | null = null;
 let signalTrayIconFilled: Electron.NativeImage | null = null;
 let focusBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 let isDayflowMode: boolean | null = null;
+
+const sendFlowmaticFocus = (isFocused: boolean) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("flowmatic-focus-changed", isFocused);
+};
 
 const updateTrayContextMenu = () => {
   if (!tray) return;
@@ -73,7 +79,7 @@ const broadcastFlowmaticFocus = () => {
   focusBroadcastTimer = setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const isFocused = BrowserWindow.getFocusedWindow() !== null;
-    mainWindow.webContents.send("flowmatic-focus-changed", isFocused);
+    sendFlowmaticFocus(isFocused);
   }, 75);
 };
 
@@ -618,6 +624,14 @@ app.whenReady().then(() => {
   createWindow();
   registerInsightsIPC(() => mainWindow);
   registerDayflowIPC();
+
+  // Sleep and screen-lock can leave Electron's window technically focused.
+  // Pause focused-writing time explicitly so those periods are never counted
+  // toward the 15-minute journaling target.
+  powerMonitor.on("suspend", () => sendFlowmaticFocus(false));
+  powerMonitor.on("lock-screen", () => sendFlowmaticFocus(false));
+  powerMonitor.on("resume", broadcastFlowmaticFocus);
+  powerMonitor.on("unlock-screen", broadcastFlowmaticFocus);
 });
 
 app.on("before-quit", () => {

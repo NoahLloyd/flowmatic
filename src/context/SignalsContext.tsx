@@ -877,7 +877,27 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
     // Refresh every 5 minutes
     const interval = setInterval(refreshSignals, 5 * 60 * 1000);
 
-    const handleSignalUpdate = () => refreshSignals();
+    const handleSignalUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        date?: string;
+        metric?: string;
+        value?: number | boolean;
+      }>).detail;
+
+      if (
+        detail?.date === getTodayInUserTimezone() &&
+        detail.metric &&
+        detail.value !== undefined
+      ) {
+        setSignals((previous) => {
+          const next = { ...previous, [detail.metric!]: detail.value! };
+          recomputeTodayScore(next);
+          return next;
+        });
+      }
+
+      refreshSignals();
+    };
     const handleSessionUpdate = () => refreshSignals();
     const handleMorningUpdate = () => refreshSignals();
 
@@ -895,7 +915,7 @@ export const SignalsProvider: React.FC<{ children: ReactNode }> = ({
       window.removeEventListener("sessionUpdated", handleSessionUpdate);
       window.removeEventListener("morningEntryUpdated", handleMorningUpdate);
     };
-  }, [user]);
+  }, [user, timezone]);
 
   // Re-fetch signals when timezone changes
   useEffect(() => {
